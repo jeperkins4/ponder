@@ -720,7 +720,7 @@ describe('getAssignedStories', () => {
     expect(issues).toHaveLength(1)
     expect(issues[0].key).toBe('TEAM-1')
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://example.atlassian.net/rest/api/3/search',
+      'https://example.atlassian.net/rest/api/3/search/jql',
       expect.objectContaining({ method: 'POST' })
     )
   })
@@ -826,7 +826,9 @@ export type JiraIssue = {
 }
 
 export async function getAssignedStories(jql: string): Promise<JiraIssue[]> {
-  const res = await jiraFetch('/rest/api/3/search', {
+  // POST /rest/api/3/search was removed by Atlassian in October 2025;
+  // /rest/api/3/search/jql is the live replacement with the same `issues` response shape.
+  const res = await jiraFetch('/rest/api/3/search/jql', {
     method: 'POST',
     body: JSON.stringify({
       jql,
