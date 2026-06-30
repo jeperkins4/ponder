@@ -11,6 +11,8 @@ A personal, local kanban board that pulls JIRA stories assigned to the user and 
 
 Single user, local-only deployment (`npm run dev` on localhost). Not a team tool, not deployed anywhere shared. One JIRA account, one Claude API key, both supplied via local `.env`.
 
+Scoped to the **TEAM** JIRA project only in v1. The project filter is configured as a list (see `JIRA_PROJECT_KEYS` below) so adding more projects later is a config change, not a code change — all configured projects' stories flow into the same combined swimlane board (no per-project board separation planned).
+
 ## Architecture
 
 A single Next.js (App Router, TypeScript) application containing both the UI and the backend (API routes). Persistence is a local SQLite file accessed via Prisma. No external services beyond the two integrations below; no auth system beyond the JIRA/Claude API credentials.
@@ -24,6 +26,7 @@ Credentials required in `.env` (documented via `.env.example`, gitignored):
 - `JIRA_SITE_URL`
 - `JIRA_EMAIL`
 - `JIRA_API_TOKEN`
+- `JIRA_PROJECT_KEYS` — comma-separated JIRA project keys to pull from; v1 is set to `TEAM` only, but the sync logic already loops over the full list so adding a second project later is just editing this value
 - `ANTHROPIC_API_KEY`
 
 ## Data Model
@@ -32,8 +35,9 @@ Credentials required in `.env` (documented via `.env.example`, gitignored):
 | field | notes |
 |---|---|
 | id | local primary key |
-| jiraKey | e.g. `PROJ-123` |
+| jiraKey | e.g. `TEAM-123` |
 | jiraId | JIRA's internal issue id, used for API calls |
+| projectKey | JIRA project key the story belongs to (e.g. `TEAM`), parsed from jiraKey; lets the board filter/tag by project once multiple are configured |
 | summary | story title |
 | description | story description, used as AI breakdown input |
 | jiraStatus | last-known JIRA status name, refreshed on sync |
@@ -59,11 +63,13 @@ Work units are **local-only**: they are never created, updated, or synced as JIR
 
 Sync is manual, triggered by a "Sync" button in the UI — no background polling or cron in v1.
 
-On sync, the app queries JIRA with:
+On sync, the app builds a JQL query from the configured `JIRA_PROJECT_KEYS` list:
 
 ```
-assignee = currentUser() AND statusCategory != Done
+project IN (TEAM) AND assignee = currentUser() AND statusCategory != Done
 ```
+
+(the `project IN (...)` clause expands to every configured key, so v1 with one key behaves identically to adding more later).
 
 For each returned issue, it upserts the corresponding `Story` row (summary, description, jiraStatus, url, lastSyncedAt). Existing `WorkUnit` rows for that story are never touched by a sync — local breakdown work is never clobbered by a JIRA-side edit. Stories no longer returned by the query (e.g. completed or reassigned) are left in the local DB as-is; they simply stop being refreshed. The user can ignore or manually archive them.
 
@@ -98,7 +104,7 @@ If a work unit is later dragged back out of `done` after a completion comment wa
 
 ## Testing
 
-- Vitest unit tests for: JQL query construction, the transition-matching logic (picking the right transition from a list given a target status category), the all-units-done/first-unit-started trigger logic (including the `completionCommentPostedAt` reset when a unit leaves `done`), and WorkUnit CRUD operations.
+- Vitest unit tests for: JQL query construction (including multi-key `project IN (...)` expansion), the transition-matching logic (picking the right transition from a list given a target status category), the all-units-done/first-unit-started trigger logic (including the `completionCommentPostedAt` reset when a unit leaves `done`), and WorkUnit CRUD operations.
 - Manual click-through testing for drag-and-drop board interactions and the breakdown review UI — not automated in v1, low value relative to cost for a single-user tool.
 
 ## Out of Scope (v1)
@@ -109,3 +115,5 @@ If a work unit is later dragged back out of `done` after a completion comment wa
 - Configurable status-category-to-transition mapping UI (the "In Progress"/"Done" category matching described above is fixed logic, not user-configurable, in v1).
 - Auto-posting the completion summary without review (always requires explicit confirmation in v1).
 - Swimlanes grouped by anything other than story (e.g. priority, issue type).
+- Per-project board separation or filtering UI (v1 is a single combined board; project scoping is config-only via `JIRA_PROJECT_KEYS`).
+- Code repository integration of any kind (no GitHub/git linkage in the data model).
