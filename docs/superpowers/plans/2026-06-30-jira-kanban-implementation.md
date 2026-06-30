@@ -22,6 +22,7 @@
 - The database is Postgres (via Prisma), run locally through Docker Compose — not a SQLite file — so the only change needed for a future Heroku/Vercel deploy is `DATABASE_URL`.
 - The installed Next.js version types dynamic route `params` as `Promise<{ id: string }>`, not a plain object. Every dynamic route handler in this plan (`[id]/route.ts` files) types its second argument as `{ params: Promise<{ id: string }> | { id: string } }` and does `const { id } = await params` as its first line — the union keeps it compatible with both Next's generated route type and the plain objects this plan's unit tests pass directly.
 - The installed `@anthropic-ai/sdk` version's `messages.create` is overloaded (streaming vs. non-streaming), so `Awaited<ReturnType<typeof anthropic.messages.create>>` does not resolve to a type with `.content`. Any helper that reads `message.content` from a Claude response types its parameter as `Anthropic.Message` (`import type Anthropic from '@anthropic-ai/sdk'`) instead.
+- Any JIRA API call made as a side effect of an already-locally-committed action (e.g. applying a status transition after a work-unit move has already saved) must be wrapped in its own try/catch that converts a thrown error into a pushed warning string, never letting it propagate up and cause the route to report the whole request as failed. This is distinct from a route whose primary purpose IS the JIRA call (e.g. posting a completion comment) — those legitimately return an error status on failure, since nothing local was already committed that needs protecting.
 - Integration failures (JIRA or Claude API errors) must never block or revert a local board action — they're caught, logged, and surfaced as a non-blocking toast.
 
 ---
@@ -2118,6 +2119,24 @@ describe('applyStatusSync', () => {
     const updated = await prisma.story.findUnique({ where: { id: story.id } })
     expect(updated?.completionCommentPostedAt).toBeNull()
   })
+
+  it('converts a thrown JIRA error into a warning instead of letting it propagate', async () => {
+    const story = await createStory()
+    vi.mocked(getIssueTransitions).mockRejectedValue(new Error('JIRA API error 503: Service Unavailable'))
+
+    const result = await applyStatusSync(
+      story.id,
+      [
+        { id: 'a', column: 'in_progress' },
+        { id: 'b', column: 'todo' },
+      ],
+      'a',
+      'todo'
+    )
+
+    expect(applyTransition).not.toHaveBeenCalled()
+    expect(result.warnings[0]).toContain('Could not update JIRA status')
+  })
 })
 ```
 
@@ -2149,25 +2168,36 @@ export async function applyStatusSync(
   }
 
   if (triggers.firstUnitStarted || triggers.allUnitsDone) {
-    const story = await prisma.story.findUniqueOrThrow({ where: { id: storyId } })
-    const transitions = await getIssueTransitions(story.jiraId)
+    // The local move (moveWorkUnit) has already committed by the time this runs.
+    // A thrown error anywhere in this block (network failure, non-2xx from JIRA)
+    // must never propagate out of applyStatusSync — it would otherwise cause the
+    // route to report the whole request as failed even though the board already
+    // updated locally, violating "integration failures must never block a local
+    // board action." Convert any such failure into a warning instead.
+    try {
+      const story = await prisma.story.findUniqueOrThrow({ where: { id: storyId } })
+      const transitions = await getIssueTransitions(story.jiraId)
 
-    if (triggers.firstUnitStarted) {
-      const transition = pickTransition(transitions, 'indeterminate')
-      if (transition) {
-        await applyTransition(story.jiraId, transition.id)
-      } else {
-        warnings.push(`No "In Progress" transition found for ${story.jiraKey}; status not updated.`)
+      if (triggers.firstUnitStarted) {
+        const transition = pickTransition(transitions, 'indeterminate')
+        if (transition) {
+          await applyTransition(story.jiraId, transition.id)
+        } else {
+          warnings.push(`No "In Progress" transition found for ${story.jiraKey}; status not updated.`)
+        }
       }
-    }
 
-    if (triggers.allUnitsDone) {
-      const transition = pickTransition(transitions, 'done')
-      if (transition) {
-        await applyTransition(story.jiraId, transition.id)
-      } else {
-        warnings.push(`No "Done" transition found for ${story.jiraKey}; status not updated.`)
+      if (triggers.allUnitsDone) {
+        const transition = pickTransition(transitions, 'done')
+        if (transition) {
+          await applyTransition(story.jiraId, transition.id)
+        } else {
+          warnings.push(`No "Done" transition found for ${story.jiraKey}; status not updated.`)
+        }
       }
+    } catch (err) {
+      console.error('JIRA status transition failed', err)
+      warnings.push('Could not update JIRA status. The board still reflects your change.')
     }
   }
 
