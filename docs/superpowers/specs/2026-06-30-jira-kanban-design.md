@@ -15,7 +15,7 @@ Scoped to the **TEAM** JIRA project only in v1. The project filter is configured
 
 ## Architecture
 
-A single Next.js (App Router, TypeScript) application containing both the UI and the backend (API routes). Persistence is a local SQLite file accessed via Prisma. No external services beyond the two integrations below; no auth system beyond the JIRA/Claude API credentials.
+A single Next.js (App Router, TypeScript) application containing both the UI and the backend (API routes). Persistence is Postgres accessed via Prisma — run locally via Docker in v1, so that a future deploy to Heroku or Vercel (both of which expect Postgres, not a SQLite file on an ephemeral filesystem) is just a `DATABASE_URL` change rather than a data-layer migration. No external services beyond the two integrations below and the local Postgres container; no auth system beyond the JIRA/Claude API credentials.
 
 Two external integrations, both called server-side only — API keys are never exposed to the browser:
 
@@ -57,7 +57,7 @@ Credentials required in `.env` (documented via `.env.example`, gitignored):
 | createdAt | |
 | completedAt | set when column becomes `done` |
 
-Work units are **local-only**: they are never created, updated, or synced as JIRA subtasks or any other JIRA entity. They exist purely in the local SQLite database.
+Work units are **local-only**: they are never created, updated, or synced as JIRA subtasks or any other JIRA entity. They exist purely in the Postgres database.
 
 ## Sync Flow (JIRA → Board)
 
@@ -111,7 +111,7 @@ If a work unit is later dragged back out of `done` after a completion comment wa
 
 - Writing work units back to JIRA as subtasks (explicitly rejected — local-only by design).
 - Background/scheduled sync polling.
-- Multi-user or hosted deployment.
+- Multi-user or hosted deployment (Postgres is used instead of SQLite specifically so a future Heroku/Vercel deploy is a config change, not a data-layer migration — but actually deploying there is a later follow-up, not v1 work).
 - Configurable status-category-to-transition mapping UI (the "In Progress"/"Done" category matching described above is fixed logic, not user-configurable, in v1).
 - Auto-posting the completion summary without review (always requires explicit confirmation in v1).
 - Swimlanes grouped by anything other than story (e.g. priority, issue type).
