@@ -20,6 +20,8 @@
 - The AI-generated completion summary always requires explicit user review/confirmation before it is posted to JIRA as a comment — it is never auto-posted.
 - Credentials (`JIRA_SITE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `ANTHROPIC_API_KEY`) live only in a local, gitignored `.env`, documented via a committed `.env.example`.
 - The database is Postgres (via Prisma), run locally through Docker Compose — not a SQLite file — so the only change needed for a future Heroku/Vercel deploy is `DATABASE_URL`.
+- The installed Next.js version types dynamic route `params` as `Promise<{ id: string }>`, not a plain object. Every dynamic route handler in this plan (`[id]/route.ts` files) types its second argument as `{ params: Promise<{ id: string }> | { id: string } }` and does `const { id } = await params` as its first line — the union keeps it compatible with both Next's generated route type and the plain objects this plan's unit tests pass directly.
+- The installed `@anthropic-ai/sdk` version's `messages.create` is overloaded (streaming vs. non-streaming), so `Awaited<ReturnType<typeof anthropic.messages.create>>` does not resolve to a type with `.content`. Any helper that reads `message.content` from a Claude response types its parameter as `Anthropic.Message` (`import type Anthropic from '@anthropic-ai/sdk'`) instead.
 - Integration failures (JIRA or Claude API errors) must never block or revert a local board action — they're caught, logged, and surfaced as a non-blocking toast.
 
 ---
@@ -1271,12 +1273,18 @@ Expected: FAIL — `./breakdown` module does not exist.
 `src/lib/claude/breakdown.ts`:
 
 ```ts
+import type Anthropic from '@anthropic-ai/sdk'
 import { anthropic, CLAUDE_MODEL } from './client'
 import { extractJson } from './json'
 
 export type BreakdownSuggestion = { title: string; description: string }
 
-function textFromMessage(message: Awaited<ReturnType<typeof anthropic.messages.create>>): string {
+// `anthropic.messages.create` is overloaded (streaming vs. non-streaming), so
+// `Awaited<ReturnType<typeof anthropic.messages.create>>` resolves to the
+// catch-all overload's union return type (`Stream<...> | Message`), which
+// doesn't have a `.content` property. We only ever call the non-streaming
+// overload here, so we type against `Anthropic.Message` directly instead.
+function textFromMessage(message: Anthropic.Message): string {
   return message.content
     .filter((block) => block.type === 'text')
     .map((block) => ('text' in block ? block.text : ''))
@@ -1364,8 +1372,16 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateBreakdown } from '@/lib/claude/breakdown'
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
-  const story = await prisma.story.findUnique({ where: { id: params.id } })
+// Next.js 16 route handlers receive `params` as a Promise (not a plain object).
+// The union keeps this assignable to Next's generated route-handler type while
+// still accepting the plain object unit tests pass directly — `await` on a
+// non-Promise value resolves to that value unchanged.
+export async function POST(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  const { id } = await params
+  const story = await prisma.story.findUnique({ where: { id } })
   if (!story) {
     return NextResponse.json({ error: 'Story not found' }, { status: 404 })
   }
@@ -1840,12 +1856,20 @@ import { NextResponse } from 'next/server'
 import { moveWorkUnit } from '@/lib/workUnits'
 import type { Column } from '@/lib/types'
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+// Next.js 16 route handlers receive `params` as a Promise (not a plain object).
+// The union keeps this assignable to Next's generated route-handler type while
+// still accepting the plain object unit tests pass directly — `await` on a
+// non-Promise value resolves to that value unchanged.
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  const { id } = await params
   const body = await request.json()
   const { column, index } = body as { column: Column; index: number }
 
   try {
-    const result = await moveWorkUnit(params.id, column, index)
+    const result = await moveWorkUnit(id, column, index)
     return NextResponse.json({ workUnits: result.workUnits, storyId: result.storyId })
   } catch (err) {
     console.error('Move work unit failed', err)
@@ -2221,16 +2245,24 @@ import { moveWorkUnit } from '@/lib/workUnits'
 import { applyStatusSync } from '@/lib/statusSync'
 import type { Column } from '@/lib/types'
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+// Next.js 16 route handlers receive `params` as a Promise (not a plain object).
+// The union keeps this assignable to Next's generated route-handler type while
+// still accepting the plain object unit tests pass directly — `await` on a
+// non-Promise value resolves to that value unchanged.
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  const { id } = await params
   const body = await request.json()
   const { column, index } = body as { column: Column; index: number }
 
   try {
-    const moveResult = await moveWorkUnit(params.id, column, index)
+    const moveResult = await moveWorkUnit(id, column, index)
     const statusResult = await applyStatusSync(
       moveResult.storyId,
       moveResult.workUnits.map((u) => ({ id: u.id, column: u.column as Column })),
-      params.id,
+      id,
       moveResult.previousColumn
     )
 
@@ -2322,11 +2354,17 @@ Expected: FAIL — `./completionSummary` module does not exist.
 `src/lib/claude/completionSummary.ts`:
 
 ```ts
+import type Anthropic from '@anthropic-ai/sdk'
 import { anthropic, CLAUDE_MODEL } from './client'
 
 export type CompletedWorkUnit = { title: string; description: string | null }
 
-function textFromMessage(message: Awaited<ReturnType<typeof anthropic.messages.create>>): string {
+// `anthropic.messages.create` is overloaded (streaming vs. non-streaming), so
+// `Awaited<ReturnType<typeof anthropic.messages.create>>` resolves to the
+// catch-all overload's union return type (`Stream<...> | Message`), which
+// doesn't have a `.content` property. We only ever call the non-streaming
+// overload here, so we type against `Anthropic.Message` directly instead.
+function textFromMessage(message: Anthropic.Message): string {
   return message.content
     .filter((block) => block.type === 'text')
     .map((block) => ('text' in block ? block.text : ''))
@@ -2467,9 +2505,17 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateCompletionSummary } from '@/lib/claude/completionSummary'
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+// Next.js 16 route handlers receive `params` as a Promise (not a plain object).
+// The union keeps this assignable to Next's generated route-handler type while
+// still accepting the plain object unit tests pass directly — `await` on a
+// non-Promise value resolves to that value unchanged.
+export async function POST(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  const { id } = await params
   const story = await prisma.story.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { workUnits: true },
   })
   if (!story) {
@@ -2498,11 +2544,19 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { postComment } from '@/lib/jira/client'
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+// Next.js 16 route handlers receive `params` as a Promise (not a plain object).
+// The union keeps this assignable to Next's generated route-handler type while
+// still accepting the plain object unit tests pass directly — `await` on a
+// non-Promise value resolves to that value unchanged.
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  const { id } = await params
   const body = await request.json()
   const { summary } = body as { summary: string }
 
-  const story = await prisma.story.findUnique({ where: { id: params.id } })
+  const story = await prisma.story.findUnique({ where: { id } })
   if (!story) {
     return NextResponse.json({ error: 'Story not found' }, { status: 404 })
   }
@@ -2510,7 +2564,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     await postComment(story.jiraId, summary)
     const updated = await prisma.story.update({
-      where: { id: params.id },
+      where: { id },
       data: { completionCommentPostedAt: new Date() },
     })
     return NextResponse.json({ completionCommentPostedAt: updated.completionCommentPostedAt })
