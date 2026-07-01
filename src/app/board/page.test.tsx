@@ -285,4 +285,101 @@ describe("Kanban Board page", () => {
       expect(document.activeElement).toBe(rightCard);
     });
   });
+
+  describe("Accessibility landmarks", () => {
+    it("wraps the board content in a main landmark", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        const main = screen.getByRole("main");
+        expect(main).toHaveAttribute("id", "main-content");
+      });
+    });
+
+    it("provides a skip link that targets the main landmark", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
+      });
+
+      const skipLink = screen.getByText(/Skip to main content/i);
+      expect(skipLink).toHaveAttribute("href", "#main-content");
+      expect(skipLink).toHaveClass("sr-only");
+    });
+
+    it("renders each column as a labelled region", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        const regions = screen.getAllByRole("region");
+        expect(regions).toHaveLength(3);
+
+        const labels = regions.map((r) => r.getAttribute("aria-label"));
+        expect(labels).toEqual(
+          expect.arrayContaining([
+            expect.stringContaining("To Do column"),
+            expect.stringContaining("In Progress column"),
+            expect.stringContaining("Done column"),
+          ])
+        );
+      });
+    });
+
+    it("renders a polite live region for status announcements", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
+      });
+
+      const liveRegion = document.querySelector('[aria-live="polite"]');
+      expect(liveRegion).toBeInTheDocument();
+      expect(liveRegion).toHaveClass("sr-only");
+    });
+
+    it("end-to-end: edit-mode focus enters/exits the card, then delete announces via the live region", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
+      });
+
+      // Enter edit mode on wu-1 via keyboard, focus should land on its title input.
+      const card = screen.getByTestId("work-unit-card-wu-1");
+      fireEvent.keyDown(card, { key: "Enter" });
+
+      const titleInput = screen.getByTestId("edit-title-input");
+      expect(document.activeElement).toBe(titleInput);
+
+      // Cancel editing: focus should return to the card.
+      fireEvent.click(screen.getByTestId("cancel-edit-button"));
+      expect(document.activeElement).toBe(
+        screen.getByTestId("work-unit-card-wu-1")
+      );
+
+      // Now delete wu-1 and confirm the live region announces it.
+      global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "DELETE") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ success: true }),
+          } as Response);
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockStories),
+        } as Response);
+      });
+
+      const deleteButton = screen.getByTestId("delete-button-wu-1");
+      fireEvent.click(deleteButton); // show confirm
+      fireEvent.click(deleteButton); // confirm delete
+
+      await waitFor(() => {
+        const liveRegion = document.querySelector('[aria-live="polite"]');
+        expect(liveRegion).toHaveTextContent("Deleted work unit: Work unit 1");
+      });
+    });
+  });
 });

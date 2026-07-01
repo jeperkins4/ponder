@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WorkUnitDTO, Column } from "@/lib/types";
 
 interface WorkUnitCardProps {
@@ -8,6 +8,7 @@ interface WorkUnitCardProps {
   onDelete?: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<WorkUnitDTO>) => void;
   onKeyboardNavigation?: (direction: "left" | "right", workUnitId: string) => void;
+  onStatusMessage?: (message: string) => void;
 }
 
 const columnLabels: Record<Column, string> = {
@@ -29,6 +30,7 @@ export function WorkUnitCard({
   onDelete,
   onUpdate,
   onKeyboardNavigation,
+  onStatusMessage,
 }: WorkUnitCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<WorkUnitDTO>>({
@@ -36,6 +38,32 @@ export function WorkUnitCard({
     description: workUnit.description,
   });
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // The card div (view mode) and the title input (edit mode) are two
+  // different DOM nodes that never exist at the same time, since the
+  // component renders one or the other depending on `isEditing`.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const wasEditingRef = useRef(false);
+
+  // Focus management for edit mode entry/exit. We rely on an effect
+  // (rather than calling .focus() directly inside handleSaveEdit /
+  // handleCancelEdit) because the DOM node we want to focus doesn't exist
+  // yet at the moment those handlers call setIsEditing() -- it only
+  // mounts after React commits the re-render.
+  useEffect(() => {
+    if (isEditing) {
+      titleInputRef.current?.focus();
+    } else if (wasEditingRef.current) {
+      cardRef.current?.focus();
+    }
+    wasEditingRef.current = isEditing;
+  }, [isEditing]);
+
+  const columnLabel = columnLabels[workUnit.column];
+  const cardAriaLabel = `Work unit: ${workUnit.title}, in ${columnLabel} column, ${
+    workUnit.description || "No description"
+  }`;
 
   const handleEditChange = (field: string, value: string | null) => {
     setEditData((prev) => ({
@@ -58,11 +86,16 @@ export function WorkUnitCard({
 
       const updated = await response.json();
       onUpdate?.(workUnit.id, updated);
+      onStatusMessage?.(`Saved changes to ${updated.title ?? workUnit.title}`);
       setIsEditing(false);
     } catch (error) {
       console.error("Error updating work unit:", error);
       alert("Failed to update work unit");
     }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
   };
 
   const handleDelete = async () => {
@@ -80,6 +113,7 @@ export function WorkUnitCard({
         throw new Error("Failed to delete work unit");
       }
 
+      onStatusMessage?.(`Deleted work unit: ${workUnit.title}`);
       onDelete?.(workUnit.id);
     } catch (error) {
       console.error("Error deleting work unit:", error);
@@ -107,16 +141,20 @@ export function WorkUnitCard({
   if (isEditing) {
     return (
       <div
+        role="article"
+        aria-label={cardAriaLabel}
         className={`p-4 bg-white border border-gray-300 rounded-lg shadow-sm ${focusRing}`}
         tabIndex={0}
         data-testid={`work-unit-card-${workUnit.id}`}
       >
         <input
+          ref={titleInputRef}
           type="text"
           value={editData.title || ""}
           onChange={(e) => handleEditChange("title", e.target.value)}
           className={`w-full px-2 py-1 mb-2 border border-gray-300 rounded ${focusRing}`}
           placeholder="Title"
+          aria-label={`Edit title: ${workUnit.title}`}
           data-testid="edit-title-input"
         />
         <textarea
@@ -125,18 +163,21 @@ export function WorkUnitCard({
           className={`w-full px-2 py-1 mb-2 border border-gray-300 rounded ${focusRing}`}
           placeholder="Description"
           rows={3}
+          aria-label={`Edit description: ${workUnit.title}`}
           data-testid="edit-description-input"
         />
         <div className="flex gap-2">
           <button
             onClick={handleSaveEdit}
-            className={`px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 ${focusRing}`}
+            aria-label={`Save changes to ${workUnit.title}`}
+            className={`px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 ${focusRing}`}
             data-testid="save-edit-button"
           >
             Save
           </button>
           <button
-            onClick={() => setIsEditing(false)}
+            onClick={handleCancelEdit}
+            aria-label={`Cancel editing ${workUnit.title}`}
             className={`px-3 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 ${focusRing}`}
             data-testid="cancel-edit-button"
           >
@@ -149,6 +190,9 @@ export function WorkUnitCard({
 
   return (
     <div
+      ref={cardRef}
+      role="article"
+      aria-label={cardAriaLabel}
       className={`p-4 bg-white border border-gray-300 rounded-lg shadow-sm transition-all ${focusRing}`}
       tabIndex={0}
       onKeyDown={handleCardKeyDown}
@@ -180,6 +224,7 @@ export function WorkUnitCard({
       <div className="flex gap-2">
         <button
           onClick={() => setIsEditing(true)}
+          aria-label={`Edit work unit: ${workUnit.title}`}
           className={`px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300 ${focusRing}`}
           data-testid={`edit-button-${workUnit.id}`}
         >
@@ -187,10 +232,13 @@ export function WorkUnitCard({
         </button>
         <button
           onClick={handleDelete}
+          aria-label={`${isDeleting ? "Confirm delete" : "Delete"} work unit: ${
+            workUnit.title
+          }`}
           className={`px-3 py-1 text-sm rounded text-white ${focusRing} ${
             isDeleting
-              ? "bg-red-600 hover:bg-red-700"
-              : "bg-red-500 hover:bg-red-600"
+              ? "bg-red-700 hover:bg-red-800"
+              : "bg-red-600 hover:bg-red-700"
           }`}
           data-testid={`delete-button-${workUnit.id}`}
         >
@@ -199,6 +247,7 @@ export function WorkUnitCard({
         {isDeleting && (
           <button
             onClick={() => setIsDeleting(false)}
+            aria-label={`Cancel delete of ${workUnit.title}`}
             className={`px-3 py-1 text-sm bg-gray-300 text-gray-800 rounded hover:bg-gray-400 ${focusRing}`}
             data-testid={`cancel-delete-button-${workUnit.id}`}
           >

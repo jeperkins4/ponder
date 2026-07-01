@@ -453,5 +453,148 @@ describe("WorkUnitCard", () => {
       expect(card).toHaveAttribute("tabindex", "0");
       expect(card).toHaveClass("focus:ring-2", "focus:outline-none");
     });
+
+    it("marks the card with role=article and an aria-label describing it", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
+      expect(card).toHaveAttribute("role", "article");
+      expect(card).toHaveAttribute(
+        "aria-label",
+        "Work unit: Test Work Unit, in To Do column, This is a test description"
+      );
+    });
+
+    it("gives the Edit button an aria-label naming the work unit", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      expect(
+        screen.getByTestId(`edit-button-${mockWorkUnit.id}`)
+      ).toHaveAttribute("aria-label", "Edit work unit: Test Work Unit");
+    });
+
+    it("gives the Delete button an aria-label that changes on confirmation", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      const deleteButton = screen.getByTestId(
+        `delete-button-${mockWorkUnit.id}`
+      );
+      expect(deleteButton).toHaveAttribute(
+        "aria-label",
+        "Delete work unit: Test Work Unit"
+      );
+
+      fireEvent.click(deleteButton);
+
+      expect(deleteButton).toHaveAttribute(
+        "aria-label",
+        "Confirm delete work unit: Test Work Unit"
+      );
+    });
+
+    it("gives the Save and Cancel buttons aria-labels naming the work unit", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      fireEvent.click(screen.getByTestId(`edit-button-${mockWorkUnit.id}`));
+
+      expect(screen.getByTestId("save-edit-button")).toHaveAttribute(
+        "aria-label",
+        "Save changes to Test Work Unit"
+      );
+      expect(screen.getByTestId("cancel-edit-button")).toHaveAttribute(
+        "aria-label",
+        "Cancel editing Test Work Unit"
+      );
+    });
+
+    it("moves focus to the title input when entering edit mode", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      fireEvent.click(screen.getByTestId(`edit-button-${mockWorkUnit.id}`));
+
+      expect(document.activeElement).toBe(
+        screen.getByTestId("edit-title-input")
+      );
+    });
+
+    it("returns focus to the card when Cancel is clicked", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      fireEvent.click(screen.getByTestId(`edit-button-${mockWorkUnit.id}`));
+      fireEvent.click(screen.getByTestId("cancel-edit-button"));
+
+      expect(document.activeElement).toBe(
+        screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`)
+      );
+    });
+
+    it("returns focus to the card when Save succeeds", async () => {
+      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockWorkUnit,
+      } as Response);
+
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      fireEvent.click(screen.getByTestId(`edit-button-${mockWorkUnit.id}`));
+      fireEvent.click(screen.getByTestId("save-edit-button"));
+
+      await waitFor(() => {
+        expect(document.activeElement).toBe(
+          screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`)
+        );
+      });
+
+      fetchSpy.mockRestore();
+    });
+
+    it("calls onStatusMessage with a save confirmation for screen readers", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...mockWorkUnit, title: "Renamed" }),
+      } as Response);
+
+      const onStatusMessage = vi.fn();
+      render(
+        <WorkUnitCard
+          workUnit={mockWorkUnit}
+          onStatusMessage={onStatusMessage}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(`edit-button-${mockWorkUnit.id}`));
+      fireEvent.click(screen.getByTestId("save-edit-button"));
+
+      await waitFor(() => {
+        expect(onStatusMessage).toHaveBeenCalledWith("Saved changes to Renamed");
+      });
+    });
+
+    it("calls onStatusMessage with a delete confirmation for screen readers", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      } as Response);
+
+      const onStatusMessage = vi.fn();
+      render(
+        <WorkUnitCard
+          workUnit={mockWorkUnit}
+          onStatusMessage={onStatusMessage}
+        />
+      );
+
+      const deleteButton = screen.getByTestId(
+        `delete-button-${mockWorkUnit.id}`
+      );
+      fireEvent.click(deleteButton);
+      fireEvent.click(deleteButton);
+
+      await waitFor(() => {
+        expect(onStatusMessage).toHaveBeenCalledWith(
+          "Deleted work unit: Test Work Unit"
+        );
+      });
+    });
   });
 });

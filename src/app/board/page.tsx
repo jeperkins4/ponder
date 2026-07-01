@@ -10,6 +10,7 @@ export default function Board() {
   const [stories, setStories] = useState<StoryDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState("");
 
   const fetchStories = useCallback(async (opts?: { silent?: boolean }) => {
     try {
@@ -48,6 +49,12 @@ export default function Board() {
     },
     []
   );
+
+  // Passed down to every WorkUnitCard so save/delete actions can announce a
+  // status update via the page-level aria-live region below.
+  const handleStatusMessage = useCallback((message: string) => {
+    setStatusMessage(message);
+  }, []);
 
   const handleKeyboardNavigation = useCallback(
     (direction: "left" | "right", currentUnitId: string) => {
@@ -95,48 +102,65 @@ export default function Board() {
     []
   );
 
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-gray-100 p-8">
-        <div className="text-center">
-          <p className="text-lg text-gray-600">Loading kanban board...</p>
-        </div>
-      </main>
-    );
-  }
+  let content: JSX.Element;
 
-  if (error) {
-    return (
-      <main className="min-h-screen bg-gray-100 p-8">
-        <div className="text-center">
-          <p className="text-lg text-red-600">Error: {error}</p>
+  if (loading) {
+    content = (
+      <div className="text-center">
+        <p className="text-lg text-gray-600">Loading kanban board...</p>
+      </div>
+    );
+  } else if (error) {
+    content = (
+      <div className="text-center">
+        <p className="text-lg text-red-600">Error: {error}</p>
+      </div>
+    );
+  } else {
+    content = (
+      <>
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-800">Kanban Board</h1>
+          <p className="text-gray-600 mt-2">
+            {stories.length} {stories.length === 1 ? "story" : "stories"}
+          </p>
         </div>
-      </main>
+
+        <div className="grid grid-cols-3 gap-6">
+          {COLUMNS.map((column) => (
+            <KanbanColumn
+              key={column}
+              column={column}
+              stories={stories}
+              onRefresh={() => fetchStories({ silent: true })}
+              columnRef={setColumnRef(column)}
+              onKeyboardNavigation={handleKeyboardNavigation}
+              onStatusMessage={handleStatusMessage}
+            />
+          ))}
+        </div>
+      </>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-800">Kanban Board</h1>
-        <p className="text-gray-600 mt-2">
-          {stories.length} {stories.length === 1 ? "story" : "stories"}
-        </p>
+    <>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:text-blue-700 focus:shadow-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+      >
+        Skip to main content
+      </a>
+
+      {/* Announces save/delete outcomes to screen readers without moving focus. */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {statusMessage}
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        {COLUMNS.map((column) => (
-          <KanbanColumn
-            key={column}
-            column={column}
-            stories={stories}
-            onRefresh={() => fetchStories({ silent: true })}
-            columnRef={setColumnRef(column)}
-            onKeyboardNavigation={handleKeyboardNavigation}
-          />
-        ))}
-      </div>
-    </main>
+      <main role="main" id="main-content" className="min-h-screen bg-gray-100 p-8">
+        {content}
+      </main>
+    </>
   );
 }
 
@@ -149,6 +173,7 @@ interface KanbanColumnProps {
     direction: "left" | "right",
     workUnitId: string
   ) => void;
+  onStatusMessage?: (message: string) => void;
 }
 
 function KanbanColumn({
@@ -157,6 +182,7 @@ function KanbanColumn({
   onRefresh,
   columnRef,
   onKeyboardNavigation,
+  onStatusMessage,
 }: KanbanColumnProps) {
   const columnLabel = {
     todo: "To Do",
@@ -176,13 +202,17 @@ function KanbanColumn({
   });
 
   const totalWorkUnits = workUnitsInColumn.length;
+  const itemWord = totalWorkUnits === 1 ? "item" : "items";
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4">
+    <section
+      aria-label={`${columnLabel} column, ${totalWorkUnits} ${itemWord}`}
+      className="bg-white rounded-lg shadow-md p-4"
+    >
       <div className="mb-4 pb-4 border-b border-gray-200">
         <h2 className="text-xl font-semibold text-gray-800">{columnLabel}</h2>
         <p className="text-sm text-gray-500 mt-1">
-          {totalWorkUnits} {totalWorkUnits === 1 ? "item" : "items"}
+          {totalWorkUnits} {itemWord}
         </p>
       </div>
 
@@ -199,10 +229,11 @@ function KanbanColumn({
               onDelete={onRefresh}
               onUpdate={onRefresh}
               onKeyboardNavigation={onKeyboardNavigation}
+              onStatusMessage={onStatusMessage}
             />
           ))
         )}
       </div>
-    </div>
+    </section>
   );
 }
