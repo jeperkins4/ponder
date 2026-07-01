@@ -51,7 +51,12 @@ describe("Board page (/board)", () => {
   it("renders the Kanban Board heading via KanbanBoard", async () => {
     render(<Board />);
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: /Kanban Board/i })).toBeInTheDocument();
+      // Query the `<h1>` specifically (level: 1): the onboarding tooltip also
+      // renders a heading whose text contains "Kanban Board", so an
+      // unqualified role+name query would be ambiguous once both are mounted.
+      expect(
+        screen.getByRole("heading", { level: 1, name: /Kanban Board/i })
+      ).toBeInTheDocument();
     });
   });
 

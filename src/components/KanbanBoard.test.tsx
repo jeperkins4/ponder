@@ -82,7 +82,12 @@ describe("KanbanBoard", () => {
   it("renders the board heading", async () => {
     render(<KanbanBoard />);
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: /Kanban Board/i })).toBeInTheDocument();
+      // Query the `<h1>` specifically (level: 1): the onboarding tooltip also
+      // renders a heading whose text contains "Kanban Board", so an
+      // unqualified role+name query would be ambiguous once both are mounted.
+      expect(
+        screen.getByRole("heading", { level: 1, name: /Kanban Board/i })
+      ).toBeInTheDocument();
     });
   });
 
@@ -446,7 +451,9 @@ describe("KanbanBoard", () => {
       render(<KanbanBoard />);
 
       await waitFor(() => {
-        expect(screen.getByRole("heading", { name: /Kanban Board/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("heading", { level: 1, name: /Kanban Board/i })
+        ).toBeInTheDocument();
       });
 
       expect(screen.queryByTestId("theme-toggle-button")).not.toBeInTheDocument();
@@ -470,6 +477,43 @@ describe("KanbanBoard", () => {
         const main = screen.getByRole("main");
         expect(main).toHaveClass("bg-gray-50");
       });
+    });
+  });
+
+  describe("title and headerActions props", () => {
+    it("renders 'Kanban Board' as the sole h1 by default", async () => {
+      render(<KanbanBoard />);
+
+      await waitFor(() => {
+        const headings = screen.getAllByRole("heading", { level: 1 });
+        expect(headings).toHaveLength(1);
+        expect(headings[0]).toHaveTextContent("Kanban Board");
+      });
+    });
+
+    it("renders a custom title as the sole h1 when provided", async () => {
+      render(<KanbanBoard title="Alpha" />);
+
+      await waitFor(() => {
+        const headings = screen.getAllByRole("heading", { level: 1 });
+        expect(headings).toHaveLength(1);
+        expect(headings[0]).toHaveTextContent("Alpha");
+      });
+    });
+
+    it("renders headerActions alongside the heading without adding another heading", async () => {
+      render(
+        <KanbanBoard
+          title="Alpha"
+          headerActions={<button data-testid="my-action">Do thing</button>}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("my-action")).toBeInTheDocument();
+      });
+
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     });
   });
 

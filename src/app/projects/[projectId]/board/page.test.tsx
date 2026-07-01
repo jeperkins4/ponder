@@ -15,11 +15,25 @@ vi.mock("@/lib/prisma", () => ({
 
 // KanbanBoard does its own data fetching (via `fetch`) and is covered
 // exhaustively by its own test suite; stub it here so this page test stays
-// focused on the page's own responsibilities (lookup, not-found, heading,
-// selector, conditional sync button).
+// focused on the page's own responsibilities (lookup, not-found, and the
+// title/headerActions it hands to KanbanBoard). The stub renders `title` as
+// an `<h1>` and `headerActions` as children, mirroring the real component's
+// contract, so this page's real (unmocked) ProjectSelector/ImportFromJira
+// children are still exercised.
 vi.mock("@/components/KanbanBoard", () => ({
-  KanbanBoard: ({ projectId }: { projectId?: string }) => (
-    <div data-testid="kanban-board-stub" data-project-id={projectId} />
+  KanbanBoard: ({
+    projectId,
+    title,
+    headerActions,
+  }: {
+    projectId?: string;
+    title?: string;
+    headerActions?: React.ReactNode;
+  }) => (
+    <div data-testid="kanban-board-stub" data-project-id={projectId}>
+      <h1 data-testid="project-board-heading">{title}</h1>
+      <div data-testid="kanban-board-header-actions">{headerActions}</div>
+    </div>
   ),
 }));
 

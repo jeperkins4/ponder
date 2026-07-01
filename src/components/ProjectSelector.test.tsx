@@ -1,5 +1,5 @@
-import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach } from "vitest";
 import { ProjectSelector } from "./ProjectSelector";
 import { Project } from "@/lib/types";
 
@@ -22,6 +22,10 @@ const mockProjects: Project[] = [
 ];
 
 describe("ProjectSelector", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("shows the current project's name on the closed toggle", () => {
     render(<ProjectSelector projects={mockProjects} currentProjectId="p1" />);
     expect(screen.getByTestId("project-selector-toggle")).toHaveTextContent(
@@ -98,6 +102,41 @@ describe("ProjectSelector", () => {
     });
 
     expect(screen.queryByTestId("project-selector-menu")).not.toBeInTheDocument();
+  });
+
+  describe("Theme awareness", () => {
+    it("applies light-mode surface styling by default", async () => {
+      render(<ProjectSelector projects={mockProjects} currentProjectId="p1" />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("project-selector-toggle")).toHaveClass(
+          "bg-ponder-light-surface"
+        );
+      });
+    });
+
+    it("applies dark-mode surface styling when ponderTheme is set to dark", async () => {
+      window.localStorage.setItem("ponderTheme", "dark");
+
+      render(<ProjectSelector projects={mockProjects} currentProjectId="p1" />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("project-selector-toggle")).toHaveClass(
+          "bg-ponder-dark-surface"
+        );
+      });
+    });
+
+    it("applies dark-mode menu styling to the current-project highlight", async () => {
+      window.localStorage.setItem("ponderTheme", "dark");
+
+      render(<ProjectSelector projects={mockProjects} currentProjectId="p1" />);
+      fireEvent.click(screen.getByTestId("project-selector-toggle"));
+
+      expect(screen.getByTestId("project-selector-item-p1")).toHaveClass(
+        "bg-ponder-dark-purple-light"
+      );
+    });
   });
 
   describe("Accessibility", () => {

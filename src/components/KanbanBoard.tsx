@@ -14,9 +14,23 @@ export interface KanbanBoardProps {
   /** Scopes the board to a single project's stories. Omit to load all stories
    * (used by the un-scoped /board route for backward compatibility). */
   projectId?: string;
+  /** Heading text for the board's single `<h1>`. Defaults to "Kanban Board".
+   * The project board page passes the project's name here instead of
+   * rendering its own separate heading, so the page ends up with exactly one
+   * `<h1>` (this one). */
+  title?: string;
+  /** Optional chrome (e.g. ProjectSelector, ImportFromJiraButton) rendered
+   * alongside the heading, inside KanbanBoard's own theme-aware container.
+   * Lets callers inject page-level actions without duplicating a heading or
+   * landmark region. */
+  headerActions?: React.ReactNode;
 }
 
-export function KanbanBoard({ projectId }: KanbanBoardProps) {
+export function KanbanBoard({
+  projectId,
+  title = "Kanban Board",
+  headerActions,
+}: KanbanBoardProps) {
   const { isDark } = useTheme();
   const [stories, setStories] = useState<StoryDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,7 +170,6 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
     content = (
       <>
         <div className="mb-8">
-          <h1 className={`text-4xl font-bold ${isDark ? "text-ponder-dark-text" : "text-ponder-light-text"} font-space-grotesk`}>Kanban Board</h1>
           <p className={`${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} text-sm`}>Drag tasks between columns to track progress.</p>
           <p className={`${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} mt-2`}>
             {stories.length} {stories.length === 1 ? "story" : "stories"}
@@ -206,6 +219,16 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             ? "bg-ponder-dark-bg border-ponder-dark-border"
             : "bg-ponder-light-bg border-ponder-light-card-border"
         }`}>
+          <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+            <h1 className={`text-4xl font-bold ${isDark ? "text-ponder-dark-text" : "text-ponder-light-text"} font-space-grotesk`}>
+              {title}
+            </h1>
+            {headerActions && (
+              <div className="flex items-center gap-3 flex-wrap">
+                {headerActions}
+              </div>
+            )}
+          </div>
           {content}
         </div>
       </main>

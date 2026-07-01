@@ -2,9 +2,12 @@
  * Per-project board page.
  *
  * Server component: looks up the project via Prisma, renders a not-found
- * state if it doesn't exist, otherwise shows the project name, a
- * ProjectSelector for switching projects, an "Import from JIRA" button
- * (only for JIRA-linked projects), and the project-scoped KanbanBoard.
+ * state if it doesn't exist, otherwise renders the project-scoped
+ * KanbanBoard with the project's name as its single `<h1>` and the
+ * ProjectSelector plus "Import from JIRA" button (JIRA-linked projects only)
+ * injected as header actions. Keeping all of that chrome inside KanbanBoard
+ * avoids a second `<h1>` on the page and keeps the skip link the first
+ * focusable element inside the board's `<main>` landmark.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -12,6 +15,7 @@ import { Project } from "@/lib/types";
 import { ProjectSelector } from "@/components/ProjectSelector";
 import { ImportFromJiraButton } from "@/components/ImportFromJiraButton";
 import { KanbanBoard } from "@/components/KanbanBoard";
+import { ProjectNotFound } from "@/components/ProjectNotFound";
 
 export default async function ProjectBoardPage({
   params,
@@ -26,18 +30,7 @@ export default async function ProjectBoardPage({
   ]);
 
   if (!project) {
-    return (
-      <main className="min-h-screen bg-ponder-light-bg p-8">
-        <div className="max-w-5xl mx-auto">
-          <p
-            data-testid="project-not-found"
-            className="text-ponder-light-text-muted font-instrument"
-          >
-            Project not found.
-          </p>
-        </div>
-      </main>
-    );
+    return <ProjectNotFound />;
   }
 
   const projects: Project[] = allProjects.map((p) => ({
@@ -50,24 +43,17 @@ export default async function ProjectBoardPage({
   }));
 
   return (
-    <div>
-      <div className="max-w-7xl mx-auto px-8 pt-8 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-4">
-          <h1
-            className="font-space-grotesk text-2xl font-bold text-ponder-light-text"
-            data-testid="project-board-heading"
-          >
-            {project.name}
-          </h1>
+    <KanbanBoard
+      projectId={project.id}
+      title={project.name}
+      headerActions={
+        <>
           <ProjectSelector projects={projects} currentProjectId={project.id} />
-        </div>
-
-        {project.type === "JIRA" && (
-          <ImportFromJiraButton projectId={project.id} />
-        )}
-      </div>
-
-      <KanbanBoard projectId={project.id} />
-    </div>
+          {project.type === "JIRA" && (
+            <ImportFromJiraButton projectId={project.id} />
+          )}
+        </>
+      }
+    />
   );
 }

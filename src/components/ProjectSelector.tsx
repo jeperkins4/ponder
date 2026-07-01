@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Project } from "@/lib/types";
+import { useTheme } from "@/hooks/useTheme";
 
 interface ProjectSelectorProps {
   projects: Project[];
@@ -16,6 +17,7 @@ export function ProjectSelector({
   projects,
   currentProjectId,
 }: ProjectSelectorProps) {
+  const { isDark } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -53,7 +55,11 @@ export function ProjectSelector({
         aria-label="Switch project"
         aria-haspopup="true"
         aria-expanded={isOpen}
-        className={`flex items-center gap-2 px-3 py-2 bg-ponder-light-surface border border-ponder-light-card-border rounded-lg font-instrument text-sm font-semibold text-ponder-light-text hover:bg-ponder-light-purple-light transition-colors ${focusRing}`}
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg font-instrument text-sm font-semibold transition-colors ${focusRing} ${
+          isDark
+            ? "bg-ponder-dark-surface border border-ponder-dark-border text-ponder-dark-text hover:bg-ponder-dark-purple-light"
+            : "bg-ponder-light-surface border border-ponder-light-card-border text-ponder-light-text hover:bg-ponder-light-purple-light"
+        }`}
         data-testid="project-selector-toggle"
       >
         <span className="truncate max-w-[10rem]">
@@ -79,11 +85,19 @@ export function ProjectSelector({
       {isOpen && (
         <ul
           aria-label="Projects"
-          className="absolute left-0 z-10 mt-2 w-64 bg-ponder-light-surface border border-ponder-light-card-border rounded-lg shadow-ponder-card-hover py-1"
+          className={`absolute left-0 z-10 mt-2 w-64 rounded-lg shadow-ponder-card-hover py-1 ${
+            isDark
+              ? "bg-ponder-dark-surface border border-ponder-dark-border"
+              : "bg-ponder-light-surface border border-ponder-light-card-border"
+          }`}
           data-testid="project-selector-menu"
         >
           {projects.length === 0 && (
-            <li className="px-3 py-2 text-sm text-ponder-light-text-muted font-instrument">
+            <li
+              className={`px-3 py-2 text-sm font-instrument ${
+                isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"
+              }`}
+            >
               No projects yet
             </li>
           )}
@@ -97,8 +111,12 @@ export function ProjectSelector({
                   aria-current={isCurrent ? "page" : undefined}
                   className={`block px-3 py-2 text-sm font-instrument ${focusRing} ${
                     isCurrent
-                      ? "bg-ponder-light-purple-light text-ponder-light-purple font-semibold"
-                      : "text-ponder-light-text hover:bg-ponder-light-bg"
+                      ? isDark
+                        ? "bg-ponder-dark-purple-light text-ponder-dark-purple font-semibold"
+                        : "bg-ponder-light-purple-light text-ponder-light-purple font-semibold"
+                      : isDark
+                        ? "text-ponder-dark-text hover:bg-ponder-dark-bg"
+                        : "text-ponder-light-text hover:bg-ponder-light-bg"
                   }`}
                   data-testid={`project-selector-item-${project.id}`}
                 >
@@ -108,11 +126,19 @@ export function ProjectSelector({
               </li>
             );
           })}
-          <li className="border-t border-ponder-light-card-border mt-1 pt-1">
+          <li
+            className={`border-t mt-1 pt-1 ${
+              isDark ? "border-ponder-dark-border" : "border-ponder-light-card-border"
+            }`}
+          >
             <Link
               href="/projects/new"
               onClick={() => setIsOpen(false)}
-              className={`block px-3 py-2 text-sm font-instrument font-semibold text-ponder-light-purple hover:bg-ponder-light-purple-light ${focusRing}`}
+              className={`block px-3 py-2 text-sm font-instrument font-semibold ${focusRing} ${
+                isDark
+                  ? "text-ponder-dark-purple hover:bg-ponder-dark-purple-light"
+                  : "text-ponder-light-purple hover:bg-ponder-light-purple-light"
+              }`}
               data-testid="project-selector-new-link"
             >
               + New Project
