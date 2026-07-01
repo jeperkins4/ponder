@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Column, WorkUnitDTO } from "@/lib/types";
+import { checkAndUpdateStoryStatus } from "@/lib/statusTrigger";
 
 // Helper to convert Prisma WorkUnit to DTO
 function workUnitToDTO(wu: {
@@ -66,6 +67,9 @@ export async function POST(
         order,
       },
     });
+
+    // Check if all work units for this story are now done
+    await checkAndUpdateStoryStatus(existing.storyId, prisma);
 
     return NextResponse.json(workUnitToDTO(updated));
   } catch (error) {
