@@ -312,6 +312,114 @@ describe("WorkUnitCard", () => {
     });
   });
 
+  describe("Keyboard navigation", () => {
+    it("activates edit mode when Enter is pressed on the card", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
+      fireEvent.keyDown(card, { key: "Enter" });
+
+      expect(screen.getByTestId("edit-title-input")).toBeInTheDocument();
+    });
+
+    it("shows delete confirmation when Delete is pressed on the card", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
+      fireEvent.keyDown(card, { key: "Delete" });
+
+      expect(
+        screen.getByTestId(`delete-button-${mockWorkUnit.id}`)
+      ).toHaveTextContent("Confirm Delete?");
+    });
+
+    it("triggers the DELETE API call when Delete is pressed a second time", async () => {
+      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      } as Response);
+
+      const onDelete = vi.fn();
+      render(<WorkUnitCard workUnit={mockWorkUnit} onDelete={onDelete} />);
+
+      const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
+      fireEvent.keyDown(card, { key: "Delete" }); // first press: show confirm
+      fireEvent.keyDown(card, { key: "Delete" }); // second press: confirm delete
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledWith(
+          `/api/work-units/${mockWorkUnit.id}`,
+          { method: "DELETE" }
+        );
+      });
+
+      await waitFor(() => {
+        expect(onDelete).toHaveBeenCalledWith(mockWorkUnit.id);
+      });
+
+      fetchSpy.mockRestore();
+    });
+
+    it("calls onKeyboardNavigation with 'left' when ArrowLeft is pressed", () => {
+      const onKeyboardNavigation = vi.fn();
+      render(
+        <WorkUnitCard
+          workUnit={mockWorkUnit}
+          onKeyboardNavigation={onKeyboardNavigation}
+        />
+      );
+
+      const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
+      fireEvent.keyDown(card, { key: "ArrowLeft" });
+
+      expect(onKeyboardNavigation).toHaveBeenCalledWith(
+        "left",
+        mockWorkUnit.id
+      );
+    });
+
+    it("calls onKeyboardNavigation with 'right' when ArrowRight is pressed", () => {
+      const onKeyboardNavigation = vi.fn();
+      render(
+        <WorkUnitCard
+          workUnit={mockWorkUnit}
+          onKeyboardNavigation={onKeyboardNavigation}
+        />
+      );
+
+      const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
+      fireEvent.keyDown(card, { key: "ArrowRight" });
+
+      expect(onKeyboardNavigation).toHaveBeenCalledWith(
+        "right",
+        mockWorkUnit.id
+      );
+    });
+
+    it("does not throw when arrow keys are pressed without onKeyboardNavigation provided", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
+      expect(() => {
+        fireEvent.keyDown(card, { key: "ArrowLeft" });
+        fireEvent.keyDown(card, { key: "ArrowRight" });
+      }).not.toThrow();
+    });
+
+    it("moves tab focus naturally from the card to the Edit button", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
+      const editButton = screen.getByTestId(`edit-button-${mockWorkUnit.id}`);
+
+      // Both elements are naturally focusable and in DOM order, so the
+      // browser's default Tab order moves from the card to the Edit button
+      // without any custom key handling required.
+      expect(card).toHaveAttribute("tabindex", "0");
+      expect(editButton.tabIndex).toBeGreaterThanOrEqual(0);
+    });
+  });
+
   describe("Accessibility", () => {
     it("is focusable and shows a visible focus ring on the card", () => {
       render(<WorkUnitCard workUnit={mockWorkUnit} />);

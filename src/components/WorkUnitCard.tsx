@@ -7,6 +7,7 @@ interface WorkUnitCardProps {
   workUnit: WorkUnitDTO;
   onDelete?: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<WorkUnitDTO>) => void;
+  onKeyboardNavigation?: (direction: "left" | "right", workUnitId: string) => void;
 }
 
 const columnLabels: Record<Column, string> = {
@@ -27,6 +28,7 @@ export function WorkUnitCard({
   workUnit,
   onDelete,
   onUpdate,
+  onKeyboardNavigation,
 }: WorkUnitCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<WorkUnitDTO>>({
@@ -86,6 +88,22 @@ export function WorkUnitCard({
     }
   };
 
+  const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      setIsEditing(true);
+    } else if (e.key === "Delete") {
+      e.preventDefault();
+      handleDelete();
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      onKeyboardNavigation?.(
+        e.key === "ArrowLeft" ? "left" : "right",
+        workUnit.id
+      );
+    }
+  };
+
   if (isEditing) {
     return (
       <div
@@ -133,6 +151,7 @@ export function WorkUnitCard({
     <div
       className={`p-4 bg-white border border-gray-300 rounded-lg shadow-sm transition-all ${focusRing}`}
       tabIndex={0}
+      onKeyDown={handleCardKeyDown}
       data-testid={`work-unit-card-${workUnit.id}`}
     >
       <div className="flex items-start justify-between mb-2">

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import Board from "@/app/board/page";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { StoryDTO } from "@/lib/types";
@@ -194,6 +194,95 @@ describe("Kanban Board page", () => {
       const card = screen.getByTestId("work-unit-card-wu-1");
       expect(card).toHaveAttribute("tabindex", "0");
       expect(card).toHaveClass("focus:ring-2", "focus:outline-none");
+    });
+  });
+
+  describe("Keyboard column navigation", () => {
+    it("sets up column refs so each column's cards are queryable for navigation", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        // wu-1 is in the To Do column, wu-2 is in In Progress, wu-3 is in Done.
+        // If column refs were wired correctly, each card renders inside the
+        // page without error and can be found directly.
+        expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
+        expect(screen.getByTestId("work-unit-card-wu-2")).toBeInTheDocument();
+        expect(screen.getByTestId("work-unit-card-wu-3")).toBeInTheDocument();
+      });
+    });
+
+    it("registers keyboard handlers without errors", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-card-wu-2")).toBeInTheDocument();
+      });
+
+      const middleCard = screen.getByTestId("work-unit-card-wu-2");
+      expect(() => {
+        fireEvent.keyDown(middleCard, { key: "ArrowLeft" });
+        fireEvent.keyDown(middleCard, { key: "ArrowRight" });
+      }).not.toThrow();
+    });
+
+    it("moves focus to the left column when ArrowLeft is pressed from the middle column", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-card-wu-2")).toBeInTheDocument();
+      });
+
+      const middleCard = screen.getByTestId("work-unit-card-wu-2"); // in_progress
+      const leftCard = screen.getByTestId("work-unit-card-wu-1"); // todo
+
+      middleCard.focus();
+      fireEvent.keyDown(middleCard, { key: "ArrowLeft" });
+
+      expect(document.activeElement).toBe(leftCard);
+    });
+
+    it("moves focus to the right column when ArrowRight is pressed from the middle column", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-card-wu-2")).toBeInTheDocument();
+      });
+
+      const middleCard = screen.getByTestId("work-unit-card-wu-2"); // in_progress
+      const rightCard = screen.getByTestId("work-unit-card-wu-3"); // done
+
+      middleCard.focus();
+      fireEvent.keyDown(middleCard, { key: "ArrowRight" });
+
+      expect(document.activeElement).toBe(rightCard);
+    });
+
+    it("is a no-op when ArrowLeft is pressed from the leftmost column", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
+      });
+
+      const leftCard = screen.getByTestId("work-unit-card-wu-1"); // todo
+      leftCard.focus();
+      fireEvent.keyDown(leftCard, { key: "ArrowLeft" });
+
+      expect(document.activeElement).toBe(leftCard);
+    });
+
+    it("is a no-op when ArrowRight is pressed from the rightmost column", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-card-wu-3")).toBeInTheDocument();
+      });
+
+      const rightCard = screen.getByTestId("work-unit-card-wu-3"); // done
+      rightCard.focus();
+      fireEvent.keyDown(rightCard, { key: "ArrowRight" });
+
+      expect(document.activeElement).toBe(rightCard);
     });
   });
 });

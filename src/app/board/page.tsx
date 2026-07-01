@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StoryDTO, WorkUnitDTO, Column, COLUMNS } from "@/lib/types";
 import { WorkUnitCard } from "@/components/WorkUnitCard";
+
+type ColumnRefMap = Record<Column, HTMLDivElement | null>;
 
 export default function Board() {
   const [stories, setStories] = useState<StoryDTO[]>([]);
@@ -30,6 +32,68 @@ export default function Board() {
   useEffect(() => {
     fetchStories();
   }, [fetchStories]);
+
+  // One ref per column, pointing at the DOM node that holds that column's
+  // work unit cards. Used by handleKeyboardNavigation to move focus between
+  // columns when the user presses ArrowLeft/ArrowRight on a card.
+  const columnRefs = useRef<ColumnRefMap>({
+    todo: null,
+    in_progress: null,
+    done: null,
+  });
+
+  const setColumnRef = useCallback(
+    (column: Column) => (el: HTMLDivElement | null) => {
+      columnRefs.current[column] = el;
+    },
+    []
+  );
+
+  const handleKeyboardNavigation = useCallback(
+    (direction: "left" | "right", currentUnitId: string) => {
+      const cardSelector = (id: string) =>
+        `[data-testid="work-unit-card-${id}"]`;
+
+      // Find which column currently contains the focused card.
+      const currentColumnIndex = COLUMNS.findIndex((column) =>
+        columnRefs.current[column]?.querySelector(cardSelector(currentUnitId))
+      );
+      if (currentColumnIndex === -1) return;
+
+      const currentColumnEl = columnRefs.current[COLUMNS[currentColumnIndex]];
+      const cardsInCurrentColumn = Array.from(
+        currentColumnEl?.querySelectorAll<HTMLElement>(
+          '[data-testid^="work-unit-card-"]'
+        ) ?? []
+      );
+      const currentIndex = cardsInCurrentColumn.findIndex(
+        (el) => el.matches(cardSelector(currentUnitId))
+      );
+
+      const targetColumnIndex =
+        direction === "left" ? currentColumnIndex - 1 : currentColumnIndex + 1;
+
+      // Already at the leftmost/rightmost column: no-op.
+      if (targetColumnIndex < 0 || targetColumnIndex >= COLUMNS.length) {
+        return;
+      }
+
+      const targetColumnEl = columnRefs.current[COLUMNS[targetColumnIndex]];
+      const cardsInTargetColumn = Array.from(
+        targetColumnEl?.querySelectorAll<HTMLElement>(
+          '[data-testid^="work-unit-card-"]'
+        ) ?? []
+      );
+      if (cardsInTargetColumn.length === 0) return;
+
+      const targetIndex = Math.min(
+        Math.max(currentIndex, 0),
+        cardsInTargetColumn.length - 1
+      );
+      cardsInTargetColumn[targetIndex]?.focus();
+    },
+    []
+  );
 
   if (loading) {
     return (
@@ -67,6 +131,8 @@ export default function Board() {
             column={column}
             stories={stories}
             onRefresh={() => fetchStories({ silent: true })}
+            columnRef={setColumnRef(column)}
+            onKeyboardNavigation={handleKeyboardNavigation}
           />
         ))}
       </div>
@@ -78,9 +144,20 @@ interface KanbanColumnProps {
   column: Column;
   stories: StoryDTO[];
   onRefresh: () => void;
+  columnRef?: (el: HTMLDivElement | null) => void;
+  onKeyboardNavigation?: (
+    direction: "left" | "right",
+    workUnitId: string
+  ) => void;
 }
 
-function KanbanColumn({ column, stories, onRefresh }: KanbanColumnProps) {
+function KanbanColumn({
+  column,
+  stories,
+  onRefresh,
+  columnRef,
+  onKeyboardNavigation,
+}: KanbanColumnProps) {
   const columnLabel = {
     todo: "To Do",
     in_progress: "In Progress",
@@ -109,7 +186,7 @@ function KanbanColumn({ column, stories, onRefresh }: KanbanColumnProps) {
         </p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3" ref={columnRef}>
         {workUnitsInColumn.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
             <p>No work units</p>
@@ -121,6 +198,7 @@ function KanbanColumn({ column, stories, onRefresh }: KanbanColumnProps) {
               workUnit={workUnit}
               onDelete={onRefresh}
               onUpdate={onRefresh}
+              onKeyboardNavigation={onKeyboardNavigation}
             />
           ))
         )}
