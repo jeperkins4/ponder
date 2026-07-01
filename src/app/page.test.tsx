@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import Home from "./page";
+import Home from "@/app/page";
 import { describe, it, expect } from "vitest";
 
 describe("Home page", () => {
