@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import TopNav from "@/components/TopNav";
 
 export const metadata: Metadata = {
-  title: "JIRA Kanban Sync",
-  description: "Local JIRA Kanban board sync tool",
+  title: "Ponder",
+  description: "Plan and track work units across your projects",
 };
 
 export default function RootLayout({
@@ -13,7 +14,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <TopNav />
+        {children}
+      </body>
     </html>
   );
 }
