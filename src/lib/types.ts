@@ -30,3 +30,17 @@ export interface StoryDTO {
   completionCommentPostedAt: string | null; // ISO string
   workUnits: WorkUnitDTO[];
 }
+
+export interface Project {
+  id: string;
+  name: string;
+  type: "JIRA" | "STANDALONE";
+  jiraProjectKey?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ProjectWithStats extends Project {
+  storyCount: number;
+  workUnitCount: number;
+}

@@ -9,6 +9,20 @@ datasource db {
   provider = "postgresql"
 }
 
+model Project {
+  id             String   @id @default(cuid())
+  name           String
+  type           String   @default("STANDALONE")
+  jiraProjectKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  stories   Story[]
+  workUnits WorkUnit[] @relation("ProjectWorkUnits")
+
+  @@index([jiraProjectKey])
+}
+
 model Story {
   id                        String     @id @default(cuid())
   jiraKey                   String     @unique
@@ -20,17 +34,26 @@ model Story {
   url                       String
   lastSyncedAt              DateTime
   completionCommentPostedAt DateTime?
+  projectId                 String?
+  project                   Project?   @relation(fields: [projectId], references: [id])
   workUnits                 WorkUnit[]
+
+  @@index([projectId])
 }
 
 model WorkUnit {
   id          String    @id @default(cuid())
   storyId     String
   story       Story     @relation(fields: [storyId], references: [id])
+  projectId   String?
+  project     Project?  @relation("ProjectWorkUnits", fields: [projectId], references: [id])
   title       String
   description String?
   column      String   // "todo" | "in_progress" | "done"
   order       Int
   createdAt   DateTime  @default(now())
   completedAt DateTime?
+
+  @@index([projectId])
+  @@index([storyId])
 }
