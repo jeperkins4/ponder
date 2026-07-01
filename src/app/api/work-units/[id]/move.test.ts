@@ -3,8 +3,21 @@
  * Tests actual Prisma client against test database
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
+
+vi.mock("@/lib/statusTrigger", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/statusTrigger")>(
+    "@/lib/statusTrigger"
+  );
+  return {
+    ...actual,
+    applyStoryStatusSync: vi.fn(async () => {
+      throw new Error("simulated JIRA sync failure");
+    }),
+  };
+});
+
 import { POST } from "@/app/api/work-units/[id]/move/route";
 
 describe("Work Unit Move Endpoint", () => {
@@ -164,6 +177,27 @@ describe("Work Unit Move Endpoint", () => {
 
     const body = await res.json();
     expect(body.error).toContain("Missing required fields");
+  });
+
+  it("POST still returns 200 when the JIRA status sync throws", async () => {
+    // applyStoryStatusSync is mocked (module-level, above) to always reject —
+    // simulating a JIRA/Claude outage. The move must still succeed.
+    const req = new Request("http://localhost/api/work-units/test-id/move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        column: "in_progress",
+        order: 1,
+      }),
+    });
+
+    const res = await POST(req as never, {
+      params: Promise.resolve({ id: workUnitId }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.column).toBe("in_progress");
   });
 
   afterAll(async () => {

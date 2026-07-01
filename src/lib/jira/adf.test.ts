@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { adfToPlainText } from "./adf";
+import { adfToPlainText, textToAdf } from "./adf";
 
 describe("ADF to Plain Text Converter", () => {
   it("should return empty string for null input", () => {
@@ -177,5 +177,26 @@ describe("ADF to Plain Text Converter", () => {
     };
     const result = adfToPlainText(adf);
     expect(result).toBe("Text");
+  });
+});
+
+describe("textToAdf", () => {
+  it("wraps plain text in a minimal valid ADF document", () => {
+    const result = textToAdf("Hello world");
+    expect(result).toEqual({
+      type: "doc",
+      version: 1,
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Hello world" }],
+        },
+      ],
+    });
+  });
+
+  it("round-trips through adfToPlainText", () => {
+    const text = "Some summary text";
+    expect(adfToPlainText(textToAdf(text))).toBe(text);
   });
 });
