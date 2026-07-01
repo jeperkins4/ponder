@@ -5,7 +5,7 @@
 
 import cuid from "cuid";
 import { StoryDTO } from "@/lib/types";
-import { buildAssignedStoriesJql } from "@/lib/jira/jql";
+import { buildAssignedStoriesJql, buildProjectStoriesJql } from "@/lib/jira/jql";
 import { adfToPlainText, type AdfNode } from "@/lib/jira/adf";
 
 /**
@@ -72,19 +72,19 @@ function issueToStoryDTO(issue: JiraIssue, siteUrl: string): StoryDTO {
 }
 
 /**
- * Fetches assigned stories from JIRA for the given project keys
- * @param projectKeys - Array of JIRA project keys (e.g., ['TEAM', 'OPS'])
+ * Runs a JQL search against the JIRA REST API and converts the results to
+ * StoryDTOs. This is the shared fetch mechanism (Basic Auth, /rest/api/3/search)
+ * used by every JQL-driven fetch in this module — new fetch functions should
+ * build a JQL string and delegate here rather than talking to fetch() directly.
+ * @param jql - JQL query string
  * @param config - JIRA configuration (siteUrl, email, apiToken)
  * @returns Array of StoryDTO objects
  * @throws Error if API request fails
  */
-export async function fetchAssignedStories(
-  projectKeys: string[],
+async function searchIssuesByJql(
+  jql: string,
   config: JiraConfig
 ): Promise<StoryDTO[]> {
-  // Build JQL query
-  const jql = buildAssignedStoriesJql(projectKeys);
-
   // Construct API URL
   const url = new URL(config.siteUrl);
   url.pathname = "/rest/api/3/search";
@@ -114,4 +114,36 @@ export async function fetchAssignedStories(
 
   // Convert issues to StoryDTO
   return data.issues.map((issue) => issueToStoryDTO(issue, config.siteUrl));
+}
+
+/**
+ * Fetches assigned stories from JIRA for the given project keys
+ * @param projectKeys - Array of JIRA project keys (e.g., ['TEAM', 'OPS'])
+ * @param config - JIRA configuration (siteUrl, email, apiToken)
+ * @returns Array of StoryDTO objects
+ * @throws Error if API request fails
+ */
+export async function fetchAssignedStories(
+  projectKeys: string[],
+  config: JiraConfig
+): Promise<StoryDTO[]> {
+  const jql = buildAssignedStoriesJql(projectKeys);
+  return searchIssuesByJql(jql, config);
+}
+
+/**
+ * Fetches all Story/Task/Bug issues for a single JIRA project (not limited to
+ * the current user's assigned issues). Used by project-aware sync to import
+ * every relevant issue for a project.
+ * @param projectKey - JIRA project key (e.g., 'TEAM')
+ * @param config - JIRA configuration (siteUrl, email, apiToken)
+ * @returns Array of StoryDTO objects
+ * @throws Error if API request fails
+ */
+export async function fetchStoriesForProject(
+  projectKey: string,
+  config: JiraConfig
+): Promise<StoryDTO[]> {
+  const jql = buildProjectStoriesJql(projectKey);
+  return searchIssuesByJql(jql, config);
 }

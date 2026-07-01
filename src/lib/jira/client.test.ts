@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { fetchAssignedStories, extractProjectKey } from "./client";
+import { fetchAssignedStories, fetchStoriesForProject, extractProjectKey } from "./client";
 import type { JiraConfig } from "./client";
 
 describe("JIRA API Client", () => {
@@ -328,6 +328,69 @@ describe("JIRA API Client", () => {
       expect(stories[0].projectKey).toBe("TEAM");
       expect(stories[1].projectKey).toBe("TEAM");
       expect(stories[2].projectKey).toBe("OPS");
+    });
+  });
+
+  describe("fetchStoriesForProject", () => {
+    it("fetches and converts all issues for a single project", async () => {
+      const mockResponse = {
+        issues: [
+          {
+            id: "10001",
+            key: "TEAM-123",
+            fields: {
+              summary: "Unassigned bug",
+              description: null,
+              status: { name: "To Do" },
+            },
+          },
+        ],
+      };
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => mockResponse,
+        })
+      );
+
+      const stories = await fetchStoriesForProject("TEAM", mockConfig);
+
+      expect(stories).toHaveLength(1);
+      expect(stories[0].jiraKey).toBe("TEAM-123");
+      expect(stories[0].projectKey).toBe("TEAM");
+    });
+
+    it("builds a JQL query scoped to the project key without an assignee filter", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ issues: [] }),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await fetchStoriesForProject("TEAM", mockConfig);
+
+      const url = mockFetch.mock.calls[0][0] as string;
+      const decodedUrl = decodeURIComponent(url.replace(/\+/g, " "));
+      expect(decodedUrl).toContain('project = "TEAM"');
+      expect(decodedUrl).toContain("issuetype in (Story, Task, Bug)");
+      expect(decodedUrl).not.toContain("assignee");
+    });
+
+    it("throws error on API failure", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 401,
+          statusText: "Unauthorized",
+        })
+      );
+
+      await expect(fetchStoriesForProject("TEAM", mockConfig)).rejects.toThrow(
+        "JIRA API error"
+      );
     });
   });
 });

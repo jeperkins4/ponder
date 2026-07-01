@@ -4,7 +4,12 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { fetchAssignedStories, type JiraConfig } from "@/lib/jira/client";
+import { prisma } from "@/lib/prisma";
+import {
+  fetchAssignedStories,
+  fetchStoriesForProject,
+  type JiraConfig,
+} from "@/lib/jira/client";
 
 /**
  * Result of a sync operation
@@ -12,6 +17,17 @@ import { fetchAssignedStories, type JiraConfig } from "@/lib/jira/client";
 export interface SyncResult {
   created: number;
   updated: number;
+}
+
+/**
+ * Result of a project-aware sync operation. `message` is populated (and
+ * created/updated left at 0) when the project isn't linked to JIRA, so
+ * callers can distinguish "nothing to sync" from "sync failed".
+ */
+export interface ProjectSyncResult {
+  created: number;
+  updated: number;
+  message?: string;
 }
 
 /**
@@ -72,6 +88,98 @@ export async function syncStoriesFromJira(
           completionCommentPostedAt: story.completionCommentPostedAt
             ? new Date(story.completionCommentPostedAt)
             : null,
+        },
+      });
+      created++;
+    }
+  }
+
+  return { created, updated };
+}
+
+/**
+ * Syncs stories from JIRA into a specific project, filtered by that
+ * project's jiraProjectKey.
+ *
+ * - Non-existent project: throws (callers, e.g. the sync route, should map
+ *   this to an error response).
+ * - STANDALONE project or missing jiraProjectKey: returns a no-op result
+ *   with an explanatory message rather than erroring, since "not linked to
+ *   JIRA" is an expected, non-exceptional state.
+ * - JIRA project: fetches Story/Task/Bug issues for the project's key and
+ *   upserts them into Story, keyed by jiraKey, with projectId set.
+ *
+ * @param projectId - ID of the Project to sync
+ * @param prismaClient - Prisma client instance (defaults to the app singleton;
+ *   overridable for tests)
+ * @returns Object with created/updated counts, and an optional message
+ * @throws Error if the project does not exist
+ */
+export async function syncStoriesForProject(
+  projectId: string,
+  prismaClient: PrismaClient = prisma
+): Promise<ProjectSyncResult> {
+  const project = await prismaClient.project.findUnique({
+    where: { id: projectId },
+  });
+
+  if (!project) {
+    throw new Error(`Project not found: ${projectId}`);
+  }
+
+  if (project.type !== "JIRA" || !project.jiraProjectKey) {
+    return { created: 0, updated: 0, message: "Project is not linked to JIRA" };
+  }
+
+  const jiraConfig: JiraConfig = {
+    siteUrl: process.env.JIRA_SITE_URL!,
+    email: process.env.JIRA_EMAIL!,
+    apiToken: process.env.JIRA_API_TOKEN!,
+  };
+
+  const stories = await fetchStoriesForProject(project.jiraProjectKey, jiraConfig);
+
+  let created = 0;
+  let updated = 0;
+
+  for (const story of stories) {
+    const existingStory = await prismaClient.story.findUnique({
+      where: { jiraKey: story.jiraKey },
+    });
+
+    if (existingStory) {
+      await prismaClient.story.update({
+        where: { jiraKey: story.jiraKey },
+        data: {
+          jiraId: story.jiraId,
+          projectKey: story.projectKey,
+          summary: story.summary,
+          description: story.description,
+          jiraStatus: story.jiraStatus,
+          url: story.url,
+          lastSyncedAt: new Date(story.lastSyncedAt),
+          completionCommentPostedAt: story.completionCommentPostedAt
+            ? new Date(story.completionCommentPostedAt)
+            : null,
+          projectId,
+        },
+      });
+      updated++;
+    } else {
+      await prismaClient.story.create({
+        data: {
+          jiraKey: story.jiraKey,
+          jiraId: story.jiraId,
+          projectKey: story.projectKey,
+          summary: story.summary,
+          description: story.description,
+          jiraStatus: story.jiraStatus,
+          url: story.url,
+          lastSyncedAt: new Date(story.lastSyncedAt),
+          completionCommentPostedAt: story.completionCommentPostedAt
+            ? new Date(story.completionCommentPostedAt)
+            : null,
+          projectId,
         },
       });
       created++;

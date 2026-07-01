@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
-import { syncStoriesFromJira } from "./sync";
+import { syncStoriesFromJira, syncStoriesForProject } from "./sync";
 import * as jiraClient from "@/lib/jira/client";
 import type { StoryDTO } from "@/lib/types";
 
@@ -328,5 +328,195 @@ describe("syncStoriesFromJira", () => {
     expect(result.created).toBe(2);
     expect(result.updated).toBe(1);
     expect(result).toEqual({ created: 2, updated: 1 });
+  });
+});
+
+describe("syncStoriesForProject", () => {
+  let mockFetchStoriesForProject: ReturnType<typeof vi.fn>;
+  let mockPrisma: {
+    project: {
+      findUnique: ReturnType<typeof vi.fn>;
+    };
+    story: {
+      findUnique: ReturnType<typeof vi.fn>;
+      create: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+    };
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockPrisma = {
+      project: {
+        findUnique: vi.fn(),
+      },
+      story: {
+        findUnique: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+    };
+
+    mockFetchStoriesForProject = vi.fn();
+    vi.spyOn(jiraClient, "fetchStoriesForProject").mockImplementation(
+      mockFetchStoriesForProject as any
+    );
+  });
+
+  it("throws when the project does not exist", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce(null);
+
+    await expect(
+      syncStoriesForProject("nonexistent-id", mockPrisma as unknown as PrismaClient)
+    ).rejects.toThrow("Project not found");
+
+    expect(mockFetchStoriesForProject).not.toHaveBeenCalled();
+  });
+
+  it("returns a no-op result for a STANDALONE project without calling JIRA", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({
+      id: "proj-1",
+      name: "Personal",
+      type: "STANDALONE",
+      jiraProjectKey: null,
+    });
+
+    const result = await syncStoriesForProject(
+      "proj-1",
+      mockPrisma as unknown as PrismaClient
+    );
+
+    expect(result).toEqual({
+      created: 0,
+      updated: 0,
+      message: "Project is not linked to JIRA",
+    });
+    expect(mockFetchStoriesForProject).not.toHaveBeenCalled();
+  });
+
+  it("returns a no-op result for a JIRA-type project missing a jiraProjectKey", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({
+      id: "proj-2",
+      name: "Half-configured",
+      type: "JIRA",
+      jiraProjectKey: null,
+    });
+
+    const result = await syncStoriesForProject(
+      "proj-2",
+      mockPrisma as unknown as PrismaClient
+    );
+
+    expect(result).toEqual({
+      created: 0,
+      updated: 0,
+      message: "Project is not linked to JIRA",
+    });
+    expect(mockFetchStoriesForProject).not.toHaveBeenCalled();
+  });
+
+  it("creates new stories with projectId set for a JIRA project", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({
+      id: "proj-3",
+      name: "Team Project",
+      type: "JIRA",
+      jiraProjectKey: "TEAM",
+    });
+
+    const stories: StoryDTO[] = [
+      {
+        id: "story-1",
+        jiraKey: "TEAM-1",
+        jiraId: "10000",
+        projectKey: "TEAM",
+        summary: "First story",
+        description: "First description",
+        jiraStatus: "To Do",
+        url: "https://example.com/browse/TEAM-1",
+        lastSyncedAt: "2024-01-01T00:00:00.000Z",
+        completionCommentPostedAt: null,
+        workUnits: [],
+      },
+    ];
+
+    mockFetchStoriesForProject.mockResolvedValueOnce(stories);
+    mockPrisma.story.findUnique.mockResolvedValueOnce(null);
+    mockPrisma.story.create.mockResolvedValueOnce({});
+
+    const result = await syncStoriesForProject(
+      "proj-3",
+      mockPrisma as unknown as PrismaClient
+    );
+
+    expect(mockFetchStoriesForProject).toHaveBeenCalledWith(
+      "TEAM",
+      expect.any(Object)
+    );
+    expect(mockPrisma.story.create).toHaveBeenCalledWith({
+      data: {
+        jiraKey: "TEAM-1",
+        jiraId: "10000",
+        projectKey: "TEAM",
+        summary: "First story",
+        description: "First description",
+        jiraStatus: "To Do",
+        url: "https://example.com/browse/TEAM-1",
+        lastSyncedAt: new Date("2024-01-01T00:00:00.000Z"),
+        completionCommentPostedAt: null,
+        projectId: "proj-3",
+      },
+    });
+    expect(result).toEqual({ created: 1, updated: 0 });
+  });
+
+  it("updates existing stories (matched by jiraKey) with projectId set", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({
+      id: "proj-4",
+      name: "Team Project",
+      type: "JIRA",
+      jiraProjectKey: "TEAM",
+    });
+
+    const stories: StoryDTO[] = [
+      {
+        id: "story-1",
+        jiraKey: "TEAM-1",
+        jiraId: "10000",
+        projectKey: "TEAM",
+        summary: "Updated story",
+        description: "Updated description",
+        jiraStatus: "In Progress",
+        url: "https://example.com/browse/TEAM-1",
+        lastSyncedAt: "2024-01-02T00:00:00.000Z",
+        completionCommentPostedAt: null,
+        workUnits: [],
+      },
+    ];
+
+    mockFetchStoriesForProject.mockResolvedValueOnce(stories);
+    mockPrisma.story.findUnique.mockResolvedValueOnce({ id: "existing-1" });
+    mockPrisma.story.update.mockResolvedValueOnce({});
+
+    const result = await syncStoriesForProject(
+      "proj-4",
+      mockPrisma as unknown as PrismaClient
+    );
+
+    expect(mockPrisma.story.update).toHaveBeenCalledWith({
+      where: { jiraKey: "TEAM-1" },
+      data: {
+        jiraId: "10000",
+        projectKey: "TEAM",
+        summary: "Updated story",
+        description: "Updated description",
+        jiraStatus: "In Progress",
+        url: "https://example.com/browse/TEAM-1",
+        lastSyncedAt: new Date("2024-01-02T00:00:00.000Z"),
+        completionCommentPostedAt: null,
+        projectId: "proj-4",
+      },
+    });
+    expect(result).toEqual({ created: 0, updated: 1 });
   });
 });

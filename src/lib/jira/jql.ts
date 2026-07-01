@@ -18,3 +18,18 @@ export function buildAssignedStoriesJql(projectKeys: string[]): string {
   const keys = projectKeys.join(", ");
   return `project IN (${keys}) AND assignee = currentUser() AND statusCategory != Done`;
 }
+
+/**
+ * Builds a JQL query for finding all Story/Task/Bug issues in a single project.
+ * Used by project-aware sync, which imports every relevant issue for a
+ * project rather than only issues assigned to the current user.
+ * @param projectKey - JIRA project key (e.g., 'TEAM')
+ * @returns JQL query string
+ * @throws Error if projectKey is empty
+ */
+export function buildProjectStoriesJql(projectKey: string): string {
+  if (!projectKey) {
+    throw new Error("buildProjectStoriesJql requires a project key");
+  }
+  return `project = "${projectKey}" AND issuetype in (Story, Task, Bug)`;
+}

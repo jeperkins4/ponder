@@ -1,15 +1,20 @@
 /**
  * GET /api/stories
- * List all stories with their work units
+ * List stories with their work units. Accepts an optional `?projectId=`
+ * query param to filter to a single project; omitting it returns all
+ * stories (backward compatible with pre-multi-project callers).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Column, StoryDTO } from "@/lib/types";
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
+    const projectId = request.nextUrl.searchParams.get("projectId");
+
     const stories = await prisma.story.findMany({
+      where: projectId ? { projectId } : undefined,
       include: {
         workUnits: {
           orderBy: { order: "asc" },
