@@ -74,6 +74,9 @@ describe("Kanban Board page", () => {
         json: () => Promise.resolve(mockStories),
       } as Response)
     );
+
+    // Onboarding is first-visit-only; start each test from a clean slate.
+    window.localStorage.clear();
   });
 
   it("renders the board heading", async () => {
@@ -433,6 +436,54 @@ describe("Kanban Board page", () => {
         const liveRegion = document.querySelector('[aria-live="polite"]');
         expect(liveRegion).toHaveTextContent("Deleted work unit: Work unit 1");
       });
+    });
+  });
+
+  describe("Onboarding tooltip", () => {
+    it("is shown on first visit, when boardOnboarded is not set in localStorage", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("dialog", { name: /Welcome to Kanban Board/i })
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("is hidden when boardOnboarded is already set to 'true' in localStorage", async () => {
+      window.localStorage.setItem("boardOnboarded", "true");
+
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: /Kanban Board/i })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("clicking 'Got it' sets localStorage and hides the tooltip", async () => {
+      render(<Board />);
+
+      const dismissButton = await screen.findByTestId(
+        "onboarding-dismiss-button"
+      );
+      fireEvent.click(dismissButton);
+
+      expect(window.localStorage.getItem("boardOnboarded")).toBe("true");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("pressing Escape dismisses the tooltip", async () => {
+      render(<Board />);
+
+      await screen.findByRole("dialog", { name: /Welcome to Kanban Board/i });
+
+      fireEvent.keyDown(document, { key: "Escape" });
+
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+      expect(window.localStorage.getItem("boardOnboarded")).toBe("true");
     });
   });
 });

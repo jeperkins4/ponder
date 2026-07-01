@@ -3,14 +3,35 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StoryDTO, WorkUnitDTO, Column, COLUMNS } from "@/lib/types";
 import { WorkUnitCard } from "@/components/WorkUnitCard";
+import { OnboardingTooltip } from "@/components/OnboardingTooltip";
 
 type ColumnRefMap = Record<Column, HTMLDivElement | null>;
+
+const ONBOARDING_STORAGE_KEY = "boardOnboarded";
 
 export default function Board() {
   const [stories, setStories] = useState<StoryDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    // `?reset-onboarding=true` lets us re-trigger the tooltip for manual
+    // testing without clearing localStorage by hand.
+    const params = new URLSearchParams(window.location.search);
+    const forceReset = params.get("reset-onboarding") === "true";
+
+    const hasOnboarded = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    if (forceReset || !hasOnboarded) {
+      setShowOnboarding(true);
+    }
+  }, []);
+
+  const handleOnboardingDismiss = useCallback(() => {
+    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
+    setShowOnboarding(false);
+  }, []);
 
   const fetchStories = useCallback(async (opts?: { silent?: boolean }) => {
     try {
@@ -157,6 +178,11 @@ export default function Board() {
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {statusMessage}
       </div>
+
+      <OnboardingTooltip
+        isOpen={showOnboarding}
+        onDismiss={handleOnboardingDismiss}
+      />
 
       <main role="main" id="main-content" className="min-h-screen bg-gray-100 p-8">
         {content}
