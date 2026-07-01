@@ -2,7 +2,7 @@
  * Integration test for Prisma client and database models
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "./prisma";
 
 describe("Prisma Integration", () => {
@@ -49,5 +49,10 @@ describe("Prisma Integration", () => {
     expect(foundStory!.jiraKey).toBe("TEAM-1");
     expect(foundStory!.workUnits).toHaveLength(1);
     expect(foundStory!.workUnits[0].title).toBe("First work unit");
+  });
+
+  afterAll(async () => {
+    // Properly close database connections and adapter resources
+    await prisma.$disconnect();
   });
 });
