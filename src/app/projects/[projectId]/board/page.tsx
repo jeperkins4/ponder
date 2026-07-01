@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { Project } from "@/lib/types";
 import { ProjectSelector } from "@/components/ProjectSelector";
 import { ImportFromJiraButton } from "@/components/ImportFromJiraButton";
+import { ProjectSettingsLink } from "@/components/ProjectSettingsLink";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { ProjectNotFound } from "@/components/ProjectNotFound";
 
@@ -49,6 +50,7 @@ export default async function ProjectBoardPage({
       headerActions={
         <>
           <ProjectSelector projects={projects} currentProjectId={project.id} />
+          <ProjectSettingsLink projectId={project.id} />
           {project.type === "JIRA" && (
             <ImportFromJiraButton projectId={project.id} />
           )}
