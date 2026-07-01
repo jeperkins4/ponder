@@ -1,11 +1,63 @@
 /**
- * POST /api/work-units
- * Create a new work unit
+ * GET /api/work-units?storyId=X - List work units (optionally filtered by storyId)
+ * POST /api/work-units - Create a new work unit
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Column, StoryDTO } from "@/lib/types";
+import { Column, StoryDTO, WorkUnitDTO } from "@/lib/types";
+
+// Helper to convert Prisma WorkUnit to DTO
+function workUnitToDTO(wu: {
+  id: string;
+  storyId: string;
+  title: string;
+  description: string | null;
+  column: string;
+  order: number;
+  createdAt: Date;
+  completedAt: Date | null;
+}): WorkUnitDTO {
+  return {
+    id: wu.id,
+    storyId: wu.storyId,
+    title: wu.title,
+    description: wu.description,
+    column: wu.column as Column,
+    order: wu.order,
+    createdAt: wu.createdAt.toISOString(),
+    completedAt: wu.completedAt?.toISOString() ?? null,
+  };
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const storyId = request.nextUrl.searchParams.get("storyId");
+
+    if (storyId) {
+      // Filter by storyId if provided
+      const workUnits = await prisma.workUnit.findMany({
+        where: { storyId },
+        orderBy: { order: "asc" },
+      });
+
+      return NextResponse.json(workUnits.map(workUnitToDTO));
+    } else {
+      // Return all work units
+      const workUnits = await prisma.workUnit.findMany({
+        orderBy: [{ storyId: "asc" }, { order: "asc" }],
+      });
+
+      return NextResponse.json(workUnits.map(workUnitToDTO));
+    }
+  } catch (error) {
+    console.error("Error fetching work units:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
