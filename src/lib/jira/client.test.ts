@@ -37,6 +37,83 @@ describe("JIRA API Client", () => {
     });
   });
 
+  describe("enhanced search endpoint (/rest/api/3/search/jql)", () => {
+    const makeIssue = (n: number) => ({
+      id: `100${n}`,
+      key: `TEAM-${n}`,
+      fields: {
+        summary: `Issue ${n}`,
+        description: null,
+        status: { name: "To Do" },
+      },
+    });
+
+    it("targets /search/jql and requests fields + maxResults explicitly", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ issues: [makeIssue(1)] }),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await fetchStoriesForProject("TEAM", mockConfig);
+
+      const url = mockFetch.mock.calls[0][0] as string;
+      expect(url).toContain("/rest/api/3/search/jql");
+      // The enhanced endpoint returns only id/key unless fields is requested.
+      expect(url).toContain("fields=summary%2Cdescription%2Cstatus");
+      expect(url).toContain("maxResults=");
+    });
+
+    it("walks every page using nextPageToken and returns all issues", async () => {
+      const mockFetch = vi
+        .fn()
+        // Page 1: a continuation token is returned.
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            issues: [makeIssue(1), makeIssue(2)],
+            nextPageToken: "TOKEN_PAGE_2",
+          }),
+        })
+        // Page 2: no token → last page.
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ issues: [makeIssue(3)] }),
+        });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const stories = await fetchStoriesForProject("TEAM", mockConfig);
+
+      // All three issues across both pages are returned.
+      expect(stories.map((s) => s.jiraKey)).toEqual([
+        "TEAM-1",
+        "TEAM-2",
+        "TEAM-3",
+      ]);
+      // Two requests were made, and the second carried the page-2 token.
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch.mock.calls[0][0]).not.toContain("nextPageToken");
+      expect(mockFetch.mock.calls[1][0]).toContain("nextPageToken=TOKEN_PAGE_2");
+    });
+
+    it("stops paginating when isLast is true even if a token is present", async () => {
+      const mockFetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          issues: [makeIssue(1)],
+          nextPageToken: "SHOULD_NOT_BE_USED",
+          isLast: true,
+        }),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const stories = await fetchStoriesForProject("TEAM", mockConfig);
+
+      expect(stories).toHaveLength(1);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("fetchAssignedStories", () => {
     it("fetches and converts assigned stories", async () => {
       const mockResponse = {
