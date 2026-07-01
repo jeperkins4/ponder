@@ -17,12 +17,16 @@ interface WorkUnitCardProps {
 const columnLabels: Record<Column, string> = {
   todo: "To Do",
   in_progress: "In Progress",
+  code_review: "Code Review",
+  in_review: "In Review",
   done: "Done",
 };
 
 const columnColors: Record<Column, string> = {
   todo: "bg-gray-100 text-gray-800",
   in_progress: "bg-blue-100 text-blue-800",
+  code_review: "bg-purple-100 text-purple-800",
+  in_review: "bg-amber-100 text-amber-800",
   done: "bg-green-100 text-green-800",
 };
 
