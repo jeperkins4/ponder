@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { pickTransition, JiraTransition } from "./transitions";
+import { pickTransition, pickTransitionByStatusName, JiraTransition } from "./transitions";
 
 describe("Transitions", () => {
   const mockTransitions: JiraTransition[] = [
@@ -64,5 +64,54 @@ describe("Transitions", () => {
     const transition = pickTransition(mockTransitions, "indeterminate");
     // Should return the first match
     expect(transition?.id).toBe("1");
+  });
+});
+
+describe("pickTransitionByStatusName", () => {
+  const workflowTransitions: JiraTransition[] = [
+    {
+      id: "11",
+      name: "Start Progress",
+      to: { name: "In Progress", statusCategory: { key: "indeterminate" } },
+    },
+    {
+      id: "21",
+      name: "Send to Review",
+      to: { name: "Code Revew", statusCategory: { key: "indeterminate" } },
+    },
+  ];
+
+  it("matches a transition by its destination status name", () => {
+    const t = pickTransitionByStatusName(workflowTransitions, "In Progress");
+    expect(t?.id).toBe("11");
+  });
+
+  it("matches case-insensitively", () => {
+    const t = pickTransitionByStatusName(workflowTransitions, "in progress");
+    expect(t?.id).toBe("11");
+  });
+
+  it("treats 'Code Review' and 'Code Revew' as equivalent", () => {
+    const t1 = pickTransitionByStatusName(workflowTransitions, "Code Review");
+    expect(t1?.id).toBe("21");
+
+    const misspelledTransitions: JiraTransition[] = [
+      {
+        id: "22",
+        name: "Send to Review",
+        to: { name: "Code Review", statusCategory: { key: "indeterminate" } },
+      },
+    ];
+    const t2 = pickTransitionByStatusName(misspelledTransitions, "Code Revew");
+    expect(t2?.id).toBe("22");
+  });
+
+  it("returns null when no transition matches the status name", () => {
+    const t = pickTransitionByStatusName(workflowTransitions, "Done");
+    expect(t).toBeNull();
+  });
+
+  it("returns null for an empty transitions list", () => {
+    expect(pickTransitionByStatusName([], "In Progress")).toBeNull();
   });
 });

@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Column, WorkUnitDTO } from "@/lib/types";
-import { checkAndUpdateStoryStatus } from "@/lib/statusTrigger";
+import { applyStoryStatusSync } from "@/lib/statusTrigger";
 
 // Helper to convert Prisma WorkUnit to DTO
 function workUnitToDTO(wu: {
@@ -68,8 +68,15 @@ export async function POST(
       },
     });
 
-    // Check if all work units for this story are now done
-    await checkAndUpdateStoryStatus(existing.storyId, prisma);
+    // Sync JIRA status from the board (non-blocking): applyStoryStatusSync
+    // never throws internally, but this try/catch is load-bearing belt-and-
+    // suspenders — the move must return 200 to the client regardless of
+    // JIRA/Claude availability.
+    try {
+      await applyStoryStatusSync(existing.storyId, prisma);
+    } catch (syncError) {
+      console.warn("Non-blocking JIRA status sync failure:", syncError);
+    }
 
     return NextResponse.json(workUnitToDTO(updated));
   } catch (error) {

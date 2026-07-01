@@ -2,9 +2,11 @@
  * Shared TypeScript types for the kanban application
  */
 
-export type Column = "todo" | "in_progress" | "done";
-
-export const COLUMNS: Column[] = ["todo", "in_progress", "done"];
+export type Column =
+  | "todo"
+  | "in_progress"
+  | "code_review"
+  | "done";
 
 export interface WorkUnitDTO {
   id: string;

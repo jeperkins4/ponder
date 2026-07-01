@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StoryDTO, WorkUnitDTO, Column, COLUMNS } from "@/lib/types";
+import { StoryDTO, WorkUnitDTO, Column } from "@/lib/types";
+import { COLUMNS } from "@/lib/columns";
 import { WorkUnitCard } from "@/components/WorkUnitCard";
 import { OnboardingTooltip } from "@/components/OnboardingTooltip";
 import { useTheme } from "@/hooks/useTheme";
@@ -84,12 +85,27 @@ export function KanbanBoard({
     fetchStories();
   }, [fetchStories]);
 
+  // ImportFromJiraButton lives inside `headerActions`, a separate element
+  // tree from this component's own state, so it has no direct handle on
+  // `fetchStories`. It broadcasts this DOM event instead (mirroring the
+  // THEME_EVENT pattern in useTheme.ts) once an import finishes; refetch
+  // silently so newly created cards show up without a loading flash.
+  useEffect(() => {
+    const handleImportComplete = () => {
+      fetchStories({ silent: true });
+    };
+    window.addEventListener("ponder-jira-import-complete", handleImportComplete);
+    return () =>
+      window.removeEventListener("ponder-jira-import-complete", handleImportComplete);
+  }, [fetchStories]);
+
   // One ref per column, pointing at the DOM node that holds that column's
   // work unit cards. Used by handleKeyboardNavigation to move focus between
   // columns when the user presses ArrowLeft/ArrowRight on a card.
   const columnRefs = useRef<ColumnRefMap>({
     todo: null,
     in_progress: null,
+    code_review: null,
     done: null,
   });
 
@@ -112,12 +128,13 @@ export function KanbanBoard({
         `[data-testid="work-unit-card-${id}"]`;
 
       // Find which column currently contains the focused card.
-      const currentColumnIndex = COLUMNS.findIndex((column) =>
-        columnRefs.current[column]?.querySelector(cardSelector(currentUnitId))
+      const currentColumnIndex = COLUMNS.findIndex(({ key }) =>
+        columnRefs.current[key]?.querySelector(cardSelector(currentUnitId))
       );
       if (currentColumnIndex === -1) return;
 
-      const currentColumnEl = columnRefs.current[COLUMNS[currentColumnIndex]];
+      const currentColumnEl =
+        columnRefs.current[COLUMNS[currentColumnIndex].key];
       const cardsInCurrentColumn = Array.from(
         currentColumnEl?.querySelectorAll<HTMLElement>(
           '[data-testid^="work-unit-card-"]'
@@ -135,7 +152,8 @@ export function KanbanBoard({
         return;
       }
 
-      const targetColumnEl = columnRefs.current[COLUMNS[targetColumnIndex]];
+      const targetColumnEl =
+        columnRefs.current[COLUMNS[targetColumnIndex].key];
       const cardsInTargetColumn = Array.from(
         targetColumnEl?.querySelectorAll<HTMLElement>(
           '[data-testid^="work-unit-card-"]'
@@ -176,19 +194,22 @@ export function KanbanBoard({
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          {COLUMNS.map((column) => (
-            <KanbanColumn
-              key={column}
-              column={column}
-              stories={stories}
-              onRefresh={() => fetchStories({ silent: true })}
-              columnRef={setColumnRef(column)}
-              onKeyboardNavigation={handleKeyboardNavigation}
-              onStatusMessage={handleStatusMessage}
-              isDark={isDark}
-            />
-          ))}
+        <div className="overflow-x-auto">
+          <div className="grid grid-cols-4 gap-4 min-w-[900px]">
+            {COLUMNS.map(({ key, label }) => (
+              <KanbanColumn
+                key={key}
+                column={key}
+                columnLabel={label}
+                stories={stories}
+                onRefresh={() => fetchStories({ silent: true })}
+                columnRef={setColumnRef(key)}
+                onKeyboardNavigation={handleKeyboardNavigation}
+                onStatusMessage={handleStatusMessage}
+                isDark={isDark}
+              />
+            ))}
+          </div>
         </div>
       </>
     );
@@ -238,6 +259,7 @@ export function KanbanBoard({
 
 interface KanbanColumnProps {
   column: Column;
+  columnLabel: string;
   stories: StoryDTO[];
   onRefresh: () => void;
   columnRef?: (el: HTMLDivElement | null) => void;
@@ -251,6 +273,7 @@ interface KanbanColumnProps {
 
 function KanbanColumn({
   column,
+  columnLabel,
   stories,
   onRefresh,
   columnRef,
@@ -258,12 +281,6 @@ function KanbanColumn({
   onStatusMessage,
   isDark = false,
 }: KanbanColumnProps) {
-  const columnLabel = {
-    todo: "To Do",
-    in_progress: "In Progress",
-    done: "Done",
-  }[column];
-
   // Get all work units in this column
   const workUnitsInColumn: WorkUnitDTO[] = [];
 
