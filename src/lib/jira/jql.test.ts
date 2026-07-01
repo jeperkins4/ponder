@@ -35,9 +35,11 @@ describe("JQL Builder", () => {
 });
 
 describe("buildProjectStoriesJql", () => {
-  it("should build JQL scoped to a single project's key and issue types", () => {
+  it("should scope to the project's key, issue types, and the current user", () => {
     const jql = buildProjectStoriesJql("TEAM");
-    expect(jql).toBe('project = "TEAM" AND issuetype in (Story, Task, Bug)');
+    expect(jql).toBe(
+      'project = "TEAM" AND issuetype in (Story, Task, Bug) AND assignee = currentUser()'
+    );
   });
 
   it("should throw an error for an empty project key", () => {

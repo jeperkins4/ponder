@@ -444,7 +444,7 @@ describe("JIRA API Client", () => {
       expect(stories[0].projectKey).toBe("TEAM");
     });
 
-    it("builds a JQL query scoped to the project key without an assignee filter", async () => {
+    it("builds a JQL query scoped to the project key and the current user", async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ issues: [] }),
@@ -457,7 +457,7 @@ describe("JIRA API Client", () => {
       const decodedUrl = decodeURIComponent(url.replace(/\+/g, " "));
       expect(decodedUrl).toContain('project = "TEAM"');
       expect(decodedUrl).toContain("issuetype in (Story, Task, Bug)");
-      expect(decodedUrl).not.toContain("assignee");
+      expect(decodedUrl).toContain("assignee = currentUser()");
     });
 
     it("throws error on API failure", async () => {
