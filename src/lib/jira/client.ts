@@ -147,3 +147,64 @@ export async function fetchStoriesForProject(
   const jql = buildProjectStoriesJql(projectKey);
   return searchIssuesByJql(jql, config);
 }
+
+/**
+ * Result of a lightweight JIRA connection check.
+ */
+export type JiraConnectionResult =
+  | { ok: true; displayName?: string }
+  | { ok: false; error: string };
+
+/**
+ * Performs a single lightweight authenticated GET against
+ * `${siteUrl}/rest/api/3/myself` to validate a set of JIRA credentials,
+ * reusing the same Basic-auth header construction as the rest of this
+ * module. Never throws: all failure modes (bad credentials, bad site URL,
+ * network errors) are surfaced as `{ ok: false, error }`.
+ * @param config - JIRA configuration (siteUrl, email, apiToken) to validate
+ * @returns `{ ok: true, displayName? }` on success, `{ ok: false, error }` otherwise
+ */
+export async function testJiraConnection(
+  config: JiraConfig
+): Promise<JiraConnectionResult> {
+  const credentials = Buffer.from(
+    `${config.email}:${config.apiToken}`
+  ).toString("base64");
+
+  let response: Response;
+  try {
+    const url = new URL(config.siteUrl);
+    url.pathname = "/rest/api/3/myself";
+
+    response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        Accept: "application/json",
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return { ok: false, error: `Could not reach JIRA — ${message}` };
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      return { ok: false, error: "HTTP 401 — check email/API token" };
+    }
+    if (response.status === 404) {
+      return { ok: false, error: "HTTP 404 — check the site URL" };
+    }
+    return {
+      ok: false,
+      error: `HTTP ${response.status} — ${response.statusText}`,
+    };
+  }
+
+  try {
+    const data = await response.json();
+    return { ok: true, displayName: data?.displayName };
+  } catch {
+    return { ok: true };
+  }
+}

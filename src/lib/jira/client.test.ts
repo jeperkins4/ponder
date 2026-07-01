@@ -3,7 +3,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { fetchAssignedStories, fetchStoriesForProject, extractProjectKey } from "./client";
+import {
+  fetchAssignedStories,
+  fetchStoriesForProject,
+  extractProjectKey,
+  testJiraConnection,
+} from "./client";
 import type { JiraConfig } from "./client";
 
 describe("JIRA API Client", () => {
@@ -390,6 +395,114 @@ describe("JIRA API Client", () => {
 
       await expect(fetchStoriesForProject("TEAM", mockConfig)).rejects.toThrow(
         "JIRA API error"
+      );
+    });
+  });
+
+  describe("testJiraConnection", () => {
+    it("returns ok with the display name on a 200 response", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ displayName: "Jane Doe" }),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const result = await testJiraConnection(mockConfig);
+
+      expect(result).toEqual({ ok: true, displayName: "Jane Doe" });
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toBe("https://example.atlassian.net/rest/api/3/myself");
+      const authHeader = (options.headers as Record<string, string>)
+        .Authorization;
+      expect(authHeader).toMatch(/^Basic /);
+      const decoded = Buffer.from(
+        authHeader.replace("Basic ", ""),
+        "base64"
+      ).toString("utf-8");
+      expect(decoded).toBe("user@example.com:test-token-123");
+    });
+
+    it("returns ok without a display name when the response has none", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({}),
+        })
+      );
+
+      const result = await testJiraConnection(mockConfig);
+
+      expect(result).toEqual({ ok: true, displayName: undefined });
+    });
+
+    it("maps a 401 response to a friendly credentials error", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 401,
+          statusText: "Unauthorized",
+        })
+      );
+
+      const result = await testJiraConnection(mockConfig);
+
+      expect(result).toEqual({
+        ok: false,
+        error: "HTTP 401 — check email/API token",
+      });
+    });
+
+    it("maps a 404 response to a friendly site-url error", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
+        })
+      );
+
+      const result = await testJiraConnection(mockConfig);
+
+      expect(result).toEqual({
+        ok: false,
+        error: "HTTP 404 — check the site URL",
+      });
+    });
+
+    it("maps other non-ok statuses to a generic HTTP error", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          statusText: "Internal Server Error",
+        })
+      );
+
+      const result = await testJiraConnection(mockConfig);
+
+      expect(result).toEqual({
+        ok: false,
+        error: "HTTP 500 — Internal Server Error",
+      });
+    });
+
+    it("maps a network error to a friendly message", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockRejectedValue(new Error("fetch failed"))
+      );
+
+      const result = await testJiraConnection(mockConfig);
+
+      expect(result.ok).toBe(false);
+      expect((result as { ok: false; error: string }).error).toContain(
+        "fetch failed"
       );
     });
   });

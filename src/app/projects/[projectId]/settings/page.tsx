@@ -11,22 +11,29 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Project } from "@/lib/types";
+import { ProjectWithStats } from "@/lib/types";
 
 const focusRing =
   "focus:ring-2 focus:ring-ponder-light-purple focus:outline-none";
+
+type TestConnectionStatus = "idle" | "testing" | "success" | "error";
 
 export default function ProjectSettingsPage() {
   const router = useRouter();
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId as string;
 
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<ProjectWithStats | null>(null);
   const [name, setName] = useState("");
   const [jiraProjectKey, setJiraProjectKey] = useState("");
+  const [jiraSiteUrl, setJiraSiteUrl] = useState("");
+  const [jiraEmail, setJiraEmail] = useState("");
+  const [jiraApiToken, setJiraApiToken] = useState("");
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testStatus, setTestStatus] = useState<TestConnectionStatus>("idle");
+  const [testMessage, setTestMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +54,10 @@ export default function ProjectSettingsPage() {
           setProject(data);
           setName(data.name);
           setJiraProjectKey(data.jiraProjectKey ?? "");
+          setJiraSiteUrl(data.jiraSiteUrl ?? "");
+          setJiraEmail(data.jiraEmail ?? "");
+          // The API token is write-only and never returned by the API, so
+          // it is intentionally never pre-filled here.
         }
       } catch (err) {
         if (!cancelled) {
@@ -72,10 +83,22 @@ export default function ProjectSettingsPage() {
     setIsSaving(true);
 
     try {
+      const body: Record<string, unknown> = {
+        name,
+        jiraProjectKey,
+        jiraSiteUrl,
+        jiraEmail,
+      };
+      // The API token is write-only: only send it when the user actually
+      // typed something, so leaving it blank preserves the stored token.
+      if (jiraApiToken.trim() !== "") {
+        body.jiraApiToken = jiraApiToken;
+      }
+
       const response = await fetch(`/api/projects/${projectId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, jiraProjectKey }),
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();
@@ -90,6 +113,46 @@ export default function ProjectSettingsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsSaving(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setTestStatus("testing");
+    setTestMessage("");
+
+    try {
+      const body: Record<string, unknown> = { jiraSiteUrl, jiraEmail };
+      if (jiraApiToken.trim() !== "") {
+        body.jiraApiToken = jiraApiToken;
+      }
+
+      const response = await fetch(
+        `/api/projects/${projectId}/test-connection`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.ok) {
+        setTestStatus("success");
+        setTestMessage(
+          data.displayName
+            ? `✓ Connected as ${data.displayName}`
+            : "✓ Connection successful"
+        );
+      } else {
+        setTestStatus("error");
+        setTestMessage(`✗ ${data.error || "Connection failed"}`);
+      }
+    } catch (err) {
+      setTestStatus("error");
+      setTestMessage(
+        `✗ ${err instanceof Error ? err.message : "Connection failed"}`
+      );
     }
   };
 
@@ -160,6 +223,116 @@ export default function ProjectSettingsPage() {
               <p className="mt-1 text-xs text-ponder-light-text-muted font-instrument">
                 The uppercase issue-key prefix, e.g. TEAM in TEAM-1.
               </p>
+            </div>
+          )}
+
+          {project?.type === "JIRA" && (
+            <div
+              className="space-y-4 border-t border-ponder-light-card-border pt-6"
+              data-testid="jira-connection-section"
+            >
+              <h2 className="text-sm font-instrument font-semibold text-ponder-light-text">
+                JIRA Connection
+              </h2>
+
+              <div>
+                <label
+                  htmlFor="jira-site-url"
+                  className="block text-sm font-instrument font-semibold text-ponder-light-text mb-1"
+                >
+                  Site URL
+                </label>
+                <input
+                  id="jira-site-url"
+                  type="text"
+                  value={jiraSiteUrl}
+                  onChange={(e) => setJiraSiteUrl(e.target.value)}
+                  placeholder="https://your-domain.atlassian.net"
+                  className={`w-full px-3 py-2 bg-ponder-light-surface border border-ponder-light-card-border rounded-lg font-instrument text-ponder-light-text ${focusRing}`}
+                  data-testid="jira-site-url-input"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="jira-email"
+                  className="block text-sm font-instrument font-semibold text-ponder-light-text mb-1"
+                >
+                  Email
+                </label>
+                <input
+                  id="jira-email"
+                  type="text"
+                  value={jiraEmail}
+                  onChange={(e) => setJiraEmail(e.target.value)}
+                  className={`w-full px-3 py-2 bg-ponder-light-surface border border-ponder-light-card-border rounded-lg font-instrument text-ponder-light-text ${focusRing}`}
+                  data-testid="jira-email-input"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="jira-api-token"
+                  className="block text-sm font-instrument font-semibold text-ponder-light-text mb-1"
+                >
+                  API token
+                </label>
+                <input
+                  id="jira-api-token"
+                  type="password"
+                  value={jiraApiToken}
+                  onChange={(e) => setJiraApiToken(e.target.value)}
+                  placeholder={
+                    project?.hasApiToken
+                      ? "•••••••• (saved — leave blank to keep)"
+                      : "Paste your Atlassian API token"
+                  }
+                  className={`w-full px-3 py-2 bg-ponder-light-surface border border-ponder-light-card-border rounded-lg font-instrument text-ponder-light-text ${focusRing}`}
+                  data-testid="jira-api-token-input"
+                />
+                <p className="mt-1 text-xs text-ponder-light-text-muted font-instrument">
+                  Create a token at{" "}
+                  <a
+                    href="https://id.atlassian.com/manage-profile/security/api-tokens"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`underline text-ponder-light-purple ${focusRing}`}
+                  >
+                    id.atlassian.com
+                  </a>{" "}
+                  → Security → API tokens.
+                </p>
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={handleTestConnection}
+                  disabled={testStatus === "testing"}
+                  className={`px-4 py-2 rounded-lg font-instrument font-semibold text-sm border transition-colors ${
+                    testStatus === "testing"
+                      ? "border-ponder-light-card-border text-ponder-light-text-muted cursor-not-allowed"
+                      : "border-ponder-light-purple text-ponder-light-purple hover:bg-ponder-light-purple/10"
+                  } ${focusRing}`}
+                  data-testid="test-connection-button"
+                >
+                  {testStatus === "testing" ? "Testing…" : "Test connection"}
+                </button>
+
+                {testMessage && (
+                  <p
+                    role={testStatus === "error" ? "alert" : "status"}
+                    className={`mt-2 text-sm font-instrument ${
+                      testStatus === "error"
+                        ? "text-red-600"
+                        : "text-green-700"
+                    }`}
+                    data-testid="test-connection-result"
+                  >
+                    {testMessage}
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
