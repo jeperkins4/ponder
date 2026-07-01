@@ -5,6 +5,12 @@ import { ImportFromJiraButton } from "./ImportFromJiraButton";
 describe("ImportFromJiraButton", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ stories: [] }),
+      } as Response)
+    );
   });
 
   it("renders the button", () => {
@@ -14,42 +20,36 @@ describe("ImportFromJiraButton", () => {
     );
   });
 
-  it("posts to the project-scoped sync endpoint and shows the result on success", async () => {
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ created: 2, updated: 1 }),
-      } as Response)
-    );
-
+  it("opens the import review dialog and triggers a preview fetch on click", async () => {
     render(<ImportFromJiraButton projectId="p1" />);
+
+    expect(screen.queryByTestId("import-review-dialog")).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByTestId("import-from-jira-button"));
 
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith("/api/projects/p1/sync", {
-        method: "POST",
-      });
-    });
+    expect(screen.getByTestId("import-review-dialog")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText(/3 stories imported/i)).toBeInTheDocument();
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/projects/p1/import/preview",
+        { method: "POST" }
+      );
     });
   });
 
-  it("shows an error alert when the sync fails", async () => {
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: false,
-        json: () => Promise.resolve({ error: "JIRA unreachable" }),
-      } as Response)
-    );
-
+  it("closes the review dialog when its Close button is clicked", async () => {
     render(<ImportFromJiraButton projectId="p1" />);
+
     fireEvent.click(screen.getByTestId("import-from-jira-button"));
+    expect(screen.getByTestId("import-review-dialog")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent("JIRA unreachable");
+      expect(screen.getByTestId("import-review-empty-message")).toBeInTheDocument();
     });
+
+    fireEvent.click(screen.getByTestId("import-review-close-button"));
+
+    expect(screen.queryByTestId("import-review-dialog")).not.toBeInTheDocument();
   });
 
   describe("Theme awareness", () => {

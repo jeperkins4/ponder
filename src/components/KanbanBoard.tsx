@@ -85,6 +85,20 @@ export function KanbanBoard({
     fetchStories();
   }, [fetchStories]);
 
+  // ImportFromJiraButton lives inside `headerActions`, a separate element
+  // tree from this component's own state, so it has no direct handle on
+  // `fetchStories`. It broadcasts this DOM event instead (mirroring the
+  // THEME_EVENT pattern in useTheme.ts) once an import finishes; refetch
+  // silently so newly created cards show up without a loading flash.
+  useEffect(() => {
+    const handleImportComplete = () => {
+      fetchStories({ silent: true });
+    };
+    window.addEventListener("ponder-jira-import-complete", handleImportComplete);
+    return () =>
+      window.removeEventListener("ponder-jira-import-complete", handleImportComplete);
+  }, [fetchStories]);
+
   // One ref per column, pointing at the DOM node that holds that column's
   // work unit cards. Used by handleKeyboardNavigation to move focus between
   // columns when the user presses ArrowLeft/ArrowRight on a card.
