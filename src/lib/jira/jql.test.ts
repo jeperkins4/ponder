@@ -35,10 +35,10 @@ describe("JQL Builder", () => {
 });
 
 describe("buildProjectStoriesJql", () => {
-  it("should scope to the project's key, issue types, and the current user", () => {
+  it("should scope to the project key, issue types, current user, and active statuses", () => {
     const jql = buildProjectStoriesJql("TEAM");
     expect(jql).toBe(
-      'project = "TEAM" AND issuetype in (Story, Task, Bug) AND assignee = currentUser()'
+      'project = "TEAM" AND issuetype in (Story, Task, Bug) AND assignee = currentUser() AND status in ("To Do", "In Progress", "Code Revew")'
     );
   });
 

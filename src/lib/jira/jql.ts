@@ -20,10 +20,22 @@ export function buildAssignedStoriesJql(projectKeys: string[]): string {
 }
 
 /**
+ * JIRA statuses considered "active work" for the local board. Stories outside
+ * these statuses (e.g. Closed, QA Approved) are not imported.
+ *
+ * NOTE: "Code Revew" is intentionally spelled this way — it matches the actual
+ * (misspelled) status name configured in the JIRA instance. JQL status matching
+ * is exact, so "correcting" this to "Code Review" would silently import nothing
+ * for that status.
+ */
+export const PROJECT_SYNC_STATUSES = ["To Do", "In Progress", "Code Revew"];
+
+/**
  * Builds a JQL query for finding a single project's Story/Task/Bug issues that
- * are assigned to the current user. Used by project-aware sync: `currentUser()`
+ * are assigned to the current user and currently in an active status
+ * (see PROJECT_SYNC_STATUSES). Used by project-aware sync: `currentUser()`
  * resolves to the account whose credentials the project is configured with, so
- * each project imports only the issues assigned to that account.
+ * each project imports only that account's active, assigned issues.
  * @param projectKey - JIRA project key (e.g., 'TEAM')
  * @returns JQL query string
  * @throws Error if projectKey is empty
@@ -32,5 +44,6 @@ export function buildProjectStoriesJql(projectKey: string): string {
   if (!projectKey) {
     throw new Error("buildProjectStoriesJql requires a project key");
   }
-  return `project = "${projectKey}" AND issuetype in (Story, Task, Bug) AND assignee = currentUser()`;
+  const statuses = PROJECT_SYNC_STATUSES.map((s) => `"${s}"`).join(", ");
+  return `project = "${projectKey}" AND issuetype in (Story, Task, Bug) AND assignee = currentUser() AND status in (${statuses})`;
 }
