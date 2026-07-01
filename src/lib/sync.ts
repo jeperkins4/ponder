@@ -5,7 +5,6 @@
 
 import { PrismaClient } from "@prisma/client";
 import { fetchAssignedStories, type JiraConfig } from "@/lib/jira/client";
-import type { StoryDTO } from "@/lib/types";
 
 /**
  * Result of a sync operation
