@@ -13,7 +13,7 @@ describe("SyncButton", () => {
 
   it("renders the sync button", () => {
     render(<SyncButton />);
-    expect(screen.getByRole("button", { name: /Sync from JIRA/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Import from JIRA/i })).toBeInTheDocument();
   });
 
   it("calls POST /api/sync on click", async () => {
@@ -24,7 +24,7 @@ describe("SyncButton", () => {
     global.fetch = mockFetch;
 
     render(<SyncButton />);
-    const button = screen.getByRole("button", { name: /Sync from JIRA/i });
+    const button = screen.getByRole("button", { name: /Import from JIRA/i });
 
     fireEvent.click(button);
 
@@ -57,15 +57,15 @@ describe("SyncButton", () => {
     render(<SyncButton />);
     const button = screen.getByRole("button");
 
-    // Initially, button should say "Sync from JIRA"
-    expect(button).toHaveTextContent("Sync from JIRA");
+    // Initially, button should say "Import from JIRA"
+    expect(button).toHaveTextContent("Import from JIRA");
 
     // Click the button
     fireEvent.click(button);
 
-    // After click, button should be disabled and show "Syncing…"
+    // After click, button should be disabled and show "Importing…"
     await waitFor(() => {
-      expect(button).toHaveTextContent("Syncing…");
+      expect(button).toHaveTextContent("Importing…");
       expect(button).toBeDisabled();
     });
 
@@ -74,9 +74,9 @@ describe("SyncButton", () => {
 
     // After resolve, loading state should be gone and result should show
     await waitFor(() => {
-      expect(button).toHaveTextContent("Sync from JIRA");
+      expect(button).toHaveTextContent("Import from JIRA");
       expect(button).not.toBeDisabled();
-      expect(screen.getByText(/1 stories synced/i)).toBeInTheDocument();
+      expect(screen.getByText(/1 stories imported/i)).toBeInTheDocument();
     });
   });
 
@@ -88,12 +88,12 @@ describe("SyncButton", () => {
     global.fetch = mockFetch;
 
     render(<SyncButton />);
-    const button = screen.getByRole("button", { name: /Sync from JIRA/i });
+    const button = screen.getByRole("button", { name: /Import from JIRA/i });
 
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByText(/8 stories synced.*5 created.*3 updated/i)).toBeInTheDocument();
+      expect(screen.getByText(/8 stories imported.*5 created.*3 updated/i)).toBeInTheDocument();
     });
   });
 
@@ -105,7 +105,7 @@ describe("SyncButton", () => {
     global.fetch = mockFetch;
 
     render(<SyncButton />);
-    const button = screen.getByRole("button", { name: /Sync from JIRA/i });
+    const button = screen.getByRole("button", { name: /Import from JIRA/i });
 
     fireEvent.click(button);
 
@@ -120,7 +120,7 @@ describe("SyncButton", () => {
     global.fetch = mockFetch;
 
     render(<SyncButton />);
-    const button = screen.getByRole("button", { name: /Sync from JIRA/i });
+    const button = screen.getByRole("button", { name: /Import from JIRA/i });
 
     fireEvent.click(button);
 
@@ -138,7 +138,7 @@ describe("SyncButton", () => {
     global.fetch = mockFetch;
 
     render(<SyncButton />);
-    const button = screen.getByRole("button", { name: /Sync from JIRA/i });
+    const button = screen.getByRole("button", { name: /Import from JIRA/i });
 
     expect(button).not.toBeDisabled();
 

@@ -169,6 +169,59 @@ describe("Kanban Board page", () => {
     });
   });
 
+  it("displays 'No tasks' when a column is empty", async () => {
+    // Mock empty column scenario by providing stories with no work units in one column
+    const emptyColumnStories: StoryDTO[] = [
+      {
+        id: "story-1",
+        jiraKey: "PROJ-1",
+        jiraId: "1",
+        projectKey: "PROJ",
+        summary: "First story",
+        description: "Description of first story",
+        jiraStatus: "To Do",
+        url: "https://jira.example.com/browse/PROJ-1",
+        lastSyncedAt: "2024-01-01T00:00:00Z",
+        completionCommentPostedAt: null,
+        workUnits: [
+          {
+            id: "wu-1",
+            storyId: "story-1",
+            title: "Work unit 1",
+            description: "Work unit description",
+            column: "done", // All work units are in Done column
+            order: 1,
+            createdAt: "2024-01-01T00:00:00Z",
+            completedAt: null,
+          },
+        ],
+      },
+    ];
+
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(emptyColumnStories),
+      } as Response)
+    );
+
+    render(<Board />);
+
+    await waitFor(() => {
+      // The To Do and In Progress columns should show "No tasks"
+      const noTasksTexts = screen.getAllByText(/No tasks/i);
+      expect(noTasksTexts.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it("displays subtitle explaining the drag affordance", async () => {
+    render(<Board />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Drag tasks between columns to track progress/i)).toBeInTheDocument();
+    });
+  });
+
   it("fetches stories from API on mount", async () => {
     render(<Board />);
 

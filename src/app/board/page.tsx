@@ -121,6 +121,7 @@ export default function Board() {
       <>
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-800">Kanban Board</h1>
+          <p className="text-gray-600 text-sm">Drag tasks between columns to track progress.</p>
           <p className="text-gray-600 mt-2">
             {stories.length} {stories.length === 1 ? "story" : "stories"}
           </p>
@@ -219,7 +220,7 @@ function KanbanColumn({
       <div className="space-y-3" ref={columnRef}>
         {workUnitsInColumn.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
-            <p>No work units</p>
+            <p>No tasks</p>
           </div>
         ) : (
           workUnitsInColumn.map((workUnit) => (

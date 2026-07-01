@@ -51,7 +51,7 @@ export default function SyncButton() {
             : "bg-blue-500 hover:bg-blue-600 active:bg-blue-700"
         }`}
       >
-        {isLoading ? "Syncing…" : "Sync from JIRA"}
+        {isLoading ? "Importing…" : "Import from JIRA"}
       </button>
 
       {error && (
@@ -62,7 +62,7 @@ export default function SyncButton() {
 
       {result && (
         <div className="text-green-600 font-semibold">
-          {result.created + result.updated} stories synced ({result.created} created,{" "}
+          {result.created + result.updated} stories imported ({result.created} created,{" "}
           {result.updated} updated)
         </div>
       )}
