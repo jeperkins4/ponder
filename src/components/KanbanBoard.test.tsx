@@ -47,16 +47,6 @@ const mockStories: StoryDTO[] = [
         createdAt: "2024-01-01T00:00:00Z",
         completedAt: null,
       },
-      {
-        id: "wu-5",
-        storyId: "story-1",
-        title: "Work unit 5",
-        description: null,
-        column: "in_review",
-        order: 4,
-        createdAt: "2024-01-01T00:00:00Z",
-        completedAt: null,
-      },
     ],
   },
   {
@@ -111,7 +101,7 @@ describe("KanbanBoard", () => {
     });
   });
 
-  it("renders 5 columns", async () => {
+  it("renders 4 columns", async () => {
     render(<KanbanBoard />);
     await waitFor(() => {
       const columnHeadings = screen
@@ -122,7 +112,6 @@ describe("KanbanBoard", () => {
           "To Do",
           "In Progress",
           "Code Review",
-          "In Review",
           "Done",
         ])
       );
@@ -137,7 +126,6 @@ describe("KanbanBoard", () => {
       expect(screen.getByText("Work unit 2")).toBeInTheDocument();
       expect(screen.getByText("Work unit 3")).toBeInTheDocument();
       expect(screen.getByText("Work unit 4")).toBeInTheDocument();
-      expect(screen.getByText("Work unit 5")).toBeInTheDocument();
     });
   });
 
@@ -180,9 +168,6 @@ describe("KanbanBoard", () => {
 
       const codeReviewColumn = screen.getAllByText(/Code Review/i)[0].closest("div");
       expect(codeReviewColumn).toHaveTextContent("1 item");
-
-      const inReviewColumn = screen.getAllByText(/In Review/i)[0].closest("div");
-      expect(inReviewColumn).toHaveTextContent("1 item");
 
       const doneColumn = screen.getAllByText(/Done/i)[0].closest("div");
       expect(doneColumn).toHaveTextContent("1 item");
@@ -306,7 +291,6 @@ describe("KanbanBoard", () => {
         expect(screen.getByTestId("work-unit-card-wu-2")).toBeInTheDocument();
         expect(screen.getByTestId("work-unit-card-wu-3")).toBeInTheDocument();
         expect(screen.getByTestId("work-unit-card-wu-4")).toBeInTheDocument();
-        expect(screen.getByTestId("work-unit-card-wu-5")).toBeInTheDocument();
       });
     });
 
@@ -356,7 +340,7 @@ describe("KanbanBoard", () => {
       expect(document.activeElement).toBe(rightCard);
     });
 
-    it("continues moving focus rightward across code_review, in_review, and done", async () => {
+    it("continues moving focus rightward from code_review to done", async () => {
       render(<KanbanBoard />);
 
       await waitFor(() => {
@@ -364,14 +348,10 @@ describe("KanbanBoard", () => {
       });
 
       const codeReviewCard = screen.getByTestId("work-unit-card-wu-4"); // code_review
-      const inReviewCard = screen.getByTestId("work-unit-card-wu-5"); // in_review
       const doneCard = screen.getByTestId("work-unit-card-wu-3"); // done
 
       codeReviewCard.focus();
       fireEvent.keyDown(codeReviewCard, { key: "ArrowRight" });
-      expect(document.activeElement).toBe(inReviewCard);
-
-      fireEvent.keyDown(inReviewCard, { key: "ArrowRight" });
       expect(document.activeElement).toBe(doneCard);
     });
 
@@ -431,7 +411,7 @@ describe("KanbanBoard", () => {
 
       await waitFor(() => {
         const regions = screen.getAllByRole("region");
-        expect(regions).toHaveLength(5);
+        expect(regions).toHaveLength(4);
 
         const labels = regions.map((r) => r.getAttribute("aria-label"));
         expect(labels).toEqual(
@@ -439,7 +419,6 @@ describe("KanbanBoard", () => {
             expect.stringContaining("To Do column"),
             expect.stringContaining("In Progress column"),
             expect.stringContaining("Code Review column"),
-            expect.stringContaining("In Review column"),
             expect.stringContaining("Done column"),
           ])
         );

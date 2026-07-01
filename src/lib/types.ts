@@ -6,7 +6,6 @@ export type Column =
   | "todo"
   | "in_progress"
   | "code_review"
-  | "in_review"
   | "done";
 
 export interface WorkUnitDTO {

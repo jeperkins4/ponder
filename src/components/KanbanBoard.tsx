@@ -92,7 +92,6 @@ export function KanbanBoard({
     todo: null,
     in_progress: null,
     code_review: null,
-    in_review: null,
     done: null,
   });
 
@@ -182,7 +181,7 @@ export function KanbanBoard({
         </div>
 
         <div className="overflow-x-auto">
-          <div className="grid grid-cols-5 gap-4 min-w-[1100px]">
+          <div className="grid grid-cols-4 gap-4 min-w-[900px]">
             {COLUMNS.map(({ key, label }) => (
               <KanbanColumn
                 key={key}

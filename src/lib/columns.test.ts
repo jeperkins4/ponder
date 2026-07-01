@@ -2,12 +2,11 @@ import { describe, it, expect } from "vitest";
 import { COLUMNS, jiraStatusToColumn } from "@/lib/columns";
 
 describe("COLUMNS", () => {
-  it("has the 5 keys in the specified order", () => {
+  it("has the 4 keys in the specified order", () => {
     expect(COLUMNS.map((c) => c.key)).toEqual([
       "todo",
       "in_progress",
       "code_review",
-      "in_review",
       "done",
     ]);
   });
@@ -17,7 +16,6 @@ describe("COLUMNS", () => {
       { key: "todo", label: "To Do" },
       { key: "in_progress", label: "In Progress" },
       { key: "code_review", label: "Code Review" },
-      { key: "in_review", label: "In Review" },
       { key: "done", label: "Done" },
     ]);
   });

@@ -4,12 +4,11 @@ export const COLUMNS: { key: Column; label: string }[] = [
   { key: "todo", label: "To Do" },
   { key: "in_progress", label: "In Progress" },
   { key: "code_review", label: "Code Review" },
-  { key: "in_review", label: "In Review" },
   { key: "done", label: "Done" },
 ];
 
-// Import target columns only. `in_review` and `done` are local-only lanes
-// (no JIRA status maps to them; users drag cards there as work progresses).
+// Import target columns only. `done` is a local-only lane (no JIRA status maps
+// to it; users drag cards there as work progresses).
 const STATUS_TO_COLUMN: Record<string, Column> = {
   "to do": "todo",
   "in progress": "in_progress",
