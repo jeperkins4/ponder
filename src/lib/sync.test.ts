@@ -416,12 +416,39 @@ describe("syncStoriesForProject", () => {
     expect(mockFetchStoriesForProject).not.toHaveBeenCalled();
   });
 
+  it("returns a no-op result for a JIRA project with incomplete credentials", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({
+      id: "proj-2b",
+      name: "Missing Creds",
+      type: "JIRA",
+      jiraProjectKey: "TEAM",
+      jiraSiteUrl: "https://example.atlassian.net",
+      jiraEmail: null,
+      jiraApiToken: null,
+    });
+
+    const result = await syncStoriesForProject(
+      "proj-2b",
+      mockPrisma as unknown as PrismaClient
+    );
+
+    expect(result).toEqual({
+      created: 0,
+      updated: 0,
+      message: "JIRA credentials not configured. Add them in project settings.",
+    });
+    expect(mockFetchStoriesForProject).not.toHaveBeenCalled();
+  });
+
   it("creates new stories with projectId set for a JIRA project", async () => {
     mockPrisma.project.findUnique.mockResolvedValueOnce({
       id: "proj-3",
       name: "Team Project",
       type: "JIRA",
       jiraProjectKey: "TEAM",
+      jiraSiteUrl: "https://example.atlassian.net",
+      jiraEmail: "team@example.com",
+      jiraApiToken: "secret-token",
     });
 
     const stories: StoryDTO[] = [
@@ -449,10 +476,11 @@ describe("syncStoriesForProject", () => {
       mockPrisma as unknown as PrismaClient
     );
 
-    expect(mockFetchStoriesForProject).toHaveBeenCalledWith(
-      "TEAM",
-      expect.any(Object)
-    );
+    expect(mockFetchStoriesForProject).toHaveBeenCalledWith("TEAM", {
+      siteUrl: "https://example.atlassian.net",
+      email: "team@example.com",
+      apiToken: "secret-token",
+    });
     expect(mockPrisma.story.create).toHaveBeenCalledWith({
       data: {
         jiraKey: "TEAM-1",
@@ -476,6 +504,9 @@ describe("syncStoriesForProject", () => {
       name: "Team Project",
       type: "JIRA",
       jiraProjectKey: "TEAM",
+      jiraSiteUrl: "https://example.atlassian.net",
+      jiraEmail: "team@example.com",
+      jiraApiToken: "secret-token",
     });
 
     const stories: StoryDTO[] = [

@@ -99,15 +99,20 @@ export async function syncStoriesFromJira(
 
 /**
  * Syncs stories from JIRA into a specific project, filtered by that
- * project's jiraProjectKey.
+ * project's jiraProjectKey. Credentials (siteUrl/email/apiToken) are read
+ * from the project row itself — there is NO fallback to env vars.
  *
  * - Non-existent project: throws (callers, e.g. the sync route, should map
  *   this to an error response).
  * - STANDALONE project or missing jiraProjectKey: returns a no-op result
  *   with an explanatory message rather than erroring, since "not linked to
  *   JIRA" is an expected, non-exceptional state.
- * - JIRA project: fetches Story/Task/Bug issues for the project's key and
- *   upserts them into Story, keyed by jiraKey, with projectId set.
+ * - JIRA project missing any of jiraSiteUrl/jiraEmail/jiraApiToken: returns
+ *   a no-op result telling the caller to configure credentials, rather than
+ *   throwing an opaque error.
+ * - JIRA project with complete credentials: fetches Story/Task/Bug issues
+ *   for the project's key and upserts them into Story, keyed by jiraKey,
+ *   with projectId set.
  *
  * @param projectId - ID of the Project to sync
  * @param prismaClient - Prisma client instance (defaults to the app singleton;
@@ -131,10 +136,18 @@ export async function syncStoriesForProject(
     return { created: 0, updated: 0, message: "Project is not linked to JIRA" };
   }
 
+  if (!project.jiraSiteUrl || !project.jiraEmail || !project.jiraApiToken) {
+    return {
+      created: 0,
+      updated: 0,
+      message: "JIRA credentials not configured. Add them in project settings.",
+    };
+  }
+
   const jiraConfig: JiraConfig = {
-    siteUrl: process.env.JIRA_SITE_URL!,
-    email: process.env.JIRA_EMAIL!,
-    apiToken: process.env.JIRA_API_TOKEN!,
+    siteUrl: project.jiraSiteUrl,
+    email: project.jiraEmail,
+    apiToken: project.jiraApiToken,
   };
 
   const stories = await fetchStoriesForProject(project.jiraProjectKey, jiraConfig);

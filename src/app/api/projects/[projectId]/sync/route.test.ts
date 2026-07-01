@@ -56,7 +56,14 @@ describe("POST /api/projects/[projectId]/sync", () => {
 
   it("creates stories for a JIRA project and links them via projectId", async () => {
     const project = await prisma.project.create({
-      data: { name: "Sync Route Team", type: "JIRA", jiraProjectKey: "SYNCRT" },
+      data: {
+        name: "Sync Route Team",
+        type: "JIRA",
+        jiraProjectKey: "SYNCRT",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "sync-route@example.com",
+        jiraApiToken: "sync-route-token",
+      },
     });
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
     const jiraKey = `SYNCRT-${suffix}`;

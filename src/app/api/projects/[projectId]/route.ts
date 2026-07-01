@@ -1,6 +1,9 @@
 /**
  * GET /api/projects/[projectId] - Fetch a single project
- * PUT /api/projects/[projectId] - Update a project (name, jiraProjectKey)
+ * PUT /api/projects/[projectId] - Update a project (name, jiraProjectKey,
+ *   jiraSiteUrl, jiraEmail, jiraApiToken). jiraApiToken is write-only: it is
+ *   only updated when a non-empty string is provided, and is never returned
+ *   in the response (see hasApiToken in the DTO).
  * DELETE /api/projects/[projectId] - Delete a project (cascades to its stories/work units)
  */
 
@@ -45,7 +48,7 @@ export async function PUT(
   try {
     const { projectId } = await params;
     const body = await request.json();
-    const { name, jiraProjectKey } = body;
+    const { name, jiraProjectKey, jiraSiteUrl, jiraEmail, jiraApiToken } = body;
 
     const existing = await prisma.project.findUnique({
       where: { id: projectId },
@@ -60,6 +63,14 @@ export async function PUT(
       data: {
         ...(name !== undefined && { name }),
         ...(jiraProjectKey !== undefined && { jiraProjectKey }),
+        // jiraSiteUrl/jiraEmail: update whenever explicitly provided, including
+        // an explicit "" to clear them.
+        ...(jiraSiteUrl !== undefined && { jiraSiteUrl }),
+        ...(jiraEmail !== undefined && { jiraEmail }),
+        // jiraApiToken: only overwrite when a non-empty string is provided, so
+        // saving other fields (e.g. site URL) never wipes a previously-stored
+        // token. This is the write-only security boundary for the token.
+        ...(jiraApiToken && { jiraApiToken }),
       },
       include: {
         _count: {

@@ -183,6 +183,33 @@ describe("GET /api/projects/[projectId]", () => {
     const data = await res.json();
     expect(data.id).toBe(project.id);
     expect(data.name).toBe("Team A");
+    expect(data.hasApiToken).toBe(false);
+    expect(data.jiraApiToken).toBeUndefined();
+  });
+
+  it("should include hasApiToken/jiraSiteUrl/jiraEmail but never the raw token", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Team A",
+        type: "JIRA",
+        jiraProjectKey: "TEAM",
+        jiraSiteUrl: "https://acme.atlassian.net",
+        jiraEmail: "user@acme.com",
+        jiraApiToken: "super-secret-token",
+      },
+    });
+
+    const req = new Request(`http://localhost:3000/api/projects/${project.id}`);
+    const res = await GET_ONE(req as never, {
+      params: Promise.resolve({ projectId: project.id }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.jiraSiteUrl).toBe("https://acme.atlassian.net");
+    expect(data.jiraEmail).toBe("user@acme.com");
+    expect(data.hasApiToken).toBe(true);
+    expect(data.jiraApiToken).toBeUndefined();
+    expect(JSON.stringify(data)).not.toContain("super-secret-token");
   });
 
   it("should return 404 if project not found", async () => {
@@ -224,6 +251,110 @@ describe("PUT /api/projects/[projectId]", () => {
       params: Promise.resolve({ projectId: "nonexistent" }),
     });
     expect(res.status).toBe(404);
+  });
+
+  it("should store jiraSiteUrl, jiraEmail, and jiraApiToken and report hasApiToken without leaking the raw token", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Team A", type: "JIRA", jiraProjectKey: "TEAM" },
+    });
+
+    const req = new Request(`http://localhost:3000/api/projects/${project.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jiraSiteUrl: "https://acme.atlassian.net",
+        jiraEmail: "user@acme.com",
+        jiraApiToken: "super-secret-token",
+      }),
+    });
+    const res = await PUT(req as never, {
+      params: Promise.resolve({ projectId: project.id }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.jiraSiteUrl).toBe("https://acme.atlassian.net");
+    expect(data.jiraEmail).toBe("user@acme.com");
+    expect(data.hasApiToken).toBe(true);
+    expect(data.jiraApiToken).toBeUndefined();
+
+    const stored = await prisma.project.findUnique({ where: { id: project.id } });
+    expect(stored?.jiraApiToken).toBe("super-secret-token");
+  });
+
+  it("should leave the existing token untouched when jiraApiToken is missing from the body", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Team A",
+        type: "JIRA",
+        jiraProjectKey: "TEAM",
+        jiraSiteUrl: "https://acme.atlassian.net",
+        jiraEmail: "user@acme.com",
+        jiraApiToken: "original-token",
+      },
+    });
+
+    const req = new Request(`http://localhost:3000/api/projects/${project.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Renamed" }),
+    });
+    const res = await PUT(req as never, {
+      params: Promise.resolve({ projectId: project.id }),
+    });
+    expect(res.status).toBe(200);
+
+    const stored = await prisma.project.findUnique({ where: { id: project.id } });
+    expect(stored?.jiraApiToken).toBe("original-token");
+  });
+
+  it("should leave the existing token untouched when jiraApiToken is an empty string", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Team A",
+        type: "JIRA",
+        jiraProjectKey: "TEAM",
+        jiraApiToken: "original-token",
+      },
+    });
+
+    const req = new Request(`http://localhost:3000/api/projects/${project.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jiraApiToken: "" }),
+    });
+    const res = await PUT(req as never, {
+      params: Promise.resolve({ projectId: project.id }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.hasApiToken).toBe(true);
+
+    const stored = await prisma.project.findUnique({ where: { id: project.id } });
+    expect(stored?.jiraApiToken).toBe("original-token");
+  });
+
+  it("should replace the token when a new non-empty jiraApiToken is provided", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Team A",
+        type: "JIRA",
+        jiraProjectKey: "TEAM",
+        jiraApiToken: "original-token",
+      },
+    });
+
+    const req = new Request(`http://localhost:3000/api/projects/${project.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jiraApiToken: "new-token" }),
+    });
+    const res = await PUT(req as never, {
+      params: Promise.resolve({ projectId: project.id }),
+    });
+    expect(res.status).toBe(200);
+
+    const stored = await prisma.project.findUnique({ where: { id: project.id } });
+    expect(stored?.jiraApiToken).toBe("new-token");
   });
 });
 

@@ -36,11 +36,14 @@ export interface Project {
   name: string;
   type: "JIRA" | "STANDALONE";
   jiraProjectKey?: string;
+  jiraSiteUrl?: string;
+  jiraEmail?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface ProjectWithStats extends Project {
+  hasApiToken: boolean;
   storyCount: number;
   workUnitCount: number;
 }

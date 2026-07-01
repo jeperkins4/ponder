@@ -10,6 +10,9 @@ export function projectToDTO(project: {
   name: string;
   type: string;
   jiraProjectKey: string | null;
+  jiraSiteUrl?: string | null;
+  jiraEmail?: string | null;
+  jiraApiToken?: string | null;
   createdAt: Date;
   updatedAt: Date;
   _count: { stories: number; workUnits: number };
@@ -19,6 +22,9 @@ export function projectToDTO(project: {
     name: project.name,
     type: project.type as "JIRA" | "STANDALONE",
     jiraProjectKey: project.jiraProjectKey ?? undefined,
+    jiraSiteUrl: project.jiraSiteUrl ?? undefined,
+    jiraEmail: project.jiraEmail ?? undefined,
+    hasApiToken: Boolean(project.jiraApiToken),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
     storyCount: project._count.stories,

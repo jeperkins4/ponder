@@ -33,7 +33,7 @@ export async function GET(_request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, type, jiraProjectKey } = body;
+    const { name, type, jiraProjectKey, jiraSiteUrl, jiraEmail, jiraApiToken } = body;
 
     // Validate required fields
     if (!name || !type) {
@@ -54,8 +54,11 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         type,
-        // jiraProjectKey only applies to JIRA-type projects
+        // jiraProjectKey/jiraSiteUrl/jiraEmail/jiraApiToken only apply to JIRA-type projects
         jiraProjectKey: type === "JIRA" ? (jiraProjectKey ?? null) : null,
+        jiraSiteUrl: type === "JIRA" ? (jiraSiteUrl ?? null) : null,
+        jiraEmail: type === "JIRA" ? (jiraEmail ?? null) : null,
+        jiraApiToken: type === "JIRA" ? (jiraApiToken ?? null) : null,
       },
       include: {
         _count: {
