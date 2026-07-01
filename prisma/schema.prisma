@@ -1,0 +1,36 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Story {
+  id                        String     @id @default(cuid())
+  jiraKey                   String     @unique
+  jiraId                    String     @unique
+  projectKey                String
+  summary                   String
+  description               String?
+  jiraStatus                String
+  url                       String
+  lastSyncedAt              DateTime
+  completionCommentPostedAt DateTime?
+  workUnits                 WorkUnit[]
+}
+
+model WorkUnit {
+  id          String    @id @default(cuid())
+  storyId     String
+  story       Story     @relation(fields: [storyId], references: [id])
+  title       String
+  description String?
+  column      String   // "todo" | "in_progress" | "done"
+  order       Int
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+}
