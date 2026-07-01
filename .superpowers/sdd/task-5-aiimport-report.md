@@ -29,4 +29,4 @@ Instead, `ImportFromJiraButton` dispatches a `window` `Event("ponder-jira-import
 
 ## Commit
 
-Commit hash: (see below, filled after `git commit`)
+Commit hash: `f692507` — "feat: add import review UI with per-story breakdown toggle"
