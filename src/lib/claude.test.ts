@@ -89,7 +89,7 @@ describe("breakdownStory", () => {
 
     // Verify request body structure
     const body = JSON.parse(callArgs[1].body);
-    expect(body.model).toBe("claude-opus-4-8");
+    expect(body.model).toBe("claude-3-5-sonnet");
     expect(body.max_tokens).toBe(1024);
     expect(body.messages).toHaveLength(1);
     expect(body.messages[0].role).toBe("user");

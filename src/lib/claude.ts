@@ -55,7 +55,7 @@ ${storyText}
 Return ONLY valid JSON array (no markdown formatting, no code blocks).`;
 
   const requestBody = {
-    model: "claude-opus-4-8",
+    model: "claude-3-5-sonnet",
     max_tokens: 1024,
     messages: [
       {
