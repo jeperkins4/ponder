@@ -9,9 +9,9 @@ export default function Board() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchStories = useCallback(async () => {
+  const fetchStories = useCallback(async (opts?: { silent?: boolean }) => {
     try {
-      setLoading(true);
+      if (!opts?.silent) setLoading(true);
       setError(null);
       const response = await fetch("/api/stories");
       if (!response.ok) {
@@ -66,7 +66,7 @@ export default function Board() {
             key={column}
             column={column}
             stories={stories}
-            onRefresh={fetchStories}
+            onRefresh={() => fetchStories({ silent: true })}
           />
         ))}
       </div>
