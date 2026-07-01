@@ -439,6 +439,46 @@ describe("Kanban Board page", () => {
     });
   });
 
+  describe("Theme toggle", () => {
+    it("renders a theme toggle button", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("theme-toggle-button")).toBeInTheDocument();
+      });
+    });
+
+    it("theme toggle button has appropriate aria-label", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        const button = screen.getByTestId("theme-toggle-button");
+        expect(button).toHaveAttribute("aria-label");
+      });
+    });
+
+    it("persists theme preference to localStorage when toggled", async () => {
+      render(<Board />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("theme-toggle-button")).toBeInTheDocument();
+      });
+
+      const themeButton = screen.getByTestId("theme-toggle-button");
+
+      // Initial state: light theme
+      expect(window.localStorage.getItem("ponderTheme")).toBeNull();
+
+      // Click to toggle to dark
+      fireEvent.click(themeButton);
+
+      // Allow the hook to update localStorage
+      await waitFor(() => {
+        expect(window.localStorage.getItem("ponderTheme")).toBe("dark");
+      });
+    });
+  });
+
   describe("Onboarding tooltip", () => {
     it("is shown on first visit, when boardOnboarded is not set in localStorage", async () => {
       render(<Board />);

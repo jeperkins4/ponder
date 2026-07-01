@@ -4,12 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { StoryDTO, WorkUnitDTO, Column, COLUMNS } from "@/lib/types";
 import { WorkUnitCard } from "@/components/WorkUnitCard";
 import { OnboardingTooltip } from "@/components/OnboardingTooltip";
+import { useTheme } from "@/hooks/useTheme";
 
 type ColumnRefMap = Record<Column, HTMLDivElement | null>;
 
 const ONBOARDING_STORAGE_KEY = "boardOnboarded";
 
 export default function Board() {
+  const { isDark, toggle, mounted } = useTheme();
   const [stories, setStories] = useState<StoryDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +130,7 @@ export default function Board() {
   if (loading) {
     content = (
       <div className="text-center">
-        <p className="text-lg text-gray-600">Loading kanban board...</p>
+        <p className={`text-lg ${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"}`}>Loading kanban board...</p>
       </div>
     );
   } else if (error) {
@@ -141,14 +143,14 @@ export default function Board() {
     content = (
       <>
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-800">Kanban Board</h1>
-          <p className="text-gray-600 text-sm">Drag tasks between columns to track progress.</p>
-          <p className="text-gray-600 mt-2">
+          <h1 className={`text-4xl font-bold ${isDark ? "text-ponder-dark-text" : "text-ponder-light-text"} font-space-grotesk`}>Kanban Board</h1>
+          <p className={`${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} text-sm`}>Drag tasks between columns to track progress.</p>
+          <p className={`${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} mt-2`}>
             {stories.length} {stories.length === 1 ? "story" : "stories"}
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-3 gap-4">
           {COLUMNS.map((column) => (
             <KanbanColumn
               key={column}
@@ -158,6 +160,7 @@ export default function Board() {
               columnRef={setColumnRef(column)}
               onKeyboardNavigation={handleKeyboardNavigation}
               onStatusMessage={handleStatusMessage}
+              isDark={isDark}
             />
           ))}
         </div>
@@ -184,8 +187,38 @@ export default function Board() {
         onDismiss={handleOnboardingDismiss}
       />
 
-      <main role="main" id="main-content" className="min-h-screen bg-gray-100 p-8">
-        {content}
+      <main role="main" id="main-content" className={`min-h-screen ${isDark ? "bg-ponder-dark-bg" : "bg-gray-50"} p-8`}>
+        <div className={`max-w-7xl mx-auto rounded-3xl border p-8 shadow-ponder-card ${
+          isDark
+            ? "bg-ponder-dark-bg border-ponder-dark-border"
+            : "bg-ponder-light-bg border-ponder-light-card-border"
+        }`}>
+          {/* Theme toggle button */}
+          <div className="flex justify-end mb-6">
+            <button
+              onClick={toggle}
+              data-testid="theme-toggle-button"
+              className={`p-2 rounded-lg transition-colors ${
+                isDark
+                  ? "bg-ponder-dark-surface hover:bg-ponder-dark-border text-ponder-dark-text"
+                  : "bg-ponder-light-surface hover:bg-ponder-light-card-border text-ponder-light-text"
+              }`}
+              aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {isDark ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.536l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zm5.657-9.193a1 1 0 00-1.414 0l-.707.707A1 1 0 005.05 6.464l.707-.707a1 1 0 001.414-1.414l-.707-.707zM3 11a1 1 0 100-2H2a1 1 0 100 2h1z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {content}
+        </div>
       </main>
     </>
   );
@@ -201,6 +234,7 @@ interface KanbanColumnProps {
     workUnitId: string
   ) => void;
   onStatusMessage?: (message: string) => void;
+  isDark?: boolean;
 }
 
 function KanbanColumn({
@@ -210,6 +244,7 @@ function KanbanColumn({
   columnRef,
   onKeyboardNavigation,
   onStatusMessage,
+  isDark = false,
 }: KanbanColumnProps) {
   const columnLabel = {
     todo: "To Do",
@@ -234,18 +269,22 @@ function KanbanColumn({
   return (
     <section
       aria-label={`${columnLabel} column, ${totalWorkUnits} ${itemWord}`}
-      className="bg-white rounded-lg shadow-md p-4"
+      className={`rounded-xl border p-6 transition-all duration-200 ${
+        isDark
+          ? "bg-ponder-dark-surface border-ponder-dark-border hover:border-ponder-dark-purple hover:shadow-ponder-card-hover"
+          : "bg-ponder-light-surface border-ponder-light-card-border hover:border-ponder-light-purple hover:shadow-ponder-card-hover"
+      }`}
     >
-      <div className="mb-4 pb-4 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800">{columnLabel}</h2>
-        <p className="text-sm text-gray-500 mt-1">
+      <div className={`mb-6 pb-4 border-b ${isDark ? "border-ponder-dark-border" : "border-ponder-light-card-border"}`}>
+        <h2 className={`text-lg font-semibold ${isDark ? "text-ponder-dark-text" : "text-ponder-light-text"} font-space-grotesk`}>{columnLabel}</h2>
+        <p className={`text-sm ${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} mt-1`}>
           {totalWorkUnits} {itemWord}
         </p>
       </div>
 
-      <div className="space-y-3" ref={columnRef}>
+      <div className="space-y-4" ref={columnRef}>
         {workUnitsInColumn.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
+          <div className={`text-center py-8 ${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} opacity-60`}>
             <p>No tasks</p>
           </div>
         ) : (
