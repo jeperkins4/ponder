@@ -86,9 +86,12 @@ describe("Kanban Board page", () => {
   it("renders 3 columns", async () => {
     render(<Board />);
     await waitFor(() => {
-      expect(screen.getByText(/To Do/i)).toBeInTheDocument();
-      expect(screen.getByText(/In Progress/i)).toBeInTheDocument();
-      expect(screen.getByText(/Done/i)).toBeInTheDocument();
+      const columnHeadings = screen
+        .getAllByRole("heading", { level: 2 })
+        .map((heading) => heading.textContent);
+      expect(columnHeadings).toEqual(
+        expect.arrayContaining(["To Do", "In Progress", "Done"])
+      );
     });
   });
 
@@ -101,13 +104,6 @@ describe("Kanban Board page", () => {
       expect(screen.getByText("Work unit 2")).toBeInTheDocument();
       expect(screen.getByText("Work unit 3")).toBeInTheDocument();
     });
-
-    // Verify the first work unit is associated with the story
-    // The text might be split across elements, so check using a more flexible matcher
-    const storyTexts = screen.getAllByText((content, element) => {
-      return element?.textContent?.includes("Story:") ?? false;
-    });
-    expect(storyTexts.length).toBeGreaterThan(0);
   });
 
   it("handles loading state", () => {
@@ -155,11 +151,13 @@ describe("Kanban Board page", () => {
     });
   });
 
-  it("shows completed indicator for finished work units", async () => {
+  it("shows a Done column badge for finished work units", async () => {
     render(<Board />);
 
     await waitFor(() => {
-      expect(screen.getByText("✓ Completed")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("work-unit-column-badge-wu-3")
+      ).toHaveTextContent("Done");
     });
   });
 
@@ -177,6 +175,25 @@ describe("Kanban Board page", () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith("/api/stories");
       expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("renders Edit and Delete buttons for each work unit card", async () => {
+    render(<Board />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("edit-button-wu-1")).toBeInTheDocument();
+      expect(screen.getByTestId("delete-button-wu-1")).toBeInTheDocument();
+    });
+  });
+
+  it("cards are focusable and show a visible focus ring", async () => {
+    render(<Board />);
+
+    await waitFor(() => {
+      const card = screen.getByTestId("work-unit-card-wu-1");
+      expect(card).toHaveAttribute("tabindex", "0");
+      expect(card).toHaveClass("focus:ring-2", "focus:outline-none");
     });
   });
 });

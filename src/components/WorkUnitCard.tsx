@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Draggable } from "react-beautiful-dnd";
 import { WorkUnitDTO, Column } from "@/lib/types";
 
 interface WorkUnitCardProps {
   workUnit: WorkUnitDTO;
-  index: number;
   onDelete?: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<WorkUnitDTO>) => void;
 }
@@ -23,9 +21,10 @@ const columnColors: Record<Column, string> = {
   done: "bg-green-100 text-green-800",
 };
 
+const focusRing = "focus:ring-2 focus:ring-blue-500 focus:outline-none";
+
 export function WorkUnitCard({
   workUnit,
-  index,
   onDelete,
   onUpdate,
 }: WorkUnitCardProps) {
@@ -89,19 +88,23 @@ export function WorkUnitCard({
 
   if (isEditing) {
     return (
-      <div className="p-4 bg-white border border-gray-300 rounded-lg shadow-sm">
+      <div
+        className={`p-4 bg-white border border-gray-300 rounded-lg shadow-sm ${focusRing}`}
+        tabIndex={0}
+        data-testid={`work-unit-card-${workUnit.id}`}
+      >
         <input
           type="text"
           value={editData.title || ""}
           onChange={(e) => handleEditChange("title", e.target.value)}
-          className="w-full px-2 py-1 mb-2 border border-gray-300 rounded"
+          className={`w-full px-2 py-1 mb-2 border border-gray-300 rounded ${focusRing}`}
           placeholder="Title"
           data-testid="edit-title-input"
         />
         <textarea
           value={editData.description || ""}
           onChange={(e) => handleEditChange("description", e.target.value)}
-          className="w-full px-2 py-1 mb-2 border border-gray-300 rounded"
+          className={`w-full px-2 py-1 mb-2 border border-gray-300 rounded ${focusRing}`}
           placeholder="Description"
           rows={3}
           data-testid="edit-description-input"
@@ -109,14 +112,14 @@ export function WorkUnitCard({
         <div className="flex gap-2">
           <button
             onClick={handleSaveEdit}
-            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className={`px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 ${focusRing}`}
             data-testid="save-edit-button"
           >
             Save
           </button>
           <button
             onClick={() => setIsEditing(false)}
-            className="px-3 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
+            className={`px-3 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 ${focusRing}`}
             data-testid="cancel-edit-button"
           >
             Cancel
@@ -127,71 +130,63 @@ export function WorkUnitCard({
   }
 
   return (
-    <Draggable draggableId={workUnit.id} index={index}>
-      {(provided, snapshot) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
-          className={`p-4 bg-white border border-gray-300 rounded-lg shadow-sm transition-all ${
-            snapshot.isDragging ? "shadow-lg bg-blue-50" : ""
-          }`}
-          data-testid={`work-unit-card-${workUnit.id}`}
+    <div
+      className={`p-4 bg-white border border-gray-300 rounded-lg shadow-sm transition-all ${focusRing}`}
+      tabIndex={0}
+      data-testid={`work-unit-card-${workUnit.id}`}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <h3
+          className="font-semibold text-gray-900 flex-1"
+          data-testid={`work-unit-title-${workUnit.id}`}
         >
-          <div className="flex items-start justify-between mb-2">
-            <h3
-              className="font-semibold text-gray-900 flex-1"
-              data-testid={`work-unit-title-${workUnit.id}`}
-            >
-              {workUnit.title}
-            </h3>
-            <span
-              className={`px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${
-                columnColors[workUnit.column]
-              }`}
-              data-testid={`work-unit-column-badge-${workUnit.id}`}
-            >
-              {columnLabels[workUnit.column]}
-            </span>
-          </div>
+          {workUnit.title}
+        </h3>
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${
+            columnColors[workUnit.column]
+          }`}
+          data-testid={`work-unit-column-badge-${workUnit.id}`}
+        >
+          {columnLabels[workUnit.column]}
+        </span>
+      </div>
 
-          {workUnit.description && (
-            <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-              {workUnit.description}
-            </p>
-          )}
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => setIsEditing(true)}
-              className="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-              data-testid={`edit-button-${workUnit.id}`}
-            >
-              Edit
-            </button>
-            <button
-              onClick={handleDelete}
-              className={`px-3 py-1 text-sm rounded text-white ${
-                isDeleting
-                  ? "bg-red-600 hover:bg-red-700"
-                  : "bg-red-500 hover:bg-red-600"
-              }`}
-              data-testid={`delete-button-${workUnit.id}`}
-            >
-              {isDeleting ? "Confirm Delete?" : "Delete"}
-            </button>
-            {isDeleting && (
-              <button
-                onClick={() => setIsDeleting(false)}
-                className="px-3 py-1 text-sm bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
-                data-testid={`cancel-delete-button-${workUnit.id}`}
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </div>
+      {workUnit.description && (
+        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+          {workUnit.description}
+        </p>
       )}
-    </Draggable>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => setIsEditing(true)}
+          className={`px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300 ${focusRing}`}
+          data-testid={`edit-button-${workUnit.id}`}
+        >
+          Edit
+        </button>
+        <button
+          onClick={handleDelete}
+          className={`px-3 py-1 text-sm rounded text-white ${focusRing} ${
+            isDeleting
+              ? "bg-red-600 hover:bg-red-700"
+              : "bg-red-500 hover:bg-red-600"
+          }`}
+          data-testid={`delete-button-${workUnit.id}`}
+        >
+          {isDeleting ? "Confirm Delete?" : "Delete"}
+        </button>
+        {isDeleting && (
+          <button
+            onClick={() => setIsDeleting(false)}
+            className={`px-3 py-1 text-sm bg-gray-300 text-gray-800 rounded hover:bg-gray-400 ${focusRing}`}
+            data-testid={`cancel-delete-button-${workUnit.id}`}
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

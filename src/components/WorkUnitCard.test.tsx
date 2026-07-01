@@ -3,22 +3,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { WorkUnitCard } from "./WorkUnitCard";
 import { WorkUnitDTO } from "@/lib/types";
 
-// Mock react-beautiful-dnd
-vi.mock("react-beautiful-dnd", () => ({
-  Draggable: ({ children, draggableId }: any) => (
-    <div data-testid={`draggable-${draggableId}`}>
-      {children(
-        {
-          innerRef: vi.fn(),
-          draggableProps: {},
-          dragHandleProps: {},
-        },
-        { isDragging: false }
-      )}
-    </div>
-  ),
-}));
-
 const mockWorkUnit: WorkUnitDTO = {
   id: "test-id-123",
   storyId: "story-123",
@@ -37,38 +21,31 @@ describe("WorkUnitCard", () => {
 
   describe("Rendering", () => {
     it("renders the title", () => {
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
       expect(
         screen.getByTestId(`work-unit-title-${mockWorkUnit.id}`)
       ).toHaveTextContent("Test Work Unit");
     });
 
     it("renders the column badge", () => {
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
       expect(
         screen.getByTestId(`work-unit-column-badge-${mockWorkUnit.id}`)
       ).toHaveTextContent("To Do");
     });
 
     it("renders the description", () => {
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
       expect(screen.getByText("This is a test description")).toBeInTheDocument();
     });
 
     it("renders edit and delete buttons", () => {
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
       expect(
         screen.getByTestId(`edit-button-${mockWorkUnit.id}`)
       ).toBeInTheDocument();
       expect(
         screen.getByTestId(`delete-button-${mockWorkUnit.id}`)
-      ).toBeInTheDocument();
-    });
-
-    it("renders the card with draggable wrapper", () => {
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
-      expect(
-        screen.getByTestId(`draggable-${mockWorkUnit.id}`)
       ).toBeInTheDocument();
     });
 
@@ -78,14 +55,14 @@ describe("WorkUnitCard", () => {
         column: "in_progress",
       };
       const { rerender } = render(
-        <WorkUnitCard workUnit={inProgressUnit} index={0} />
+        <WorkUnitCard workUnit={inProgressUnit} />
       );
       expect(
         screen.getByTestId(`work-unit-column-badge-${mockWorkUnit.id}`)
       ).toHaveTextContent("In Progress");
 
       const doneUnit: WorkUnitDTO = { ...mockWorkUnit, column: "done" };
-      rerender(<WorkUnitCard workUnit={doneUnit} index={0} />);
+      rerender(<WorkUnitCard workUnit={doneUnit} />);
       expect(
         screen.getByTestId(`work-unit-column-badge-${mockWorkUnit.id}`)
       ).toHaveTextContent("Done");
@@ -97,7 +74,7 @@ describe("WorkUnitCard", () => {
         description: null,
       };
       render(
-        <WorkUnitCard workUnit={unitWithoutDescription} index={0} />
+        <WorkUnitCard workUnit={unitWithoutDescription} />
       );
       expect(screen.queryByText("This is a test description")).not.toBeInTheDocument();
     });
@@ -112,7 +89,7 @@ describe("WorkUnitCard", () => {
 
       const onDelete = vi.fn();
       render(
-        <WorkUnitCard workUnit={mockWorkUnit} index={0} onDelete={onDelete} />
+        <WorkUnitCard workUnit={mockWorkUnit} onDelete={onDelete} />
       );
 
       const deleteButton = screen.getByTestId(`delete-button-${mockWorkUnit.id}`);
@@ -148,7 +125,7 @@ describe("WorkUnitCard", () => {
 
       const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
 
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
 
       const deleteButton = screen.getByTestId(`delete-button-${mockWorkUnit.id}`);
       fireEvent.click(deleteButton); // First click for confirmation
@@ -162,7 +139,7 @@ describe("WorkUnitCard", () => {
     });
 
     it("shows cancel button during delete confirmation", () => {
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
 
       const deleteButton = screen.getByTestId(`delete-button-${mockWorkUnit.id}`);
       fireEvent.click(deleteButton);
@@ -173,7 +150,7 @@ describe("WorkUnitCard", () => {
     });
 
     it("cancels delete when cancel button is clicked", () => {
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
 
       const deleteButton = screen.getByTestId(`delete-button-${mockWorkUnit.id}`);
       fireEvent.click(deleteButton); // Show confirmation
@@ -192,7 +169,7 @@ describe("WorkUnitCard", () => {
 
   describe("Edit functionality", () => {
     it("switches to edit mode when edit button is clicked", () => {
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
 
       const editButton = screen.getByTestId(`edit-button-${mockWorkUnit.id}`);
       fireEvent.click(editButton);
@@ -208,7 +185,7 @@ describe("WorkUnitCard", () => {
     });
 
     it("cancels edit mode when cancel button is clicked", () => {
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
 
       const editButton = screen.getByTestId(`edit-button-${mockWorkUnit.id}`);
       fireEvent.click(editButton);
@@ -236,7 +213,7 @@ describe("WorkUnitCard", () => {
 
       const onUpdate = vi.fn();
       render(
-        <WorkUnitCard workUnit={mockWorkUnit} index={0} onUpdate={onUpdate} />
+        <WorkUnitCard workUnit={mockWorkUnit} onUpdate={onUpdate} />
       );
 
       const editButton = screen.getByTestId(`edit-button-${mockWorkUnit.id}`);
@@ -288,7 +265,7 @@ describe("WorkUnitCard", () => {
 
       const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
 
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
 
       const editButton = screen.getByTestId(`edit-button-${mockWorkUnit.id}`);
       fireEvent.click(editButton);
@@ -312,7 +289,7 @@ describe("WorkUnitCard", () => {
         }),
       } as Response);
 
-      render(<WorkUnitCard workUnit={mockWorkUnit} index={0} />);
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
 
       const editButton = screen.getByTestId(`edit-button-${mockWorkUnit.id}`);
       fireEvent.click(editButton);
@@ -332,6 +309,41 @@ describe("WorkUnitCard", () => {
       expect(
         screen.getByTestId(`work-unit-title-${mockWorkUnit.id}`)
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("Accessibility", () => {
+    it("is focusable and shows a visible focus ring on the card", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
+      expect(card).toHaveAttribute("tabindex", "0");
+      expect(card).toHaveClass(
+        "focus:ring-2",
+        "focus:ring-blue-500",
+        "focus:outline-none"
+      );
+    });
+
+    it("shows a visible focus ring on the action buttons", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      expect(
+        screen.getByTestId(`edit-button-${mockWorkUnit.id}`)
+      ).toHaveClass("focus:ring-2", "focus:outline-none");
+      expect(
+        screen.getByTestId(`delete-button-${mockWorkUnit.id}`)
+      ).toHaveClass("focus:ring-2", "focus:outline-none");
+    });
+
+    it("keeps the focus ring visible on the card while in edit mode", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      fireEvent.click(screen.getByTestId(`edit-button-${mockWorkUnit.id}`));
+
+      const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
+      expect(card).toHaveAttribute("tabindex", "0");
+      expect(card).toHaveClass("focus:ring-2", "focus:outline-none");
     });
   });
 });

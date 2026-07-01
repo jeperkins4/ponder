@@ -1,34 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { StoryDTO, WorkUnitDTO, Column, COLUMNS } from "@/lib/types";
+import { WorkUnitCard } from "@/components/WorkUnitCard";
 
 export default function Board() {
   const [stories, setStories] = useState<StoryDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchStories = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await fetch("/api/stories");
-        if (!response.ok) {
-          throw new Error(`Failed to fetch stories: ${response.statusText}`);
-        }
-        const data: StoryDTO[] = await response.json();
-        setStories(data);
-      } catch (err) {
-        console.error("Error fetching stories:", err);
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
+  const fetchStories = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch("/api/stories");
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stories: ${response.statusText}`);
       }
-    };
-
-    fetchStories();
+      const data: StoryDTO[] = await response.json();
+      setStories(data);
+    } catch (err) {
+      console.error("Error fetching stories:", err);
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchStories();
+  }, [fetchStories]);
 
   if (loading) {
     return (
@@ -65,6 +66,7 @@ export default function Board() {
             key={column}
             column={column}
             stories={stories}
+            onRefresh={fetchStories}
           />
         ))}
       </div>
@@ -75,9 +77,10 @@ export default function Board() {
 interface KanbanColumnProps {
   column: Column;
   stories: StoryDTO[];
+  onRefresh: () => void;
 }
 
-function KanbanColumn({ column, stories }: KanbanColumnProps) {
+function KanbanColumn({ column, stories, onRefresh }: KanbanColumnProps) {
   const columnLabel = {
     todo: "To Do",
     in_progress: "In Progress",
@@ -85,16 +88,12 @@ function KanbanColumn({ column, stories }: KanbanColumnProps) {
   }[column];
 
   // Get all work units in this column
-  const workUnitsInColumn: (WorkUnitDTO & { storyId: string; storySummary: string })[] = [];
+  const workUnitsInColumn: WorkUnitDTO[] = [];
 
   stories.forEach((story) => {
     story.workUnits.forEach((wu) => {
       if (wu.column === column) {
-        workUnitsInColumn.push({
-          ...wu,
-          storyId: story.id,
-          storySummary: story.summary,
-        });
+        workUnitsInColumn.push(wu);
       }
     });
   });
@@ -120,45 +119,10 @@ function KanbanColumn({ column, stories }: KanbanColumnProps) {
             <WorkUnitCard
               key={workUnit.id}
               workUnit={workUnit}
+              onDelete={onRefresh}
+              onUpdate={onRefresh}
             />
           ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-interface WorkUnitCardProps {
-  workUnit: WorkUnitDTO & { storyId: string; storySummary: string };
-}
-
-function WorkUnitCard({ workUnit }: WorkUnitCardProps) {
-  return (
-    <div
-      className="bg-blue-50 border border-blue-200 rounded p-3 hover:shadow-md transition-shadow cursor-pointer"
-      draggable
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-800 text-sm line-clamp-2">
-            {workUnit.title}
-          </h3>
-          <p className="text-xs text-gray-500 mt-1 truncate">
-            Story: {workUnit.storySummary}
-          </p>
-          {workUnit.description && (
-            <p className="text-xs text-gray-600 mt-2 line-clamp-2">
-              {workUnit.description}
-            </p>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-blue-100">
-        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-          {workUnit.id.slice(0, 8)}
-        </span>
-        {workUnit.completedAt && (
-          <span className="text-xs text-green-600">✓ Completed</span>
         )}
       </div>
     </div>
