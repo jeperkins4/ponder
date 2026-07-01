@@ -23,12 +23,16 @@ export function buildAssignedStoriesJql(projectKeys: string[]): string {
  * JIRA statuses considered "active work" for the local board. Stories outside
  * these statuses (e.g. Closed, QA Approved) are not imported.
  *
- * NOTE: "Code Revew" is intentionally spelled this way — it matches the actual
- * (misspelled) status name configured in the JIRA instance. JQL status matching
- * is exact, so "correcting" this to "Code Review" would silently import nothing
- * for that status.
+ * NOTE: both "Code Revew" (the current, misspelled status name in the JIRA
+ * instance) and "Code Review" (the corrected spelling) are listed so the sync
+ * keeps working if/when the typo is fixed in JIRA. JQL status matching is exact.
  */
-export const PROJECT_SYNC_STATUSES = ["To Do", "In Progress", "Code Revew"];
+export const PROJECT_SYNC_STATUSES = [
+  "To Do",
+  "In Progress",
+  "Code Revew",
+  "Code Review",
+];
 
 /**
  * Builds a JQL query for finding a single project's Story/Task/Bug issues that
