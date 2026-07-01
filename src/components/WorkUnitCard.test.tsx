@@ -428,7 +428,7 @@ describe("WorkUnitCard", () => {
       expect(card).toHaveAttribute("tabindex", "0");
       expect(card).toHaveClass(
         "focus:ring-2",
-        "focus:ring-blue-500",
+        "focus:ring-ponder-light-purple",
         "focus:outline-none"
       );
     });

@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { WorkUnitDTO, Column } from "@/lib/types";
 
+type PriorityLevel = "HIGH" | "MEDIUM" | "LOW";
+
 interface WorkUnitCardProps {
   workUnit: WorkUnitDTO;
+  priority?: PriorityLevel;
   onDelete?: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<WorkUnitDTO>) => void;
   onKeyboardNavigation?: (direction: "left" | "right", workUnitId: string) => void;
@@ -23,10 +26,26 @@ const columnColors: Record<Column, string> = {
   done: "bg-green-100 text-green-800",
 };
 
-const focusRing = "focus:ring-2 focus:ring-blue-500 focus:outline-none";
+const priorityStyles: Record<PriorityLevel, { dot: string; text: string }> = {
+  HIGH: {
+    dot: "bg-red-500",
+    text: "text-red-700",
+  },
+  MEDIUM: {
+    dot: "bg-amber-400",
+    text: "text-amber-700",
+  },
+  LOW: {
+    dot: "bg-gray-500",
+    text: "text-gray-600",
+  },
+};
+
+const focusRing = "focus:ring-2 focus:ring-ponder-light-purple focus:outline-none";
 
 export function WorkUnitCard({
   workUnit,
+  priority,
   onDelete,
   onUpdate,
   onKeyboardNavigation,
@@ -143,7 +162,7 @@ export function WorkUnitCard({
       <div
         role="article"
         aria-label={cardAriaLabel}
-        className={`p-4 bg-white border border-gray-300 rounded-lg shadow-sm ${focusRing}`}
+        className={`p-3 bg-ponder-light-surface border border-ponder-light-card-border rounded-xl shadow-ponder-card ${focusRing}`}
         tabIndex={0}
         data-testid={`work-unit-card-${workUnit.id}`}
       >
@@ -152,7 +171,7 @@ export function WorkUnitCard({
           type="text"
           value={editData.title || ""}
           onChange={(e) => handleEditChange("title", e.target.value)}
-          className={`w-full px-2 py-1 mb-2 border border-gray-300 rounded ${focusRing}`}
+          className={`w-full px-2 py-1 mb-2 border border-ponder-light-card-border rounded-lg font-instrument font-semibold ${focusRing}`}
           placeholder="Title"
           aria-label={`Edit title: ${workUnit.title}`}
           data-testid="edit-title-input"
@@ -160,7 +179,7 @@ export function WorkUnitCard({
         <textarea
           value={editData.description || ""}
           onChange={(e) => handleEditChange("description", e.target.value)}
-          className={`w-full px-2 py-1 mb-2 border border-gray-300 rounded ${focusRing}`}
+          className={`w-full px-2 py-1 mb-2 border border-ponder-light-card-border rounded-lg font-instrument text-ponder-light-text-muted ${focusRing}`}
           placeholder="Description"
           rows={3}
           aria-label={`Edit description: ${workUnit.title}`}
@@ -170,7 +189,7 @@ export function WorkUnitCard({
           <button
             onClick={handleSaveEdit}
             aria-label={`Save changes to ${workUnit.title}`}
-            className={`px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 ${focusRing}`}
+            className={`px-3 py-1.5 bg-ponder-light-purple text-white rounded-lg hover:bg-ponder-light-purple-dark font-instrument font-semibold text-sm ${focusRing}`}
             data-testid="save-edit-button"
           >
             Save
@@ -178,7 +197,7 @@ export function WorkUnitCard({
           <button
             onClick={handleCancelEdit}
             aria-label={`Cancel editing ${workUnit.title}`}
-            className={`px-3 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 ${focusRing}`}
+            className={`px-3 py-1.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-instrument font-semibold text-sm ${focusRing}`}
             data-testid="cancel-edit-button"
           >
             Cancel
@@ -193,20 +212,30 @@ export function WorkUnitCard({
       ref={cardRef}
       role="article"
       aria-label={cardAriaLabel}
-      className={`p-4 bg-white border border-gray-300 rounded-lg shadow-sm transition-all ${focusRing}`}
+      className={`p-3 bg-ponder-light-surface border border-ponder-light-card-border rounded-xl shadow-ponder-card hover:shadow-ponder-card-hover hover:-translate-y-0.5 transition-all ${focusRing}`}
       tabIndex={0}
       onKeyDown={handleCardKeyDown}
       data-testid={`work-unit-card-${workUnit.id}`}
     >
-      <div className="flex items-start justify-between mb-2">
-        <h3
-          className="font-semibold text-gray-900 flex-1"
-          data-testid={`work-unit-title-${workUnit.id}`}
-        >
-          {workUnit.title}
-        </h3>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex-1">
+          {priority && (
+            <div className="flex items-center gap-1 mb-2">
+              <span className={`inline-flex items-center gap-1 text-xs font-bold tracking-wide ${priorityStyles[priority].text}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${priorityStyles[priority].dot}`}></span>
+                {priority}
+              </span>
+            </div>
+          )}
+          <h3
+            className="font-instrument font-semibold text-sm text-ponder-light-text leading-tight"
+            data-testid={`work-unit-title-${workUnit.id}`}
+          >
+            {workUnit.title}
+          </h3>
+        </div>
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${
+          className={`px-2 py-1 rounded-full text-xs font-instrument font-medium ml-2 flex-shrink-0 ${
             columnColors[workUnit.column]
           }`}
           data-testid={`work-unit-column-badge-${workUnit.id}`}
@@ -216,7 +245,7 @@ export function WorkUnitCard({
       </div>
 
       {workUnit.description && (
-        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+        <p className="text-xs font-instrument text-ponder-light-text-muted mb-3 line-clamp-2">
           {workUnit.description}
         </p>
       )}
@@ -225,7 +254,7 @@ export function WorkUnitCard({
         <button
           onClick={() => setIsEditing(true)}
           aria-label={`Edit work unit: ${workUnit.title}`}
-          className={`px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300 ${focusRing}`}
+          className={`px-2 py-1.5 text-xs font-instrument font-semibold bg-ponder-light-purple text-white hover:bg-ponder-light-purple-dark rounded-lg transition-colors ${focusRing}`}
           data-testid={`edit-button-${workUnit.id}`}
         >
           Edit
@@ -235,10 +264,10 @@ export function WorkUnitCard({
           aria-label={`${isDeleting ? "Confirm delete" : "Delete"} work unit: ${
             workUnit.title
           }`}
-          className={`px-3 py-1 text-sm rounded text-white ${focusRing} ${
+          className={`px-2 py-1.5 text-xs font-instrument font-semibold rounded-lg transition-colors ${focusRing} ${
             isDeleting
-              ? "bg-red-700 hover:bg-red-800"
-              : "bg-red-600 hover:bg-red-700"
+              ? "bg-red-600 text-white hover:bg-red-700"
+              : "bg-red-500 text-white hover:bg-red-600"
           }`}
           data-testid={`delete-button-${workUnit.id}`}
         >
@@ -248,7 +277,7 @@ export function WorkUnitCard({
           <button
             onClick={() => setIsDeleting(false)}
             aria-label={`Cancel delete of ${workUnit.title}`}
-            className={`px-3 py-1 text-sm bg-gray-300 text-gray-800 rounded hover:bg-gray-400 ${focusRing}`}
+            className={`px-2 py-1.5 text-xs font-instrument font-semibold bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors ${focusRing}`}
             data-testid={`cancel-delete-button-${workUnit.id}`}
           >
             Cancel
