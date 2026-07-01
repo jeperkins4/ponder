@@ -37,7 +37,7 @@ describe("syncStoriesFromJira", () => {
     // Setup mock fetchAssignedStories
     mockFetchAssignedStories = vi.fn();
     vi.spyOn(jiraClient, "fetchAssignedStories").mockImplementation(
-      mockFetchAssignedStories
+      mockFetchAssignedStories as any
     );
   });
 
