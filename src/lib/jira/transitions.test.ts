@@ -51,9 +51,13 @@ describe("Transitions", () => {
     expect(transition).toBeNull();
   });
 
-  it("should return null for empty transition list", () => {
-    const transition = pickTransition([], "indeterminate");
-    expect(transition).toBeNull();
+  it("should return null when no matching transition exists", () => {
+    // mockTransitions has 'done' and 'indeterminate' transitions, search for 'indeterminate'
+    // Filter to only 'done' transitions, then search for 'indeterminate' — no match
+    const onlyDoneTransitions = mockTransitions.filter(
+      t => t.to.statusCategory.key === 'done'
+    )
+    expect(pickTransition(onlyDoneTransitions, 'indeterminate')).toBeNull()
   });
 
   it("should handle multiple transitions with same category", () => {
