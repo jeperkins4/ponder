@@ -132,15 +132,37 @@ describe("KanbanBoard", () => {
   it("shows each card's parent JIRA key linking to the issue", async () => {
     render(<KanbanBoard />);
     await waitFor(() => {
-      // wu-1 belongs to story-1 (PROJ-1); wu-3 belongs to story-2 (PROJ-2)
+      // wu-1 belongs to story-1 (PROJ-1, 3 work units → suffixed sub-number);
+      // it still links to the parent PROJ-1 issue.
       const key1 = screen.getByTestId("work-unit-story-key-wu-1");
-      expect(key1).toHaveTextContent("PROJ-1");
+      expect(key1).toHaveTextContent("PROJ-1-1");
       expect(key1).toHaveAttribute(
         "href",
         "https://jira.example.com/browse/PROJ-1"
       );
+      // wu-3 is the only work unit of story-2 (PROJ-2) → no suffix
       expect(screen.getByTestId("work-unit-story-key-wu-3")).toHaveTextContent(
         "PROJ-2"
+      );
+      expect(screen.getByTestId("work-unit-story-key-wu-3")).not.toHaveTextContent(
+        "PROJ-2-"
+      );
+    });
+  });
+
+  it("numbers sub-stories of a decomposed story sequentially and stably", async () => {
+    render(<KanbanBoard />);
+    await waitFor(() => {
+      // story-1's three work units (wu-1, wu-2, wu-4) get PROJ-1-1/-2/-3 by
+      // creation order (id tiebreak, since the mock createdAt values match).
+      expect(screen.getByTestId("work-unit-story-key-wu-1")).toHaveTextContent(
+        "PROJ-1-1"
+      );
+      expect(screen.getByTestId("work-unit-story-key-wu-2")).toHaveTextContent(
+        "PROJ-1-2"
+      );
+      expect(screen.getByTestId("work-unit-story-key-wu-4")).toHaveTextContent(
+        "PROJ-1-3"
       );
     });
   });
