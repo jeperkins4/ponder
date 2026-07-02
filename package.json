@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "knip": "knip",
     "test": "dotenv -e .env.test -- vitest",
     "test:watch": "dotenv -e .env.test -- vitest --watch",
     "test:ui": "dotenv -e .env.test -- vitest --ui",
@@ -28,6 +30,8 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "3.3.1",
+    "@eslint/js": "9.39.4",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.2.1",
     "@types/node": "^20",
@@ -37,11 +41,15 @@
     "@vitest/ui": "^1.6.0",
     "autoprefixer": "^10.4.19",
     "dotenv-cli": "^11.0.0",
+    "eslint": "9.39.4",
+    "eslint-config-next": "15.5.19",
     "jsdom": "^24.1.0",
+    "knip": "6.23.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.8.1",
     "typescript": "^5.3.3",
+    "typescript-eslint": "8.62.1",
     "vite": "^5.0.0",
     "vitest": "^1.6.0"
   }
