@@ -15,9 +15,10 @@ const eslintConfig = [
     extends: ["next/core-web-vitals", "next/typescript"],
   }),
   {
+    // Explicitly scope our rule overrides to the project's actual source
+    // (src/** and scripts/**), rather than everything eslint-config-next's
+    // own config already targets.
     files: ["src/**/*.{js,jsx,ts,tsx}", "scripts/**/*.mjs"],
-  },
-  {
     // Downgraded to warnings rather than a large manual refactor.
     // `any` shows up in a handful of JIRA API response shapes and test
     // mocks where a precise type would need to mirror JIRA's REST payload
