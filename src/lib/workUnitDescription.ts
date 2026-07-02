@@ -87,3 +87,21 @@ export function hasEmbeddedAcOrVerification(raw: string | null | undefined): boo
   if (!raw) return false;
   return AC_INLINE.test(raw) || VER_INLINE.test(raw);
 }
+
+/**
+ * Removes a leading parent-key prefix from a work-unit title, e.g.
+ * "COM-541-5 — Implement X" → "Implement X". The card already shows the key as
+ * a badge, so repeating it in the title is redundant. Only strips when the
+ * prefix matches THIS work unit's parent key (optionally with a `-N` sub-number)
+ * followed by a dash/em-dash/en-dash/colon separator and whitespace — so it
+ * never touches titles that merely happen to contain a hyphen.
+ */
+export function stripParentKeyFromTitle(
+  title: string,
+  parentKey: string | null | undefined
+): string {
+  if (!title || !parentKey) return title;
+  const esc = parentKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^\\s*${esc}(?:-\\d+)?\\s*[—–:-]\\s+`, "i");
+  return title.replace(re, "").trim();
+}

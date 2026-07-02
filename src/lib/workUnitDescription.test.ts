@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseWorkUnitDescription,
   hasEmbeddedAcOrVerification,
+  stripParentKeyFromTitle,
 } from "@/lib/workUnitDescription";
 
 describe("parseWorkUnitDescription", () => {
@@ -81,6 +82,43 @@ describe("parseWorkUnitDescription", () => {
     expect(parsed.description).toBe("Lead");
     expect(parsed.verification).toBe("ver text");
     expect(parsed.acceptanceCriteria).toBe("ac text");
+  });
+});
+
+describe("stripParentKeyFromTitle", () => {
+  it("strips a KEY-N — prefix that matches the parent", () => {
+    expect(
+      stripParentKeyFromTitle("COM-541-5 — Implement removal action", "COM-541")
+    ).toBe("Implement removal action");
+  });
+
+  it("strips a bare KEY prefix with a colon or hyphen separator", () => {
+    expect(stripParentKeyFromTitle("COM-541: Do the thing", "COM-541")).toBe(
+      "Do the thing"
+    );
+    expect(stripParentKeyFromTitle("COM-541 - Do the thing", "COM-541")).toBe(
+      "Do the thing"
+    );
+  });
+
+  it("leaves titles without the parent prefix untouched", () => {
+    expect(stripParentKeyFromTitle("Implement removal action", "COM-541")).toBe(
+      "Implement removal action"
+    );
+    // A different key is not stripped.
+    expect(stripParentKeyFromTitle("TEAM-9 — Something", "COM-541")).toBe(
+      "TEAM-9 — Something"
+    );
+  });
+
+  it("does not over-strip a hyphenated word (no trailing space separator)", () => {
+    expect(stripParentKeyFromTitle("COM-541-5-ish thing", "COM-541")).toBe(
+      "COM-541-5-ish thing"
+    );
+  });
+
+  it("is a no-op without a parent key", () => {
+    expect(stripParentKeyFromTitle("COM-541-5 — X", null)).toBe("COM-541-5 — X");
   });
 });
 
