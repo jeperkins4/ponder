@@ -8,6 +8,10 @@ type PriorityLevel = "HIGH" | "MEDIUM" | "LOW";
 interface WorkUnitCardProps {
   workUnit: WorkUnitDTO;
   priority?: PriorityLevel;
+  /** JIRA key of the parent story this card was decomposed from (e.g. "COM-540"). */
+  storyKey?: string;
+  /** Link to the parent JIRA issue; when present the key renders as a link. */
+  storyUrl?: string;
   onDelete?: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<WorkUnitDTO>) => void;
   onKeyboardNavigation?: (direction: "left" | "right", workUnitId: string) => void;
@@ -48,6 +52,8 @@ const focusRing = "focus:ring-2 focus:ring-ponder-light-purple focus:outline-non
 export function WorkUnitCard({
   workUnit,
   priority,
+  storyKey,
+  storyUrl,
   onDelete,
   onUpdate,
   onKeyboardNavigation,
@@ -82,9 +88,9 @@ export function WorkUnitCard({
   }, [isEditing]);
 
   const columnLabel = columnLabels[workUnit.column];
-  const cardAriaLabel = `Work unit: ${workUnit.title}, in ${columnLabel} column, ${
-    workUnit.description || "No description"
-  }`;
+  const cardAriaLabel = `Work unit: ${workUnit.title}${
+    storyKey ? `, from JIRA ${storyKey}` : ""
+  }, in ${columnLabel} column, ${workUnit.description || "No description"}`;
 
   const handleEditChange = (field: string, value: string | null) => {
     setEditData((prev) => ({
@@ -221,6 +227,26 @@ export function WorkUnitCard({
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1">
+          {storyKey &&
+            (storyUrl ? (
+              <a
+                href={storyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className={`inline-block mb-1 font-instrument text-xs font-semibold text-ponder-light-purple hover:underline ${focusRing}`}
+                data-testid={`work-unit-story-key-${workUnit.id}`}
+              >
+                {storyKey}
+              </a>
+            ) : (
+              <span
+                className="inline-block mb-1 font-instrument text-xs font-semibold text-ponder-light-text-muted"
+                data-testid={`work-unit-story-key-${workUnit.id}`}
+              >
+                {storyKey}
+              </span>
+            ))}
           {priority && (
             <div className="flex items-center gap-1 mb-2">
               <span className={`inline-flex items-center gap-1 text-xs font-bold tracking-wide ${priorityStyles[priority].text}`}>

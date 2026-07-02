@@ -129,6 +129,22 @@ describe("KanbanBoard", () => {
     });
   });
 
+  it("shows each card's parent JIRA key linking to the issue", async () => {
+    render(<KanbanBoard />);
+    await waitFor(() => {
+      // wu-1 belongs to story-1 (PROJ-1); wu-3 belongs to story-2 (PROJ-2)
+      const key1 = screen.getByTestId("work-unit-story-key-wu-1");
+      expect(key1).toHaveTextContent("PROJ-1");
+      expect(key1).toHaveAttribute(
+        "href",
+        "https://jira.example.com/browse/PROJ-1"
+      );
+      expect(screen.getByTestId("work-unit-story-key-wu-3")).toHaveTextContent(
+        "PROJ-2"
+      );
+    });
+  });
+
   it("handles loading state", () => {
     // Create a fetch that never resolves
     global.fetch = vi.fn(
