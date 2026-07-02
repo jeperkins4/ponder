@@ -126,17 +126,3 @@ export async function breakDownStory(
 
   return subtasks;
 }
-
-/**
- * Formats a subtask draft into a card description:
- * {title}
- *
- * Acceptance Criteria:
- * {acceptanceCriteria}
- *
- * Verification:
- * {verification}
- */
-export function formatSubtaskDescription(d: SubtaskDraft): string {
-  return `${d.title}\n\nAcceptance Criteria:\n${d.acceptanceCriteria}\n\nVerification:\n${d.verification}`;
-}

@@ -28,6 +28,8 @@ const mockStories: StoryDTO[] = [
         storyId: "story-1",
         title: "Work unit 1",
         description: null,
+        acceptanceCriteria: null,
+        verification: null,
         column: "todo",
         order: 1,
         createdAt: "2024-01-01T00:00:00Z",

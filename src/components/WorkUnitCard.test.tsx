@@ -8,6 +8,8 @@ const mockWorkUnit: WorkUnitDTO = {
   storyId: "story-123",
   title: "Test Work Unit",
   description: "This is a test description",
+  acceptanceCriteria: null,
+  verification: null,
   column: "todo",
   order: 0,
   createdAt: "2026-01-01T00:00:00Z",

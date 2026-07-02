@@ -14,6 +14,8 @@ function workUnitToDTO(wu: {
   storyId: string;
   title: string;
   description: string | null;
+  acceptanceCriteria: string | null;
+  verification: string | null;
   column: string;
   order: number;
   createdAt: Date;
@@ -24,6 +26,8 @@ function workUnitToDTO(wu: {
     storyId: wu.storyId,
     title: wu.title,
     description: wu.description,
+    acceptanceCriteria: wu.acceptanceCriteria,
+    verification: wu.verification,
     column: wu.column as Column,
     order: wu.order,
     createdAt: wu.createdAt.toISOString(),
@@ -66,7 +70,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { title, description, column, order } = body;
+    const { title, description, acceptanceCriteria, verification, column, order } = body;
 
     // Verify work unit exists
     const existing = await prisma.workUnit.findUnique({
@@ -84,12 +88,16 @@ export async function PATCH(
     const updateData: {
       title?: string;
       description?: string | null;
+      acceptanceCriteria?: string | null;
+      verification?: string | null;
       column?: string;
       order?: number;
     } = {};
 
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
+    if (acceptanceCriteria !== undefined) updateData.acceptanceCriteria = acceptanceCriteria;
+    if (verification !== undefined) updateData.verification = verification;
     if (column !== undefined) updateData.column = column;
     if (order !== undefined) updateData.order = order;
 

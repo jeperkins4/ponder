@@ -13,10 +13,20 @@ export interface WorkUnitDTO {
   storyId: string;
   title: string;
   description: string | null;
+  acceptanceCriteria: string | null;
+  verification: string | null;
   column: Column;
   order: number;
   createdAt: string; // ISO string
   completedAt: string | null; // ISO string
+}
+
+/** @public consumed starting in Task 2/3 (work-unit detail modal work notes) */
+export interface WorkNoteDTO {
+  id: string;
+  workUnitId: string;
+  body: string;
+  createdAt: string; // ISO string
 }
 
 export interface StoryDTO {

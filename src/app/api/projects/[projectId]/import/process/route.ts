@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { extractProjectKey } from "@/lib/jira/client";
 import { jiraStatusToColumn } from "@/lib/columns";
-import { breakDownStory, formatSubtaskDescription } from "@/lib/anthropic/breakdown";
+import { breakDownStory } from "@/lib/anthropic/breakdown";
 
 export interface ImportProcessItem {
   jiraKey: string;
@@ -107,7 +107,9 @@ export async function POST(
                 storyId: story.id,
                 projectId: project.id,
                 title: draft.title,
-                description: formatSubtaskDescription(draft),
+                description: null,
+                acceptanceCriteria: draft.acceptanceCriteria,
+                verification: draft.verification,
                 column,
                 order: i,
               },
@@ -121,6 +123,8 @@ export async function POST(
               projectId: project.id,
               title: item.summary,
               description: item.description,
+              acceptanceCriteria: null,
+              verification: null,
               column,
               order: 0,
             },
@@ -134,6 +138,8 @@ export async function POST(
             projectId: project.id,
             title: item.summary,
             description: item.description,
+            acceptanceCriteria: null,
+            verification: null,
             column,
             order: 0,
           },

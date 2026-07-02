@@ -39,6 +39,8 @@ export async function GET(request: NextRequest) {
         storyId: wu.storyId,
         title: wu.title,
         description: wu.description,
+        acceptanceCriteria: wu.acceptanceCriteria,
+        verification: wu.verification,
         column: wu.column as Column,
         order: wu.order,
         createdAt: wu.createdAt.toISOString(),

@@ -10,9 +10,6 @@ import { prisma } from "@/lib/prisma";
 import { POST } from "./route";
 import * as breakdown from "@/lib/anthropic/breakdown";
 
-// Only `breakDownStory` talks to the network; keep `formatSubtaskDescription`
-// real so the "descriptions from formatSubtaskDescription" assertions guard
-// the actual formatter rather than a hand-copied stand-in.
 vi.mock("@/lib/anthropic/breakdown", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/anthropic/breakdown")>();
   return { ...actual, breakDownStory: vi.fn() };
@@ -37,7 +34,7 @@ describe("POST /api/projects/[projectId]/import/process", () => {
     expect(data.error).toContain("not found");
   });
 
-  it("breakDown:true creates N work units in the mapped column with formatted descriptions, and upserts the Story", async () => {
+  it("breakDown:true creates N work units in the mapped column with structured AC/verification, and upserts the Story", async () => {
     const project = await prisma.project.create({
       data: {
         name: "Process Route Team",
@@ -108,9 +105,13 @@ describe("POST /api/projects/[projectId]/import/process", () => {
       expect(workUnits.map((w) => w.title)).toEqual(["Subtask A", "Subtask B", "Subtask C"]);
       expect(workUnits.every((w) => w.column === "code_review")).toBe(true);
       expect(workUnits.map((w) => w.order)).toEqual([0, 1, 2]);
-      expect(workUnits[0].description).toBe(
-        "Subtask A\n\nAcceptance Criteria:\nA done\n\nVerification:\nRun test A"
-      );
+      expect(workUnits[0].description).toBeNull();
+      expect(workUnits[0].acceptanceCriteria).toBe("A done");
+      expect(workUnits[0].verification).toBe("Run test A");
+      expect(workUnits[1].acceptanceCriteria).toBe("B done");
+      expect(workUnits[1].verification).toBe("Run test B");
+      expect(workUnits[2].acceptanceCriteria).toBe("C done");
+      expect(workUnits[2].verification).toBe("Run test C");
     } finally {
       await prisma.workUnit.deleteMany({ where: { story: { jiraKey } } });
       await prisma.story.deleteMany({ where: { jiraKey } });
@@ -169,6 +170,8 @@ describe("POST /api/projects/[projectId]/import/process", () => {
       expect(workUnits[0].title).toBe("Simple story");
       expect(workUnits[0].column).toBe("todo");
       expect(workUnits[0].order).toBe(0);
+      expect(workUnits[0].acceptanceCriteria).toBeNull();
+      expect(workUnits[0].verification).toBeNull();
     } finally {
       await prisma.workUnit.deleteMany({ where: { story: { jiraKey } } });
       await prisma.story.deleteMany({ where: { jiraKey } });
@@ -290,6 +293,8 @@ describe("POST /api/projects/[projectId]/import/process", () => {
       const workUnits = await prisma.workUnit.findMany({ where: { storyId: story!.id } });
       expect(workUnits).toHaveLength(1);
       expect(workUnits[0].title).toBe("Story with failing breakdown");
+      expect(workUnits[0].acceptanceCriteria).toBeNull();
+      expect(workUnits[0].verification).toBeNull();
     } finally {
       await prisma.workUnit.deleteMany({ where: { story: { jiraKey } } });
       await prisma.story.deleteMany({ where: { jiraKey } });

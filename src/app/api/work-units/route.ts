@@ -13,6 +13,8 @@ function workUnitToDTO(wu: {
   storyId: string;
   title: string;
   description: string | null;
+  acceptanceCriteria: string | null;
+  verification: string | null;
   column: string;
   order: number;
   createdAt: Date;
@@ -23,6 +25,8 @@ function workUnitToDTO(wu: {
     storyId: wu.storyId,
     title: wu.title,
     description: wu.description,
+    acceptanceCriteria: wu.acceptanceCriteria,
+    verification: wu.verification,
     column: wu.column as Column,
     order: wu.order,
     createdAt: wu.createdAt.toISOString(),
@@ -117,6 +121,8 @@ export async function POST(request: NextRequest) {
         storyId: wu.storyId,
         title: wu.title,
         description: wu.description,
+        acceptanceCriteria: wu.acceptanceCriteria,
+        verification: wu.verification,
         column: wu.column as Column,
         order: wu.order,
         createdAt: wu.createdAt.toISOString(),

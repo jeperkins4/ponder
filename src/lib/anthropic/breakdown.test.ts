@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { breakDownStory, formatSubtaskDescription, type SubtaskDraft } from "@/lib/anthropic/breakdown";
+import { breakDownStory, type SubtaskDraft } from "@/lib/anthropic/breakdown";
 import type {
   AnthropicLike,
   AnthropicMessageCreateParams,
@@ -118,23 +118,5 @@ describe("breakDownStory", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe(story.summary);
-  });
-});
-
-describe("formatSubtaskDescription", () => {
-  it("formats the draft into the exact expected description", () => {
-    const draft: SubtaskDraft = {
-      title: "Add login form",
-      acceptanceCriteria: "Form renders and submits email/password",
-      verification: "Run the component test suite",
-    };
-
-    expect(formatSubtaskDescription(draft)).toBe(
-      "Add login form\n\n" +
-        "Acceptance Criteria:\n" +
-        "Form renders and submits email/password\n\n" +
-        "Verification:\n" +
-        "Run the component test suite"
-    );
   });
 });
