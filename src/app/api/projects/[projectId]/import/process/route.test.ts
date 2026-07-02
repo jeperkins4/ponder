@@ -421,6 +421,63 @@ describe("POST /api/projects/[projectId]/import/process", () => {
     }
   });
 
+  it("forwards a per-item codebaseContext to breakDownStory", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Process Route Context Forwarding",
+        type: "JIRA",
+        jiraProjectKey: "PROCC",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "process-route-context@example.com",
+        jiraApiToken: "process-route-context-token",
+      },
+    });
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const jiraKey = `PROCC-${suffix}-1`;
+
+    vi.mocked(breakdown.breakDownStory).mockResolvedValueOnce([
+      { title: "Subtask A", acceptanceCriteria: "A done", verification: "Run test A" },
+    ]);
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/process`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: [
+              {
+                jiraKey,
+                jiraId: jiraKey,
+                summary: "S",
+                description: "D",
+                jiraStatus: "To Do",
+                breakDown: true,
+                codebaseContext: '{"domain":"Projects"}',
+              },
+            ],
+          }),
+        }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(breakdown.breakDownStory).toHaveBeenCalledWith({
+        summary: "S",
+        description: "D",
+        codebaseContext: '{"domain":"Projects"}',
+      });
+    } finally {
+      await prisma.workUnit.deleteMany({ where: { story: { jiraKey } } });
+      await prisma.story.deleteMany({ where: { jiraKey } });
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
   it("re-processing the same jiraKey updates the existing Story instead of creating a duplicate", async () => {
     const project = await prisma.project.create({
       data: {

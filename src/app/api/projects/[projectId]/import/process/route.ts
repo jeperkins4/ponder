@@ -25,6 +25,7 @@ export interface ImportProcessItem {
   description: string | null;
   jiraStatus: string;
   breakDown: boolean;
+  codebaseContext?: string;
 }
 
 export interface ImportProcessResult {
@@ -94,6 +95,7 @@ export async function POST(
           drafts = await breakDownStory({
             summary: item.summary,
             description: item.description,
+            codebaseContext: item.codebaseContext,
           });
         } catch (error) {
           console.error(
