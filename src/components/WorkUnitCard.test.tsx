@@ -73,6 +73,18 @@ describe("WorkUnitCard", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("is draggable and puts the work unit id on the drag payload", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+      const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
+      expect(card).toHaveAttribute("draggable", "true");
+
+      const setData = vi.fn();
+      fireEvent.dragStart(card, {
+        dataTransfer: { setData, effectAllowed: "" },
+      });
+      expect(setData).toHaveBeenCalledWith("text/plain", mockWorkUnit.id);
+    });
+
     it("renders edit and delete buttons", () => {
       render(<WorkUnitCard workUnit={mockWorkUnit} />);
       expect(

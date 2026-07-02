@@ -170,6 +170,35 @@ export function KanbanBoard({
     []
   );
 
+  // Move a work unit to another column (drag-and-drop drop handler). Calls the
+  // move endpoint — which also triggers the server-side JIRA status write-back —
+  // then silently refreshes. No-op when dropped on its current column.
+  const handleMoveWorkUnit = useCallback(
+    async (workUnitId: string, toColumn: Column) => {
+      const allUnits = stories.flatMap((s) => s.workUnits);
+      const wu = allUnits.find((w) => w.id === workUnitId);
+      if (!wu || wu.column === toColumn) return;
+      const order = allUnits.filter((w) => w.column === toColumn).length;
+      try {
+        const res = await fetch(`/api/work-units/${workUnitId}/move`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ column: toColumn, order }),
+        });
+        if (!res.ok) throw new Error(`Failed to move: ${res.statusText}`);
+        const label = COLUMNS.find((c) => c.key === toColumn)?.label ?? toColumn;
+        setStatusMessage(`Moved "${wu.title}" to ${label}`);
+        fetchStories({ silent: true });
+      } catch (err) {
+        console.error("Error moving work unit:", err);
+        setStatusMessage(
+          err instanceof Error ? err.message : "Failed to move work unit"
+        );
+      }
+    },
+    [stories, fetchStories]
+  );
+
   let content: JSX.Element;
 
   if (loading) {
@@ -206,6 +235,7 @@ export function KanbanBoard({
                 columnRef={setColumnRef(key)}
                 onKeyboardNavigation={handleKeyboardNavigation}
                 onStatusMessage={handleStatusMessage}
+                onMoveWorkUnit={handleMoveWorkUnit}
                 isDark={isDark}
               />
             ))}
@@ -268,6 +298,7 @@ interface KanbanColumnProps {
     workUnitId: string
   ) => void;
   onStatusMessage?: (message: string) => void;
+  onMoveWorkUnit?: (workUnitId: string, toColumn: Column) => void;
   isDark?: boolean;
 }
 
@@ -279,8 +310,10 @@ function KanbanColumn({
   columnRef,
   onKeyboardNavigation,
   onStatusMessage,
+  onMoveWorkUnit,
   isDark = false,
 }: KanbanColumnProps) {
+  const [isDragOver, setIsDragOver] = useState(false);
   // Get all work units in this column, keeping a handle on the parent story
   // so each card can show which JIRA issue it was decomposed from.
   const workUnitsInColumn: {
@@ -313,10 +346,30 @@ function KanbanColumn({
   return (
     <section
       aria-label={`${columnLabel} column, ${totalWorkUnits} ${itemWord}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (!isDragOver) setIsDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        // Ignore leave events fired while moving over child elements.
+        if (e.currentTarget === e.target) setIsDragOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        const id = e.dataTransfer.getData("text/plain");
+        if (id) onMoveWorkUnit?.(id, column);
+      }}
+      data-testid={`column-dropzone-${column}`}
       className={`rounded-xl border p-6 transition-all duration-200 ${
-        isDark
-          ? "bg-ponder-dark-surface border-ponder-dark-border hover:border-ponder-dark-purple hover:shadow-ponder-card-hover"
-          : "bg-ponder-light-surface border-ponder-light-card-border hover:border-ponder-light-purple hover:shadow-ponder-card-hover"
+        isDragOver
+          ? isDark
+            ? "border-ponder-dark-purple ring-2 ring-ponder-dark-purple bg-ponder-dark-bg/40"
+            : "border-ponder-light-purple ring-2 ring-ponder-light-purple bg-ponder-light-bg"
+          : isDark
+            ? "bg-ponder-dark-surface border-ponder-dark-border hover:border-ponder-dark-purple hover:shadow-ponder-card-hover"
+            : "bg-ponder-light-surface border-ponder-light-card-border hover:border-ponder-light-purple hover:shadow-ponder-card-hover"
       }`}
     >
       <div className={`mb-6 pb-4 border-b ${isDark ? "border-ponder-dark-border" : "border-ponder-light-card-border"}`}>
