@@ -27,7 +27,7 @@ export function buildAssignedStoriesJql(projectKeys: string[]): string {
  * instance) and "Code Review" (the corrected spelling) are listed so the sync
  * keeps working if/when the typo is fixed in JIRA. JQL status matching is exact.
  */
-export const PROJECT_SYNC_STATUSES = [
+const PROJECT_SYNC_STATUSES = [
   "To Do",
   "In Progress",
   "Code Revew",

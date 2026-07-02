@@ -19,7 +19,7 @@ export type AnthropicToolUseBlock = {
   input: unknown;
 };
 
-export type AnthropicContentBlock =
+type AnthropicContentBlock =
   | AnthropicToolUseBlock
   | { type: string; [key: string]: unknown };
 
@@ -27,12 +27,12 @@ export type AnthropicMessageResponse = {
   content: AnthropicContentBlock[];
 };
 
-export type AnthropicMessageParam = {
+type AnthropicMessageParam = {
   role: "user" | "assistant";
   content: string;
 };
 
-export type AnthropicToolDefinition = {
+type AnthropicToolDefinition = {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
