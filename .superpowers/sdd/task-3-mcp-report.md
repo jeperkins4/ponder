@@ -4,7 +4,8 @@
 DONE
 
 ## Commit
-(see `git log --oneline -1` on `feature/ponder-mcp-server` — filled in after commit)
+`ced391d` — "feat: add Ponder MCP move/update tools" on `feature/ponder-mcp-server`
+(verified via `git log --oneline -1`)
 
 ## Summary
 Implemented the three mutating MCP tool handlers in `src/mcp/tools.ts`:
