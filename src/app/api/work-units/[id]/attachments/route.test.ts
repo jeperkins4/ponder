@@ -1,0 +1,266 @@
+/**
+ * Integration tests for work-unit attachments endpoint
+ * Tests actual Prisma client against test database and a temp uploads dir
+ *
+ * Runs under the Node environment (rather than the project-default jsdom)
+ * because jsdom's FormData/Request classes aren't recognized by undici's
+ * Request constructor, which silently stringifies multipart bodies instead
+ * of setting a multipart/form-data Content-Type.
+ */
+
+// @vitest-environment node
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
+import { mkdtemp, rm, readFile } from "fs/promises";
+import { tmpdir } from "os";
+import path from "path";
+import { prisma } from "@/lib/prisma";
+import { GET, POST } from "@/app/api/work-units/[id]/attachments/route";
+
+describe("Work Unit Attachments Endpoint", () => {
+  let storyId: string;
+  let workUnitId: string;
+  let testCounter = 0;
+  let uploadsDir: string;
+  let originalUploadsDir: string | undefined;
+
+  beforeAll(async () => {
+    originalUploadsDir = process.env.UPLOADS_DIR;
+    uploadsDir = await mkdtemp(path.join(tmpdir(), "attachments-test-"));
+    process.env.UPLOADS_DIR = uploadsDir;
+  });
+
+  afterAll(async () => {
+    await rm(uploadsDir, { recursive: true, force: true });
+    if (originalUploadsDir === undefined) {
+      delete process.env.UPLOADS_DIR;
+    } else {
+      process.env.UPLOADS_DIR = originalUploadsDir;
+    }
+    await prisma.$disconnect();
+  });
+
+  beforeEach(async () => {
+    // Clear tables before each test (children first for FK safety)
+    await prisma.attachment.deleteMany({});
+    await prisma.workNote.deleteMany({});
+    await prisma.workUnit.deleteMany({});
+    await prisma.story.deleteMany({});
+
+    testCounter++;
+
+    const story = await prisma.story.create({
+      data: {
+        jiraKey: `ATT-${testCounter}`,
+        jiraId: `4000${testCounter}`,
+        projectKey: "ATT",
+        summary: "Test story for attachments endpoint",
+        description: "A test story for attachments endpoint tests",
+        jiraStatus: "To Do",
+        url: `https://example.atlassian.net/browse/ATT-${testCounter}`,
+        lastSyncedAt: new Date(),
+      },
+    });
+    storyId = story.id;
+
+    const workUnit = await prisma.workUnit.create({
+      data: {
+        storyId,
+        title: "Test work unit",
+        description: "A work unit for attachments tests",
+        column: "todo",
+        order: 0,
+      },
+    });
+    workUnitId = workUnit.id;
+  });
+
+  function pngFile(name = "screenshot.png", bytes = [137, 80, 78, 71]) {
+    return new File([new Uint8Array(bytes)], name, { type: "image/png" });
+  }
+
+  describe("POST", () => {
+    it("uploads an image, returns 201 with the DTO, and writes the file to disk", async () => {
+      const formData = new FormData();
+      formData.append("file", pngFile());
+
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const res = await POST(req as never, {
+        params: Promise.resolve({ id: workUnitId }),
+      });
+      expect(res.status).toBe(201);
+
+      const dto = await res.json();
+      expect(dto.workUnitId).toBe(workUnitId);
+      expect(dto.filename).toBe("screenshot.png");
+      expect(dto.mimeType).toBe("image/png");
+      expect(dto.size).toBe(4);
+      expect(dto.url).toBe(`/api/attachments/${dto.id}`);
+      expect(typeof dto.createdAt).toBe("string");
+
+      const persisted = await prisma.attachment.findUnique({
+        where: { id: dto.id },
+      });
+      expect(persisted).not.toBeNull();
+      expect(persisted?.workUnitId).toBe(workUnitId);
+
+      const filePath = path.join(uploadsDir, dto.id);
+      const fileBytes = await readFile(filePath);
+      expect(Array.from(fileBytes)).toEqual([137, 80, 78, 71]);
+    });
+
+    it("returns 400 for a non-image file and creates no row or file", async () => {
+      const formData = new FormData();
+      formData.append(
+        "file",
+        new File(["hello"], "notes.txt", { type: "text/plain" })
+      );
+
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const res = await POST(req as never, {
+        params: Promise.resolve({ id: workUnitId }),
+      });
+      expect(res.status).toBe(400);
+
+      const count = await prisma.attachment.count();
+      expect(count).toBe(0);
+    });
+
+    it("returns 400 when no file is present", async () => {
+      const formData = new FormData();
+
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const res = await POST(req as never, {
+        params: Promise.resolve({ id: workUnitId }),
+      });
+      expect(res.status).toBe(400);
+
+      const count = await prisma.attachment.count();
+      expect(count).toBe(0);
+    });
+
+    it("returns 404 for a non-existent work unit and creates no row", async () => {
+      const formData = new FormData();
+      formData.append("file", pngFile());
+
+      const req = new Request(
+        "http://localhost/api/work-units/non-existent/attachments",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const res = await POST(req as never, {
+        params: Promise.resolve({ id: "non-existent-id" }),
+      });
+      expect(res.status).toBe(404);
+
+      const count = await prisma.attachment.count();
+      expect(count).toBe(0);
+    });
+
+    it("rejects an oversized file and creates no row", async () => {
+      const oversized = new Uint8Array(10 * 1024 * 1024 + 1);
+      const formData = new FormData();
+      formData.append(
+        "file",
+        new File([oversized], "huge.png", { type: "image/png" })
+      );
+
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const res = await POST(req as never, {
+        params: Promise.resolve({ id: workUnitId }),
+      });
+      expect(res.status).toBe(413);
+
+      const count = await prisma.attachment.count();
+      expect(count).toBe(0);
+    });
+  });
+
+  describe("GET", () => {
+    it("lists attachments for a work unit in chronological order", async () => {
+      const formData1 = new FormData();
+      formData1.append("file", pngFile("first.png"));
+      const req1 = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        { method: "POST", body: formData1 }
+      );
+      await POST(req1 as never, { params: Promise.resolve({ id: workUnitId }) });
+
+      await new Promise((resolve) => setTimeout(resolve, 5));
+
+      const formData2 = new FormData();
+      formData2.append("file", pngFile("second.png"));
+      const req2 = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        { method: "POST", body: formData2 }
+      );
+      await POST(req2 as never, { params: Promise.resolve({ id: workUnitId }) });
+
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`
+      );
+      const res = await GET(req as never, {
+        params: Promise.resolve({ id: workUnitId }),
+      });
+      expect(res.status).toBe(200);
+
+      const attachments = await res.json();
+      expect(attachments).toHaveLength(2);
+      expect(attachments[0].filename).toBe("first.png");
+      expect(attachments[1].filename).toBe("second.png");
+    });
+
+    it("returns an empty array when the work unit has no attachments", async () => {
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`
+      );
+      const res = await GET(req as never, {
+        params: Promise.resolve({ id: workUnitId }),
+      });
+      expect(res.status).toBe(200);
+
+      const attachments = await res.json();
+      expect(attachments).toEqual([]);
+    });
+
+    it("returns 404 for a non-existent work unit", async () => {
+      const req = new Request(
+        "http://localhost/api/work-units/non-existent/attachments"
+      );
+      const res = await GET(req as never, {
+        params: Promise.resolve({ id: "non-existent-id" }),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+});

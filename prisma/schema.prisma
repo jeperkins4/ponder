@@ -60,7 +60,8 @@ model WorkUnit {
   createdAt          DateTime  @default(now())
   completedAt        DateTime?
 
-  workNotes WorkNote[]
+  workNotes   WorkNote[]
+  attachments Attachment[]
 
   @@index([projectId])
   @@index([storyId])
@@ -71,6 +72,18 @@ model WorkNote {
   workUnitId String
   workUnit   WorkUnit @relation(fields: [workUnitId], references: [id], onDelete: Cascade)
   body       String
+  createdAt  DateTime @default(now())
+
+  @@index([workUnitId])
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  workUnitId String
+  workUnit   WorkUnit @relation(fields: [workUnitId], references: [id], onDelete: Cascade)
+  filename   String
+  mimeType   String
+  size       Int
   createdAt  DateTime @default(now())
 
   @@index([workUnitId])

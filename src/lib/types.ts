@@ -30,6 +30,17 @@ export interface WorkNoteDTO {
   createdAt: string; // ISO string
 }
 
+/** @public consumed starting in Task 2 (work-unit detail modal attachments) */
+export interface AttachmentDTO {
+  id: string;
+  workUnitId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  createdAt: string; // ISO string
+  url: string; // /api/attachments/{id}
+}
+
 export interface StoryDTO {
   id: string;
   jiraKey: string;

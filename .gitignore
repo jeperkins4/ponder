@@ -8,6 +8,9 @@ node_modules/
 # Testing
 /coverage
 
+# Uploaded attachment files (only metadata is committed via Postgres migrations)
+/data/uploads/
+
 # Next.js
 /.next/
 /out/
