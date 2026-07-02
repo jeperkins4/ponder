@@ -113,3 +113,76 @@ export async function listWorkUnits(
 
   return textResult(`${rows.length} work unit(s):\n${lines.join("\n")}`);
 }
+
+/**
+ * Move a work unit to a column (and optional order). Moving to a working
+ * lane or Done triggers Ponder's server-side JIRA status write-back
+ * (In Progress, or Code Revew + a summary comment) — this tool does not
+ * reimplement that, it just calls the move endpoint.
+ */
+export async function moveWorkUnit(
+  client: PonderClient,
+  args: { workUnitId: string; column: string; order?: number }
+): Promise<McpTextResult> {
+  const validColumns = COLUMNS.map((c) => c.key);
+
+  if (!validColumns.includes(args.column as Column)) {
+    return textResult(
+      `Invalid column "${args.column}". Valid columns: ${validColumns.join(", ")}.`
+    );
+  }
+
+  try {
+    const workUnit = await client.moveWorkUnit(
+      args.workUnitId,
+      args.column as Column,
+      args.order
+    );
+    return textResult(
+      `Moved "${workUnit.title}" (id: ${workUnit.id}) to column "${workUnit.column}".`
+    );
+  } catch (error) {
+    return textResult(
+      `Error: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/**
+ * Convenience wrapper over moveWorkUnit that moves a work unit to Done. Once
+ * all of a story's work units are Done, Ponder's server-side write-back may
+ * drive the linked JIRA issue to Code Revew (+ a summary comment).
+ */
+export async function markDone(
+  client: PonderClient,
+  args: { workUnitId: string }
+): Promise<McpTextResult> {
+  return moveWorkUnit(client, { workUnitId: args.workUnitId, column: "done" });
+}
+
+/** Update a work unit's title and/or description. */
+export async function updateWorkUnit(
+  client: PonderClient,
+  args: { workUnitId: string; title?: string; description?: string }
+): Promise<McpTextResult> {
+  if (args.title === undefined && args.description === undefined) {
+    return textResult(
+      "Error: at least one of title or description must be provided."
+    );
+  }
+
+  const patch: { title?: string; description?: string } = {};
+  if (args.title !== undefined) patch.title = args.title;
+  if (args.description !== undefined) patch.description = args.description;
+
+  try {
+    const workUnit = await client.updateWorkUnit(args.workUnitId, patch);
+    return textResult(
+      `Updated work unit "${workUnit.title}" (id: ${workUnit.id}).`
+    );
+  } catch (error) {
+    return textResult(
+      `Error: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}

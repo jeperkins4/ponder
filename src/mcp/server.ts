@@ -18,20 +18,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 // nominally distinct declaration files.
 import { z } from "zod/v3";
 import { PonderClient } from "./client";
-import { listProjects, listStories, listWorkUnits } from "./tools";
-
-// NOTE: the three mutating tool handlers are still placeholders. Task 3
-// replaces these bodies with real PonderClient calls and result formatting.
-function notImplemented(toolName: string) {
-  return {
-    content: [
-      {
-        type: "text" as const,
-        text: `${toolName}: not yet implemented`,
-      },
-    ],
-  };
-}
+import {
+  listProjects,
+  listStories,
+  listWorkUnits,
+  markDone,
+  moveWorkUnit,
+  updateWorkUnit,
+} from "./tools";
 
 export function createServer(client: PonderClient): McpServer {
   const server = new McpServer({ name: "ponder", version: "1.0.0" });
@@ -71,25 +65,33 @@ export function createServer(client: PonderClient): McpServer {
   server.registerTool(
     "move_work_unit",
     {
-      description: "Move a work unit to a column (and optional order).",
+      description:
+        "Move a work unit to a column (todo, in_progress, code_review, done) and optional order. " +
+        "Moving to a working lane or Done may update the linked JIRA issue " +
+        "(In Progress, or Code Revew + a summary comment) — this happens " +
+        "server-side automatically.",
       inputSchema: {
         workUnitId: z.string(),
         column: z.string(),
         order: z.number().optional(),
       },
     },
-    async () => notImplemented("move_work_unit")
+    async ({ workUnitId, column, order }) =>
+      moveWorkUnit(client, { workUnitId, column, order })
   );
 
   server.registerTool(
     "mark_done",
     {
-      description: "Move a work unit to the done column.",
+      description:
+        "Move a work unit to the done column. May drive the linked JIRA " +
+        "issue to Code Revew (+ a summary comment) once all of the story's " +
+        "cards are Done — this happens server-side automatically.",
       inputSchema: {
         workUnitId: z.string(),
       },
     },
-    async () => notImplemented("mark_done")
+    async ({ workUnitId }) => markDone(client, { workUnitId })
   );
 
   server.registerTool(
@@ -102,7 +104,8 @@ export function createServer(client: PonderClient): McpServer {
         description: z.string().optional(),
       },
     },
-    async () => notImplemented("update_work_unit")
+    async ({ workUnitId, title, description }) =>
+      updateWorkUnit(client, { workUnitId, title, description })
   );
 
   return server;

@@ -1,7 +1,14 @@
-import { describe, it, expect } from "vitest";
-import { listProjects, listStories, listWorkUnits } from "./tools";
+import { describe, it, expect, vi } from "vitest";
+import {
+  listProjects,
+  listStories,
+  listWorkUnits,
+  markDone,
+  moveWorkUnit,
+  updateWorkUnit,
+} from "./tools";
 import type { PonderClient } from "./client";
-import type { ProjectWithStats, StoryDTO } from "@/lib/types";
+import type { ProjectWithStats, StoryDTO, WorkUnitDTO } from "@/lib/types";
 
 function fakeClient(overrides: Partial<PonderClient>): PonderClient {
   return overrides as PonderClient;
@@ -194,5 +201,132 @@ describe("listWorkUnits", () => {
     expect(text).toContain("in_progress");
     expect(text).toContain("code_review");
     expect(text).toContain("done");
+  });
+});
+
+const movedWorkUnit: WorkUnitDTO = {
+  id: "w1",
+  storyId: "s1",
+  title: "Task A",
+  description: null,
+  column: "in_progress",
+  order: 0,
+  createdAt: new Date().toISOString(),
+  completedAt: null,
+};
+
+describe("moveWorkUnit", () => {
+  it("calls client.moveWorkUnit with the right args and confirms", async () => {
+    const moveWorkUnitMock = vi.fn(async () => movedWorkUnit);
+    const client = fakeClient({ moveWorkUnit: moveWorkUnitMock });
+
+    const result = await moveWorkUnit(client, {
+      workUnitId: "w1",
+      column: "in_progress",
+      order: 2,
+    });
+    const text = result.content[0].text;
+
+    expect(moveWorkUnitMock).toHaveBeenCalledWith("w1", "in_progress", 2);
+    expect(text).toContain("Task A");
+    expect(text).toContain("in_progress");
+  });
+
+  it("returns an error naming valid columns for an invalid column, without calling the client", async () => {
+    const moveWorkUnitMock = vi.fn(async () => movedWorkUnit);
+    const client = fakeClient({ moveWorkUnit: moveWorkUnitMock });
+
+    const result = await moveWorkUnit(client, {
+      workUnitId: "w1",
+      column: "bogus",
+    });
+    const text = result.content[0].text;
+
+    expect(text).toMatch(/invalid column/i);
+    expect(text).toContain("todo");
+    expect(text).toContain("in_progress");
+    expect(text).toContain("code_review");
+    expect(text).toContain("done");
+    expect(moveWorkUnitMock).not.toHaveBeenCalled();
+  });
+
+  it("returns an error-text result when the client throws", async () => {
+    const client = fakeClient({
+      moveWorkUnit: vi.fn(async () => {
+        throw new Error("Ponder API error: 404 POST /api/work-units/w1/move");
+      }),
+    });
+
+    const result = await moveWorkUnit(client, {
+      workUnitId: "w1",
+      column: "in_progress",
+    });
+    const text = result.content[0].text;
+
+    expect(text).toMatch(/error/i);
+    expect(text).toContain("404");
+  });
+});
+
+describe("markDone", () => {
+  it("calls client.moveWorkUnit with column 'done'", async () => {
+    const moveWorkUnitMock = vi.fn(async () => ({
+      ...movedWorkUnit,
+      column: "done" as const,
+    }));
+    const client = fakeClient({ moveWorkUnit: moveWorkUnitMock });
+
+    const result = await markDone(client, { workUnitId: "w1" });
+    const text = result.content[0].text;
+
+    expect(moveWorkUnitMock).toHaveBeenCalledWith("w1", "done", undefined);
+    expect(text).toContain("done");
+  });
+});
+
+describe("updateWorkUnit", () => {
+  it("calls client.updateWorkUnit with just a title when only title is provided", async () => {
+    const updateWorkUnitMock = vi.fn(async () => ({
+      ...movedWorkUnit,
+      title: "New title",
+    }));
+    const client = fakeClient({ updateWorkUnit: updateWorkUnitMock });
+
+    const result = await updateWorkUnit(client, {
+      workUnitId: "w1",
+      title: "New title",
+    });
+    const text = result.content[0].text;
+
+    expect(updateWorkUnitMock).toHaveBeenCalledWith("w1", { title: "New title" });
+    expect(text).toContain("New title");
+  });
+
+  it("returns an error when neither title nor description is provided, without calling the client", async () => {
+    const updateWorkUnitMock = vi.fn(async () => movedWorkUnit);
+    const client = fakeClient({ updateWorkUnit: updateWorkUnitMock });
+
+    const result = await updateWorkUnit(client, { workUnitId: "w1" });
+    const text = result.content[0].text;
+
+    expect(text).toMatch(/error/i);
+    expect(updateWorkUnitMock).not.toHaveBeenCalled();
+  });
+
+  it("returns an error-text result when the client throws", async () => {
+    const client = fakeClient({
+      updateWorkUnit: vi.fn(async () => {
+        throw new Error("Ponder API error: 500 PATCH /api/work-units/w1");
+      }),
+    });
+
+    const result = await updateWorkUnit(client, {
+      workUnitId: "w1",
+      title: "New title",
+    });
+    const text = result.content[0].text;
+
+    expect(text).toMatch(/error/i);
+    expect(text).toContain("500");
   });
 });
