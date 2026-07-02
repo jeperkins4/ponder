@@ -75,10 +75,41 @@ npx prisma migrate dev
 npm run dev            # http://localhost:3000
 ```
 
-Run the test suite with `npm test`.
+Run the test suite with `npm test`. Lint with `npm run lint`, and check for unused code/deps with `npm run knip`. Every PR and push to `main` runs typecheck + lint + knip + tests in CI (GitHub Actions).
+
+## MCP integration — drive Ponder from Claude Code
+
+Ponder ships a **Model Context Protocol (MCP) server** so [Claude Code](https://claude.com/claude-code) can view and advance the board from the repository where you're actually writing code — moving a card fires the same JIRA status write-back as the UI. This is the intended workflow: initiate it from *where the code lives*, not by clicking through Ponder.
+
+It's a thin client over Ponder's REST API (built on the official `@modelcontextprotocol/sdk`, stdio transport), so **the Ponder app must be running** for tool calls to return data.
+
+**Setup:**
+
+```bash
+# 1. Start the Ponder app (the MCP server talks to it)
+npm run dev            # http://localhost:3000
+
+# 2. Register the server with Claude Code (from any repo)
+claude mcp add ponder -- npx tsx /absolute/path/to/ponder/src/mcp/server.ts
+
+#    If the app runs elsewhere, pass PONDER_BASE_URL:
+#    claude mcp add ponder -e PONDER_BASE_URL=http://localhost:3000 -- npx tsx /abs/path/to/ponder/src/mcp/server.ts
+```
+
+**Tools:**
+
+| Tool | Args | Description |
+|---|---|---|
+| `list_projects` | — | List projects with story/work-unit counts |
+| `list_stories` | `projectId` | Stories with a per-column work-unit breakdown |
+| `list_work_units` | `projectId`, `column?` | Flat card list (with ids), optionally filtered by column |
+| `move_work_unit` | `workUnitId`, `column`, `order?` | Move a card — **may transition the JIRA issue** (In Progress / Code Revew + comment) |
+| `mark_done` | `workUnitId` | Move a card to Done (drives the story to Code Revew + summary comment once all its cards are done) |
+| `update_work_unit` | `workUnitId`, `title?`, `description?` | Edit a card's title/description |
+
+Once connected, ask Claude Code things like *"list my Ponder projects"*, *"show the cards for project X"*, or *"mark work unit &lt;id&gt; done"*. See [`README-mcp.md`](./README-mcp.md) for the full reference and troubleshooting.
 
 ## Roadmap
 
-- **MCP server** — expose Ponder to Claude Code so the board is driven from the actual code repository as you work. Moving a card to Done there fires the same JIRA write-back. The intent: the workflow is initiated from *where the code lives*, not clicked through Ponder's UI.
 - **PR-gated completion** — a story advances to Code Review / Done when a pull request is opened, rather than on a manual board drag.
 - Re-import de-duplication, additional issue types and status mappings.
