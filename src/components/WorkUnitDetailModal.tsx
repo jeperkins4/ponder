@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, ClipboardEvent, DragEvent } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { COLUMNS } from "@/lib/columns";
-import type { WorkUnitDTO, WorkNoteDTO } from "@/lib/types";
+import type { WorkUnitDTO, WorkNoteDTO, AttachmentDTO } from "@/lib/types";
 
 export interface WorkUnitDetailModalProps {
   workUnit: WorkUnitDTO;
@@ -75,12 +76,19 @@ export function WorkUnitDetailModal({
   const [postingNote, setPostingNote] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
 
+  const [attachments, setAttachments] = useState<AttachmentDTO[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
 
-  // Fetch the notes log whenever the modal opens (or opens for a different
-  // work unit while already mounted).
+  // Fetch the notes log and the attachment list whenever the modal opens
+  // (or opens for a different work unit while already mounted).
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
@@ -107,7 +115,30 @@ export function WorkUnitDetailModal({
       }
     }
 
+    async function loadAttachments() {
+      setAttachmentsLoading(true);
+      setAttachmentsError(null);
+      try {
+        const response = await fetch(`/api/work-units/${workUnit.id}/attachments`);
+        const data = await response.json();
+        if (cancelled) return;
+
+        if (!response.ok) {
+          setAttachmentsError(data.error || "Failed to load screenshots");
+          return;
+        }
+        setAttachments(data);
+      } catch (err) {
+        if (!cancelled) {
+          setAttachmentsError(err instanceof Error ? err.message : "An error occurred");
+        }
+      } finally {
+        if (!cancelled) setAttachmentsLoading(false);
+      }
+    }
+
     loadNotes();
+    loadAttachments();
     return () => {
       cancelled = true;
     };
@@ -233,6 +264,100 @@ export function WorkUnitDetailModal({
     }
   };
 
+  const uploadAttachment = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Only image files can be added as screenshots");
+      return;
+    }
+
+    setUploadError(null);
+    setUploadingCount((count) => count + 1);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`/api/work-units/${workUnit.id}/attachments`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setUploadError(data.error || "Failed to upload screenshot");
+        return;
+      }
+
+      setAttachments((prev) => [...prev, data]);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setUploadingCount((count) => count - 1);
+    }
+  };
+
+  const uploadAttachments = (files: Iterable<File> | null | undefined) => {
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      uploadAttachment(file);
+    });
+  };
+
+  const handleAttachmentInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    uploadAttachments(e.target.files);
+    e.target.value = "";
+  };
+
+  const handleAttachmentDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleAttachmentDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleAttachmentDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    uploadAttachments(e.dataTransfer.files);
+  };
+
+  // Only treats clipboard *image* items as screenshot uploads; never calls
+  // preventDefault, so a normal text paste into the notes textarea (or
+  // anywhere else) is left untouched.
+  const handleModalPaste = (e: ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageFiles: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      uploadAttachments(imageFiles);
+    }
+  };
+
+  const handleDeleteAttachment = async (id: string) => {
+    setUploadError(null);
+    try {
+      const response = await fetch(`/api/attachments/${id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setUploadError(data.error || "Failed to delete screenshot");
+        return;
+      }
+      setAttachments((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "An error occurred");
+    }
+  };
+
   const surfaceClass = isDark
     ? "bg-ponder-dark-surface border-ponder-dark-border text-ponder-dark-text"
     : "bg-ponder-light-surface border-ponder-light-card-border text-ponder-light-text";
@@ -262,6 +387,7 @@ export function WorkUnitDetailModal({
         aria-labelledby="work-unit-detail-title"
         className={`rounded-2xl border shadow-ponder-card-hover max-w-2xl w-full max-h-[85vh] flex flex-col font-instrument ${surfaceClass}`}
         onClick={(e) => e.stopPropagation()}
+        onPaste={handleModalPaste}
         data-testid="work-unit-detail-dialog"
       >
         <div className={`flex items-start justify-between gap-4 p-6 border-b ${rowBorderClass}`}>
@@ -421,6 +547,124 @@ export function WorkUnitDetailModal({
           <div className={`text-xs ${mutedTextClass} space-y-0.5`} data-testid="work-unit-detail-dates">
             <p>Created {formatDateTime(workUnit.createdAt)}</p>
             {workUnit.completedAt && <p>Completed {formatDateTime(workUnit.completedAt)}</p>}
+          </div>
+
+          <div className={`border-t pt-4 ${rowBorderClass}`}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold font-space-grotesk">Screenshots</h3>
+              <div className="flex items-center gap-2">
+                {uploadingCount > 0 && (
+                  <span
+                    className={`text-xs ${mutedTextClass}`}
+                    data-testid="work-unit-detail-attachments-uploading"
+                  >
+                    Uploading…
+                  </span>
+                )}
+                <label
+                  htmlFor="work-unit-detail-attachment-input"
+                  className={`text-xs font-semibold underline cursor-pointer rounded ${mutedTextClass} hover:opacity-80 focus-within:ring-2 focus-within:ring-ponder-light-purple focus-within:outline-none`}
+                >
+                  Add screenshot
+                </label>
+                <input
+                  id="work-unit-detail-attachment-input"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleAttachmentInputChange}
+                  className="sr-only"
+                  aria-label="Add screenshot"
+                  data-testid="work-unit-detail-attachment-input"
+                />
+              </div>
+            </div>
+
+            <div
+              onDragOver={handleAttachmentDragOver}
+              onDragLeave={handleAttachmentDragLeave}
+              onDrop={handleAttachmentDrop}
+              data-testid="work-unit-detail-attachments-dropzone"
+              className={`rounded-lg border-2 border-dashed p-3 transition-colors ${
+                isDragOver
+                  ? "border-ponder-light-purple bg-ponder-light-purple-light"
+                  : rowBorderClass
+              }`}
+            >
+              {attachmentsLoading && (
+                <p
+                  className={`text-sm ${mutedTextClass}`}
+                  data-testid="work-unit-detail-attachments-loading"
+                >
+                  Loading screenshots…
+                </p>
+              )}
+
+              {!attachmentsLoading && attachmentsError && (
+                <div
+                  role="alert"
+                  className="text-sm text-red-600"
+                  data-testid="work-unit-detail-attachments-error"
+                >
+                  Error: {attachmentsError}
+                </div>
+              )}
+
+              {!attachmentsLoading && !attachmentsError && attachments.length === 0 && (
+                <p
+                  className={`text-sm ${mutedTextClass}`}
+                  data-testid="work-unit-detail-attachments-empty"
+                >
+                  No screenshots yet
+                </p>
+              )}
+
+              {!attachmentsLoading && !attachmentsError && attachments.length > 0 && (
+                <div className="grid grid-cols-4 gap-2" data-testid="work-unit-detail-attachments-grid">
+                  {attachments.map((attachment) => (
+                    <div
+                      key={attachment.id}
+                      className="relative group"
+                      data-testid={`work-unit-detail-attachment-${attachment.id}`}
+                    >
+                      <a
+                        href={attachment.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`View screenshot ${attachment.filename}`}
+                        className={`block rounded-lg overflow-hidden border aspect-square ${rowBorderClass} ${focusRing}`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={attachment.url}
+                          alt={attachment.filename}
+                          className="w-full h-full object-cover"
+                        />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAttachment(attachment.id)}
+                        aria-label={`Delete screenshot ${attachment.filename}`}
+                        data-testid={`work-unit-detail-attachment-delete-${attachment.id}`}
+                        className={`absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full text-xs font-semibold text-white bg-black bg-opacity-60 hover:bg-opacity-80 ${focusRing}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {uploadError && (
+              <div
+                role="alert"
+                className="text-sm text-red-600 mt-2"
+                data-testid="work-unit-detail-attachments-upload-error"
+              >
+                Error: {uploadError}
+              </div>
+            )}
           </div>
 
           <div className={`border-t pt-4 ${rowBorderClass}`}>
