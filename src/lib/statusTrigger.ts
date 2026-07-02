@@ -13,15 +13,18 @@
  * MCP "move card" tool can call `applyStoryStatusSync` directly.
  */
 
-import { PrismaClient, Project, Story, WorkUnit } from "@prisma/client";
+import { Attachment, PrismaClient, Project, Story, WorkUnit } from "@prisma/client";
 import type { JiraConfig } from "@/lib/jira/client";
 import {
   getTransitions as defaultGetTransitions,
   transitionIssue as defaultTransitionIssue,
   addComment as defaultAddComment,
+  uploadAttachment as defaultUploadAttachment,
 } from "@/lib/jira/writeback";
 import { pickTransitionByStatusName } from "@/lib/jira/transitions";
 import { summarizeCompletedWork as defaultSummarizeCompletedWork } from "@/lib/anthropic/summarize";
+import { consolidateAcceptanceCriteria as defaultConsolidateAcceptanceCriteria } from "@/lib/anthropic/consolidateAcceptanceCriteria";
+import { readAttachmentFile as defaultReadAttachmentFile } from "@/lib/attachmentStorage";
 
 /**
  * The two JIRA statuses this sync ever writes. `null` means "leave the JIRA
@@ -67,6 +70,9 @@ export type ApplyStoryStatusSyncDeps = {
   transitionIssue: typeof defaultTransitionIssue;
   addComment: typeof defaultAddComment;
   summarizeCompletedWork: typeof defaultSummarizeCompletedWork;
+  uploadAttachment: typeof defaultUploadAttachment;
+  consolidateAcceptanceCriteria: typeof defaultConsolidateAcceptanceCriteria;
+  readAttachmentFile: typeof defaultReadAttachmentFile;
 };
 
 const defaultDeps: ApplyStoryStatusSyncDeps = {
@@ -74,6 +80,9 @@ const defaultDeps: ApplyStoryStatusSyncDeps = {
   transitionIssue: defaultTransitionIssue,
   addComment: defaultAddComment,
   summarizeCompletedWork: defaultSummarizeCompletedWork,
+  uploadAttachment: defaultUploadAttachment,
+  consolidateAcceptanceCriteria: defaultConsolidateAcceptanceCriteria,
+  readAttachmentFile: defaultReadAttachmentFile,
 };
 
 export type ApplyStoryStatusSyncResult = {
@@ -82,7 +91,8 @@ export type ApplyStoryStatusSyncResult = {
   warning?: string;
 };
 
-type StoryWithRelations = Story & { workUnits: WorkUnit[]; project: Project | null };
+type WorkUnitWithAttachments = WorkUnit & { attachments: Attachment[] };
+type StoryWithRelations = Story & { workUnits: WorkUnitWithAttachments[]; project: Project | null };
 
 /**
  * Returns true when a project has complete JIRA credentials configured.
@@ -120,7 +130,7 @@ export async function applyStoryStatusSync(
   try {
     const story = (await prisma.story.findUnique({
       where: { id: storyId },
-      include: { workUnits: true, project: true },
+      include: { workUnits: { include: { attachments: true } }, project: true },
     })) as StoryWithRelations | null;
 
     if (!story) {
@@ -166,12 +176,54 @@ export async function applyStoryStatusSync(
     if (desired === "Code Revew" && story.completionCommentPostedAt == null) {
       const doneWorkUnits = story.workUnits.filter((w) => w.column === "done");
       const summaryText = await deps.summarizeCompletedWork(story, doneWorkUnits);
-      const comment =
-        `${summaryText}\n\nWork units:\n` +
-        doneWorkUnits.map((w) => `• ${w.title}`).join("\n");
+
+      // Claude failure here must never block the transition/local update —
+      // degrade to a comment without the consolidated AC/verification section.
+      let consolidated = { acceptanceCriteria: "", verification: "" };
+      try {
+        consolidated = await deps.consolidateAcceptanceCriteria(story, doneWorkUnits);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `applyStoryStatusSync: consolidateAcceptanceCriteria failed non-fatally for story ${storyId}: ${message}`
+        );
+      }
+
+      const sections = [
+        `${summaryText}\n\nWork units:\n` + doneWorkUnits.map((w) => `• ${w.title}`).join("\n"),
+      ];
+      if (consolidated.acceptanceCriteria) {
+        sections.push(`Acceptance Criteria:\n${consolidated.acceptanceCriteria}`);
+      }
+      if (consolidated.verification) {
+        sections.push(`Verification:\n${consolidated.verification}`);
+      }
+      const comment = sections.join("\n\n");
+
       await deps.addComment(story.jiraKey, comment, config);
       commented = true;
       completionCommentPostedAt = new Date();
+
+      // Upload each done work unit's attachments as JIRA attachments on the
+      // issue. Never let a single failed upload (or the whole loop) break
+      // the transition/local update — log and continue.
+      for (const workUnit of doneWorkUnits) {
+        for (const attachment of workUnit.attachments) {
+          try {
+            const buffer = await deps.readAttachmentFile(attachment.id);
+            await deps.uploadAttachment(
+              story.jiraKey,
+              { buffer, filename: attachment.filename, mimeType: attachment.mimeType },
+              config
+            );
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(
+              `applyStoryStatusSync: failed to upload attachment ${attachment.id} (${attachment.filename}) to ${story.jiraKey}: ${message}`
+            );
+          }
+        }
+      }
     }
 
     await prisma.story.update({
