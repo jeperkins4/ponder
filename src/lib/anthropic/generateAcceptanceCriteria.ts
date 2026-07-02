@@ -20,11 +20,11 @@ const TOOL_NAME = "record_acceptance";
 
 const SYSTEM_PROMPT = `You are an expert software engineering lead writing crisp acceptance criteria and verification steps for a single unit of work.
 
-Given the unit of work's title and description, produce:
-- "acceptanceCriteria": concise, testable criteria describing when this unit of work is done (use short bullet-style lines).
-- "verification": a concrete method for verifying it works (e.g. tests to run or checks to perform).
+Given the unit of work's title and description, produce BOTH of the following, and BOTH must be non-empty and distinct from each other:
+- "acceptanceCriteria": a SHORT bulleted list (roughly 3-7 concise bullet lines) of the essential done-conditions. Do NOT restate the whole description — capture only the key testable outcomes. Keep it tight.
+- "verification": 1-4 concrete steps for verifying it works (e.g. specific tests to run, manual checks, or QA steps). This is HOW you confirm the acceptance criteria are met — not a repeat of them.
 
-Base them strictly on the given title and description; do not invent unrelated scope. Call the ${TOOL_NAME} tool with the result. Do not respond with anything else.`;
+Base them strictly on the given title and description; do not invent unrelated scope. You MUST provide a meaningful, non-empty "verification". Call the ${TOOL_NAME} tool with both fields. Do not respond with anything else.`;
 
 const ACCEPTANCE_TOOL = {
   name: TOOL_NAME,
@@ -62,7 +62,7 @@ export async function generateAcceptanceCriteria(
 
   const response = await anthropic.messages.create({
     model,
-    max_tokens: 1500,
+    max_tokens: 2000,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userContent }],
     tools: [ACCEPTANCE_TOOL],
