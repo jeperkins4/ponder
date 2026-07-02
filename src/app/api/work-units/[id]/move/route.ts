@@ -17,6 +17,7 @@ function workUnitToDTO(wu: {
   verification: string | null;
   column: string;
   order: number;
+  subNumber: number | null;
   createdAt: Date;
   completedAt: Date | null;
 }): WorkUnitDTO {
@@ -29,6 +30,7 @@ function workUnitToDTO(wu: {
     verification: wu.verification,
     column: wu.column as Column,
     order: wu.order,
+    subNumber: wu.subNumber,
     createdAt: wu.createdAt.toISOString(),
     completedAt: wu.completedAt?.toISOString() ?? null,
   };

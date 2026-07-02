@@ -66,6 +66,7 @@ describe("PonderClient", () => {
       verification: null,
       column: "done",
       order: 0,
+      subNumber: null,
       createdAt: new Date().toISOString(),
       completedAt: null,
     };
@@ -94,6 +95,7 @@ describe("PonderClient", () => {
       verification: null,
       column: "in_progress",
       order: 3,
+      subNumber: null,
       createdAt: new Date().toISOString(),
       completedAt: null,
     };
@@ -121,6 +123,7 @@ describe("PonderClient", () => {
       verification: null,
       column: "todo",
       order: 0,
+      subNumber: null,
       createdAt: new Date().toISOString(),
       completedAt: null,
     };

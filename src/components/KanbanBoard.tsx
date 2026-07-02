@@ -290,23 +290,14 @@ function KanbanColumn({
   }[] = [];
 
   stories.forEach((story) => {
-    // Stable 1-based sub-story number per work unit, ordered by creation time
-    // (id as tiebreak) so the number doesn't shuffle when cards move columns.
-    // Only decomposed stories (>1 work unit) get a suffix; a single whole-story
-    // card keeps the bare key.
-    const multi = story.workUnits.length > 1;
-    const orderedIds = [...story.workUnits]
-      .sort(
-        (a, b) =>
-          a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
-      )
-      .map((w) => w.id);
-
     story.workUnits.forEach((wu) => {
       if (wu.column === column) {
-        const storyKey = multi
-          ? `${story.jiraKey}-${orderedIds.indexOf(wu.id) + 1}`
-          : story.jiraKey;
+        // The sub-story suffix is a stored, stable field (WorkUnit.subNumber)
+        // set at creation time — it never renumbers when a sibling is
+        // deleted. Ponder-local only; JIRA only ever sees the bare
+        // story.jiraKey.
+        const storyKey =
+          wu.subNumber != null ? `${story.jiraKey}-${wu.subNumber}` : story.jiraKey;
         workUnitsInColumn.push({
           workUnit: wu,
           storyKey,

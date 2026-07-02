@@ -17,6 +17,7 @@ export interface WorkUnitDTO {
   verification: string | null;
   column: Column;
   order: number;
+  subNumber: number | null; // stable 1-based decomposition suffix (e.g. COM-540-1); Ponder-local, never sent to JIRA
   createdAt: string; // ISO string
   completedAt: string | null; // ISO string
 }

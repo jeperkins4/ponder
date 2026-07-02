@@ -56,6 +56,7 @@ model WorkUnit {
   verification       String?
   column             String   // "todo" | "in_progress" | "done"
   order              Int
+  subNumber          Int?      // stable 1-based decomposition suffix (e.g. COM-540-1); null = not decomposed, Ponder-local only, never sent to JIRA
   createdAt          DateTime  @default(now())
   completedAt        DateTime?
 

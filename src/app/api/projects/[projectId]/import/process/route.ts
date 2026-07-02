@@ -100,6 +100,13 @@ export async function POST(
         }
 
         if (drafts && drafts.length > 0) {
+          // Broken-down stories get a stable 1-based sub-number (COM-540-1,
+          // -2, ...) in the order the drafts were created — Ponder-local,
+          // never sent to JIRA. Only assign one when there's actually more
+          // than one unit to number; a lone draft is indistinguishable from
+          // a non-decomposed story and keeps the bare key, matching the
+          // backfill's "only decomposed (>1 unit) stories get numbered" rule.
+          const isDecomposition = drafts.length > 1;
           for (let i = 0; i < drafts.length; i++) {
             const draft = drafts[i];
             await prisma.workUnit.create({
@@ -112,6 +119,7 @@ export async function POST(
                 verification: draft.verification,
                 column,
                 order: i,
+                subNumber: isDecomposition ? i + 1 : null,
               },
             });
             workUnitsCreated++;
@@ -127,6 +135,7 @@ export async function POST(
               verification: null,
               column,
               order: 0,
+              subNumber: null,
             },
           });
           workUnitsCreated++;
@@ -142,6 +151,7 @@ export async function POST(
             verification: null,
             column,
             order: 0,
+            subNumber: null,
           },
         });
         workUnitsCreated++;

@@ -32,6 +32,7 @@ const mockStories: StoryDTO[] = [
         verification: null,
         column: "todo",
         order: 1,
+        subNumber: null,
         createdAt: "2024-01-01T00:00:00Z",
         completedAt: null,
       },
