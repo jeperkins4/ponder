@@ -1,8 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { StoryDTO, WorkUnitDTO, Column } from "@/lib/types";
 import { COLUMNS } from "@/lib/columns";
+import {
+  buildColumnOrder,
+  computeReorderedColumns,
+  applyColumnOrder,
+  ColumnOrderMap,
+} from "@/lib/dndReorder";
 import { WorkUnitCard } from "@/components/WorkUnitCard";
 import { OnboardingTooltip } from "@/components/OnboardingTooltip";
 import { useTheme } from "@/hooks/useTheme";
@@ -170,33 +191,86 @@ export function KanbanBoard({
     []
   );
 
-  // Move a work unit to another column (drag-and-drop drop handler). Calls the
-  // move endpoint — which also triggers the server-side JIRA status write-back —
-  // then silently refreshes. No-op when dropped on its current column.
-  const handleMoveWorkUnit = useCallback(
-    async (workUnitId: string, toColumn: Column) => {
-      const allUnits = stories.flatMap((s) => s.workUnits);
-      const wu = allUnits.find((w) => w.id === workUnitId);
-      if (!wu || wu.column === toColumn) return;
-      const order = allUnits.filter((w) => w.column === toColumn).length;
+  // @dnd-kit sensors: PointerSensor requires an 8px pointer movement before
+  // a drag activates, so a plain click (mousedown+mouseup with ~0 movement)
+  // still reaches the card's onClick (opens the detail modal) and the
+  // Edit/Delete buttons/JIRA-key link instead of being swallowed by drag
+  // start. KeyboardSensor makes dragging (and thus reordering) available
+  // without a pointer; its start/end keys are Space only (not Enter) so it
+  // doesn't collide with the card's own Enter-opens-modal keyboard handling.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+      keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] },
+    })
+  );
+
+  // Persists a completed drag (from `handleDragEnd`, below): posts the
+  // affected columns' full ordered id lists to the reorder endpoint — which
+  // also triggers the server-side JIRA status write-back on a cross-column
+  // move — then silently refreshes to reconcile with the server.
+  const persistReorder = useCallback(
+    async (movedId: string, columns: Partial<ColumnOrderMap>) => {
       try {
-        const res = await fetch(`/api/work-units/${workUnitId}/move`, {
+        const res = await fetch("/api/work-units/reorder", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ column: toColumn, order }),
+          body: JSON.stringify({ movedId, columns }),
         });
-        if (!res.ok) throw new Error(`Failed to move: ${res.statusText}`);
-        const label = COLUMNS.find((c) => c.key === toColumn)?.label ?? toColumn;
-        setStatusMessage(`Moved "${wu.title}" to ${label}`);
-        fetchStories({ silent: true });
+        if (!res.ok) throw new Error(`Failed to reorder: ${res.statusText}`);
       } catch (err) {
-        console.error("Error moving work unit:", err);
+        console.error("Error reordering work unit:", err);
         setStatusMessage(
-          err instanceof Error ? err.message : "Failed to move work unit"
+          err instanceof Error ? err.message : "Failed to reorder work unit"
         );
+      } finally {
+        // Reconciles local state with the server either way: confirms the
+        // optimistic update on success, and reverts it on failure.
+        fetchStories({ silent: true });
       }
     },
-    [stories, fetchStories]
+    [fetchStories]
+  );
+
+  // @dnd-kit drop handler: computes the new card ordering via the pure
+  // `computeReorderedColumns` helper, applies it to local state
+  // optimistically (so the UI updates immediately), then persists it.
+  // Handles both within-column reordering and cross-column moves.
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over) return;
+
+      const activeId = String(active.id);
+      const overId = String(over.id);
+
+      const columnOrder = buildColumnOrder(stories);
+      const result = computeReorderedColumns(columnOrder, activeId, overId);
+      if (result.changedColumns.length === 0) return;
+
+      const movedUnit = stories
+        .flatMap((s) => s.workUnits)
+        .find((w) => w.id === activeId);
+
+      setStories((prev) => applyColumnOrder(prev, result.columns));
+
+      if (movedUnit) {
+        if (result.changedColumns.length > 1) {
+          const toColumn = result.changedColumns[1];
+          const label = COLUMNS.find((c) => c.key === toColumn)?.label ?? toColumn;
+          setStatusMessage(`Moved "${movedUnit.title}" to ${label}`);
+        } else {
+          setStatusMessage(`Reordered "${movedUnit.title}"`);
+        }
+      }
+
+      const affectedColumns: Partial<ColumnOrderMap> = Object.fromEntries(
+        result.changedColumns.map((key) => [key, result.columns[key]])
+      );
+      persistReorder(activeId, affectedColumns);
+    },
+    [stories, persistReorder]
   );
 
   let content: JSX.Element;
@@ -223,24 +297,29 @@ export function KanbanBoard({
           </p>
         </div>
 
-        <div className="overflow-x-auto">
-          <div className="grid grid-cols-4 gap-4 min-w-[900px]">
-            {COLUMNS.map(({ key, label }) => (
-              <KanbanColumn
-                key={key}
-                column={key}
-                columnLabel={label}
-                stories={stories}
-                onRefresh={() => fetchStories({ silent: true })}
-                columnRef={setColumnRef(key)}
-                onKeyboardNavigation={handleKeyboardNavigation}
-                onStatusMessage={handleStatusMessage}
-                onMoveWorkUnit={handleMoveWorkUnit}
-                isDark={isDark}
-              />
-            ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="overflow-x-auto">
+            <div className="grid grid-cols-4 gap-4 min-w-[900px]">
+              {COLUMNS.map(({ key, label }) => (
+                <KanbanColumn
+                  key={key}
+                  column={key}
+                  columnLabel={label}
+                  stories={stories}
+                  onRefresh={() => fetchStories({ silent: true })}
+                  columnRef={setColumnRef(key)}
+                  onKeyboardNavigation={handleKeyboardNavigation}
+                  onStatusMessage={handleStatusMessage}
+                  isDark={isDark}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        </DndContext>
       </>
     );
   }
@@ -298,7 +377,6 @@ interface KanbanColumnProps {
     workUnitId: string
   ) => void;
   onStatusMessage?: (message: string) => void;
-  onMoveWorkUnit?: (workUnitId: string, toColumn: Column) => void;
   isDark?: boolean;
 }
 
@@ -310,10 +388,8 @@ function KanbanColumn({
   columnRef,
   onKeyboardNavigation,
   onStatusMessage,
-  onMoveWorkUnit,
   isDark = false,
 }: KanbanColumnProps) {
-  const [isDragOver, setIsDragOver] = useState(false);
   // Get all work units in this column, keeping a handle on the parent story
   // so each card can show which JIRA issue it was decomposed from.
   const workUnitsInColumn: {
@@ -340,36 +416,31 @@ function KanbanColumn({
     });
   });
 
+  // Sort by `order` ascending so dragged/reordered cards render in their
+  // persisted position; ties (equal `order`) break on id for a stable,
+  // deterministic render order — mirrors `buildColumnOrder` in dndReorder.ts.
+  workUnitsInColumn.sort(
+    (a, b) =>
+      a.workUnit.order - b.workUnit.order ||
+      a.workUnit.id.localeCompare(b.workUnit.id)
+  );
+
   const totalWorkUnits = workUnitsInColumn.length;
   const itemWord = totalWorkUnits === 1 ? "item" : "items";
+  const cardIds = workUnitsInColumn.map(({ workUnit }) => workUnit.id);
+
+  // Registers the whole column body as a droppable target (id = the column
+  // key) so a card can be dropped into an empty column, or below the last
+  // card, and still resolve to this column.
+  const { setNodeRef: setDroppableRef } = useDroppable({ id: column });
 
   return (
     <section
       aria-label={`${columnLabel} column, ${totalWorkUnits} ${itemWord}`}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        if (!isDragOver) setIsDragOver(true);
-      }}
-      onDragLeave={(e) => {
-        // Ignore leave events fired while moving over child elements.
-        if (e.currentTarget === e.target) setIsDragOver(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setIsDragOver(false);
-        const id = e.dataTransfer.getData("text/plain");
-        if (id) onMoveWorkUnit?.(id, column);
-      }}
-      data-testid={`column-dropzone-${column}`}
       className={`rounded-xl border p-6 transition-all duration-200 ${
-        isDragOver
-          ? isDark
-            ? "border-ponder-dark-purple ring-2 ring-ponder-dark-purple bg-ponder-dark-bg/40"
-            : "border-ponder-light-purple ring-2 ring-ponder-light-purple bg-ponder-light-bg"
-          : isDark
-            ? "bg-ponder-dark-surface border-ponder-dark-border hover:border-ponder-dark-purple hover:shadow-ponder-card-hover"
-            : "bg-ponder-light-surface border-ponder-light-card-border hover:border-ponder-light-purple hover:shadow-ponder-card-hover"
+        isDark
+          ? "bg-ponder-dark-surface border-ponder-dark-border hover:border-ponder-dark-purple hover:shadow-ponder-card-hover"
+          : "bg-ponder-light-surface border-ponder-light-card-border hover:border-ponder-light-purple hover:shadow-ponder-card-hover"
       }`}
     >
       <div className={`mb-6 pb-4 border-b ${isDark ? "border-ponder-dark-border" : "border-ponder-light-card-border"}`}>
@@ -379,25 +450,33 @@ function KanbanColumn({
         </p>
       </div>
 
-      <div className="space-y-4" ref={columnRef}>
-        {workUnitsInColumn.length === 0 ? (
-          <div className={`text-center py-8 ${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} opacity-60`}>
-            <p>No tasks</p>
-          </div>
-        ) : (
-          workUnitsInColumn.map(({ workUnit, storyKey, storyUrl }) => (
-            <WorkUnitCard
-              key={workUnit.id}
-              workUnit={workUnit}
-              storyKey={storyKey}
-              storyUrl={storyUrl}
-              onDelete={onRefresh}
-              onUpdate={onRefresh}
-              onKeyboardNavigation={onKeyboardNavigation}
-              onStatusMessage={onStatusMessage}
-            />
-          ))
-        )}
+      <div
+        className="space-y-4"
+        ref={(el) => {
+          columnRef?.(el);
+          setDroppableRef(el);
+        }}
+      >
+        <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
+          {workUnitsInColumn.length === 0 ? (
+            <div className={`text-center py-8 ${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} opacity-60`}>
+              <p>No tasks</p>
+            </div>
+          ) : (
+            workUnitsInColumn.map(({ workUnit, storyKey, storyUrl }) => (
+              <WorkUnitCard
+                key={workUnit.id}
+                workUnit={workUnit}
+                storyKey={storyKey}
+                storyUrl={storyUrl}
+                onDelete={onRefresh}
+                onUpdate={onRefresh}
+                onKeyboardNavigation={onKeyboardNavigation}
+                onStatusMessage={onStatusMessage}
+              />
+            ))
+          )}
+        </SortableContext>
       </div>
     </section>
   );

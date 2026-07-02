@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { WorkUnitDTO, Column } from "@/lib/types";
 import { WorkUnitDetailModal } from "@/components/WorkUnitDetailModal";
 
@@ -71,9 +73,28 @@ export function WorkUnitCard({
   // The card div (view mode) and the title input (edit mode) are two
   // different DOM nodes that never exist at the same time, since the
   // component renders one or the other depending on `isEditing`.
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const wasEditingRef = useRef(false);
+
+  // Makes the card a @dnd-kit sortable item: whole-card dragging (both
+  // pointer and keyboard, via the sensors configured on KanbanBoard's
+  // DndContext), reorderable within its column and movable across columns.
+  // Disabled while editing — you can't drag a card that's mid-edit.
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: workUnit.id, disabled: isEditing });
+
+  const dragStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+  };
 
   // Focus management for edit mode entry/exit. We rely on an effect
   // (rather than calling .focus() directly inside handleSaveEdit /
@@ -193,9 +214,11 @@ export function WorkUnitCard({
     return (
       <>
       <div
+        ref={setSortableRef}
         role="article"
         aria-label={cardAriaLabel}
         className={`p-3 bg-ponder-light-surface border border-ponder-light-card-border rounded-xl shadow-ponder-card ${focusRing}`}
+        style={dragStyle}
         tabIndex={0}
         data-testid={`work-unit-card-${workUnit.id}`}
       >
@@ -245,18 +268,27 @@ export function WorkUnitCard({
   return (
     <>
     <div
-      ref={cardRef}
+      ref={(el) => {
+        cardRef.current = el;
+        setSortableRef(el);
+      }}
+      {...attributes}
+      {...listeners}
       role="article"
       aria-label={cardAriaLabel}
       className={`p-3 bg-ponder-light-surface border border-ponder-light-card-border rounded-xl shadow-ponder-card hover:shadow-ponder-card-hover hover:-translate-y-0.5 transition-all cursor-pointer ${focusRing}`}
+      style={dragStyle}
       tabIndex={0}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", workUnit.id);
-        e.dataTransfer.effectAllowed = "move";
-      }}
       onClick={() => setIsDetailOpen(true)}
-      onKeyDown={handleCardKeyDown}
+      onKeyDown={(e) => {
+        // dnd-kit's KeyboardSensor listener first (Space starts/ends a
+        // keyboard drag), then this card's own key handling (Enter opens
+        // the modal, Delete deletes, arrow keys move focus between
+        // columns) — the two never collide since KanbanBoard's
+        // KeyboardSensor is configured to use Space only, not Enter.
+        listeners?.onKeyDown?.(e);
+        handleCardKeyDown(e);
+      }}
       data-testid={`work-unit-card-${workUnit.id}`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
