@@ -181,43 +181,82 @@ describe("KanbanBoard", () => {
     });
   });
 
-  it("moves a card to another column on drop via the move endpoint", async () => {
-    render(<KanbanBoard />);
-    await waitFor(() => {
-      expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
-    });
+  // Actual @dnd-kit pointer/keyboard drag interactions aren't reliably
+  // driveable under jsdom (no real layout/geometry for collision detection),
+  // so cross-lane move + reorder persistence is covered by:
+  //   - src/lib/dndReorder.test.ts — the pure helpers KanbanBoard's
+  //     onDragEnd uses to compute the new per-column orderings from a drag
+  //     result (within-column reorder, cross-column move, empty-column
+  //     drop, no-op cases).
+  //   - src/app/api/work-units/reorder/route.test.ts — the persistence
+  //     endpoint those results are posted to (column/order updates, JIRA
+  //     sync triggered on cross-column moves and not on pure reorders,
+  //     validation).
+  // Actual pointer/keyboard dragging requires manual verification in a real
+  // browser (jsdom has no layout, so @dnd-kit's collision detection can't
+  // resolve meaningfully here).
+  it("sorts each column's cards by `order` ascending, independent of story/workUnits array order", async () => {
+    const outOfOrderStories: StoryDTO[] = [
+      {
+        id: "story-1",
+        jiraKey: "PROJ-1",
+        jiraId: "1",
+        projectKey: "PROJ",
+        summary: "First story",
+        description: null,
+        jiraStatus: "To Do",
+        url: "https://jira.example.com/browse/PROJ-1",
+        lastSyncedAt: "2024-01-01T00:00:00Z",
+        completionCommentPostedAt: null,
+        workUnits: [
+          // Deliberately pushed in descending `order` — the array position
+          // itself must NOT determine render order.
+          {
+            id: "wu-second",
+            storyId: "story-1",
+            title: "Second card",
+            description: null,
+            acceptanceCriteria: null,
+            verification: null,
+            column: "todo",
+            order: 1,
+            subNumber: 1,
+            createdAt: "2024-01-01T00:00:00Z",
+            completedAt: null,
+          },
+          {
+            id: "wu-first",
+            storyId: "story-1",
+            title: "First card",
+            description: null,
+            acceptanceCriteria: null,
+            verification: null,
+            column: "todo",
+            order: 0,
+            subNumber: 2,
+            createdAt: "2024-01-01T00:00:00Z",
+            completedAt: null,
+          },
+        ],
+      },
+    ];
 
-    // wu-1 is in "todo"; drop it on the "done" column.
-    const doneZone = screen.getByTestId("column-dropzone-done");
-    fireEvent.drop(doneZone, { dataTransfer: { getData: () => "wu-1" } });
-
-    await waitFor(() => {
-      const moveCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
-        (c) => String(c[0]).includes("/api/work-units/wu-1/move")
-      );
-      expect(moveCall).toBeTruthy();
-      expect(moveCall![1].method).toBe("POST");
-      expect(JSON.parse(moveCall![1].body)).toMatchObject({ column: "done" });
-    });
-  });
-
-  it("does not call the move endpoint when a card is dropped on its own column", async () => {
-    render(<KanbanBoard />);
-    await waitFor(() => {
-      expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
-    });
-
-    // wu-1 already lives in "todo" — dropping it there is a no-op.
-    const todoZone = screen.getByTestId("column-dropzone-todo");
-    fireEvent.drop(todoZone, { dataTransfer: { getData: () => "wu-1" } });
-
-    await waitFor(() =>
-      expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument()
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(outOfOrderStories),
+      } as Response)
     );
-    const moveCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
-      (c) => String(c[0]).includes("/move")
-    );
-    expect(moveCall).toBeUndefined();
+
+    render(<KanbanBoard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("work-unit-card-wu-first")).toBeInTheDocument();
+    });
+
+    const cards = screen.getAllByTestId(/^work-unit-card-/);
+    const ids = cards.map((c) => c.getAttribute("data-testid"));
+    expect(ids).toEqual(["work-unit-card-wu-first", "work-unit-card-wu-second"]);
   });
 
   it("handles loading state", () => {

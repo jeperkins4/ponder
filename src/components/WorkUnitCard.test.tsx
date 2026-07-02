@@ -73,16 +73,18 @@ describe("WorkUnitCard", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("is draggable and puts the work unit id on the drag payload", () => {
+    it("is a @dnd-kit sortable item rather than natively draggable", () => {
       render(<WorkUnitCard workUnit={mockWorkUnit} />);
       const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
-      expect(card).toHaveAttribute("draggable", "true");
 
-      const setData = vi.fn();
-      fireEvent.dragStart(card, {
-        dataTransfer: { setData, effectAllowed: "" },
-      });
-      expect(setData).toHaveBeenCalledWith("text/plain", mockWorkUnit.id);
+      // Native HTML5 DnD is gone...
+      expect(card).not.toHaveAttribute("draggable");
+      // ...replaced by @dnd-kit's useSortable wiring (attributes/listeners
+      // spread onto the card root — see WorkUnitCard.tsx). `role`/`tabIndex`
+      // are explicitly overridden back to the card's own semantics
+      // (role="article", tabIndex=0) rather than dnd-kit's defaults, which
+      // the "Accessibility" describe block below asserts directly.
+      expect(card).toHaveAttribute("aria-roledescription", "sortable");
     });
 
     it("renders edit and delete buttons", () => {
