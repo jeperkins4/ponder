@@ -2,7 +2,7 @@
 
 ## Status: DONE
 
-Commit hash: (recorded below after commit; verified via `git log --oneline -1` on `feature/card-attachments`)
+Commit hash: `cdb924a` (verified via `git log --oneline -1` on `feature/card-attachments`)
 
 ## Summary
 
