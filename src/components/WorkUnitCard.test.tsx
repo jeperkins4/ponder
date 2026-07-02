@@ -39,6 +39,37 @@ describe("WorkUnitCard", () => {
       expect(screen.getByText("This is a test description")).toBeInTheDocument();
     });
 
+    it("renders the parent JIRA key as a link when storyUrl is provided", () => {
+      render(
+        <WorkUnitCard
+          workUnit={mockWorkUnit}
+          storyKey="COM-540"
+          storyUrl="https://acme.atlassian.net/browse/COM-540"
+        />
+      );
+      const link = screen.getByTestId(`work-unit-story-key-${mockWorkUnit.id}`);
+      expect(link).toHaveTextContent("COM-540");
+      expect(link).toHaveAttribute(
+        "href",
+        "https://acme.atlassian.net/browse/COM-540"
+      );
+      expect(link.tagName).toBe("A");
+    });
+
+    it("renders the parent JIRA key as plain text when no storyUrl", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} storyKey="COM-540" />);
+      const badge = screen.getByTestId(`work-unit-story-key-${mockWorkUnit.id}`);
+      expect(badge).toHaveTextContent("COM-540");
+      expect(badge.tagName).not.toBe("A");
+    });
+
+    it("omits the JIRA key badge when no storyKey is provided", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+      expect(
+        screen.queryByTestId(`work-unit-story-key-${mockWorkUnit.id}`)
+      ).not.toBeInTheDocument();
+    });
+
     it("renders edit and delete buttons", () => {
       render(<WorkUnitCard workUnit={mockWorkUnit} />);
       expect(

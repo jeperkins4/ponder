@@ -281,13 +281,22 @@ function KanbanColumn({
   onStatusMessage,
   isDark = false,
 }: KanbanColumnProps) {
-  // Get all work units in this column
-  const workUnitsInColumn: WorkUnitDTO[] = [];
+  // Get all work units in this column, keeping a handle on the parent story
+  // so each card can show which JIRA issue it was decomposed from.
+  const workUnitsInColumn: {
+    workUnit: WorkUnitDTO;
+    storyKey: string;
+    storyUrl: string;
+  }[] = [];
 
   stories.forEach((story) => {
     story.workUnits.forEach((wu) => {
       if (wu.column === column) {
-        workUnitsInColumn.push(wu);
+        workUnitsInColumn.push({
+          workUnit: wu,
+          storyKey: story.jiraKey,
+          storyUrl: story.url,
+        });
       }
     });
   });
@@ -317,10 +326,12 @@ function KanbanColumn({
             <p>No tasks</p>
           </div>
         ) : (
-          workUnitsInColumn.map((workUnit) => (
+          workUnitsInColumn.map(({ workUnit, storyKey, storyUrl }) => (
             <WorkUnitCard
               key={workUnit.id}
               workUnit={workUnit}
+              storyKey={storyKey}
+              storyUrl={storyUrl}
               onDelete={onRefresh}
               onUpdate={onRefresh}
               onKeyboardNavigation={onKeyboardNavigation}
