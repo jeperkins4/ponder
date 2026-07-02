@@ -18,9 +18,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 // nominally distinct declaration files.
 import { z } from "zod/v3";
 import { PonderClient } from "./client";
+import { listProjects, listStories, listWorkUnits } from "./tools";
 
-// NOTE: tool handlers are placeholders. Tasks 2-3 replace these bodies with
-// real PonderClient calls and result formatting.
+// NOTE: the three mutating tool handlers are still placeholders. Task 3
+// replaces these bodies with real PonderClient calls and result formatting.
 function notImplemented(toolName: string) {
   return {
     content: [
@@ -40,7 +41,7 @@ export function createServer(client: PonderClient): McpServer {
     {
       description: "List all Ponder projects with story/work-unit stats.",
     },
-    async () => notImplemented("list_projects")
+    async () => listProjects(client)
   );
 
   server.registerTool(
@@ -51,7 +52,7 @@ export function createServer(client: PonderClient): McpServer {
         projectId: z.string(),
       },
     },
-    async () => notImplemented("list_stories")
+    async ({ projectId }) => listStories(client, { projectId })
   );
 
   server.registerTool(
@@ -64,7 +65,7 @@ export function createServer(client: PonderClient): McpServer {
         column: z.string().optional(),
       },
     },
-    async () => notImplemented("list_work_units")
+    async ({ projectId, column }) => listWorkUnits(client, { projectId, column })
   );
 
   server.registerTool(

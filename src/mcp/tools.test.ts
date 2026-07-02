@@ -1,0 +1,198 @@
+import { describe, it, expect } from "vitest";
+import { listProjects, listStories, listWorkUnits } from "./tools";
+import type { PonderClient } from "./client";
+import type { ProjectWithStats, StoryDTO } from "@/lib/types";
+
+function fakeClient(overrides: Partial<PonderClient>): PonderClient {
+  return overrides as PonderClient;
+}
+
+const projects: ProjectWithStats[] = [
+  {
+    id: "p1",
+    name: "Project One",
+    type: "JIRA",
+    jiraProjectKey: "PONE",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    hasApiToken: true,
+    storyCount: 2,
+    workUnitCount: 5,
+  },
+  {
+    id: "p2",
+    name: "Project Two",
+    type: "STANDALONE",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    hasApiToken: false,
+    storyCount: 0,
+    workUnitCount: 0,
+  },
+];
+
+const stories: StoryDTO[] = [
+  {
+    id: "s1",
+    jiraKey: "PONE-1",
+    jiraId: "10001",
+    projectKey: "PONE",
+    summary: "Do the thing",
+    description: null,
+    jiraStatus: "In Progress",
+    url: "https://example.atlassian.net/browse/PONE-1",
+    lastSyncedAt: new Date().toISOString(),
+    completionCommentPostedAt: null,
+    workUnits: [
+      {
+        id: "w1",
+        storyId: "s1",
+        title: "Task A",
+        description: null,
+        column: "todo",
+        order: 0,
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+      },
+      {
+        id: "w2",
+        storyId: "s1",
+        title: "Task B",
+        description: null,
+        column: "todo",
+        order: 1,
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+      },
+      {
+        id: "w3",
+        storyId: "s1",
+        title: "Task C",
+        description: null,
+        column: "in_progress",
+        order: 0,
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+      },
+      {
+        id: "w4",
+        storyId: "s1",
+        title: "Task D",
+        description: null,
+        column: "code_review",
+        order: 0,
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+      },
+    ],
+  },
+  {
+    id: "s2",
+    jiraKey: "PONE-2",
+    jiraId: "10002",
+    projectKey: "PONE",
+    summary: "Do another thing",
+    description: null,
+    jiraStatus: "To Do",
+    url: "https://example.atlassian.net/browse/PONE-2",
+    lastSyncedAt: new Date().toISOString(),
+    completionCommentPostedAt: null,
+    workUnits: [],
+  },
+];
+
+describe("listProjects", () => {
+  it("includes each project's name and counts", async () => {
+    const client = fakeClient({ getProjects: async () => projects });
+
+    const result = await listProjects(client);
+    const text = result.content[0].text;
+
+    expect(text).toContain("Project One");
+    expect(text).toContain("stories: 2");
+    expect(text).toContain("workUnits: 5");
+    expect(text).toContain("Project Two");
+    expect(text).toContain("stories: 0");
+    expect(text).toContain("jiraProjectKey: PONE");
+    expect(text).toContain("jiraProjectKey: —");
+  });
+
+  it("reports zero projects clearly", async () => {
+    const client = fakeClient({ getProjects: async () => [] });
+
+    const result = await listProjects(client);
+
+    expect(result.content[0].text).toMatch(/no projects/i);
+  });
+});
+
+describe("listStories", () => {
+  it("includes each story's jiraKey, status, and per-column breakdown", async () => {
+    const client = fakeClient({ getStories: async () => stories });
+
+    const result = await listStories(client, { projectId: "p1" });
+    const text = result.content[0].text;
+
+    expect(text).toContain("PONE-1");
+    expect(text).toContain("In Progress");
+    expect(text).toContain("todo: 2");
+    expect(text).toContain("in_progress: 1");
+    expect(text).toContain("code_review: 1");
+    expect(text).toContain("PONE-2");
+    expect(text).toContain("To Do");
+  });
+
+  it("returns a clear message when there are no stories", async () => {
+    const client = fakeClient({ getStories: async () => [] });
+
+    const result = await listStories(client, { projectId: "p1" });
+
+    expect(result.content[0].text).toMatch(/no stories/i);
+  });
+});
+
+describe("listWorkUnits", () => {
+  it("lists every work unit with its id and parent jiraKey", async () => {
+    const client = fakeClient({ getStories: async () => stories });
+
+    const result = await listWorkUnits(client, { projectId: "p1" });
+    const text = result.content[0].text;
+
+    expect(text).toContain("w1");
+    expect(text).toContain("Task A");
+    expect(text).toContain("PONE-1");
+    expect(text).toContain("w4");
+    expect(text).toContain("Task D");
+  });
+
+  it("filters to a single column when provided", async () => {
+    const client = fakeClient({ getStories: async () => stories });
+
+    const result = await listWorkUnits(client, {
+      projectId: "p1",
+      column: "code_review",
+    });
+    const text = result.content[0].text;
+
+    expect(text).toContain("Task D");
+    expect(text).not.toContain("Task A");
+    expect(text).not.toContain("Task B");
+    expect(text).not.toContain("Task C");
+  });
+
+  it("returns an error mentioning valid columns for an invalid column", async () => {
+    const client = fakeClient({ getStories: async () => stories });
+
+    const result = await listWorkUnits(client, {
+      projectId: "p1",
+      column: "bogus",
+    });
+    const text = result.content[0].text;
+
+    expect(text).toMatch(/invalid column/i);
+    expect(text).toContain("todo");
+    expect(text).toContain("in_progress");
+    expect(text).toContain("code_review");
+    expect(text).toContain("done");
+  });
+});
