@@ -510,7 +510,7 @@ export function WorkUnitDetailModal({
                   onClick={handleRegenerate}
                   disabled={regenerating}
                   data-testid="work-unit-detail-regenerate-button"
-                  className={`px-3 py-1.5 rounded-lg border text-sm font-semibold ${fieldClass} hover:opacity-80 disabled:opacity-50 ${focusRing}`}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold text-white shadow-sm transition-colors ${purpleButtonClass} disabled:opacity-50 ${focusRing}`}
                 >
                   {regenerating
                     ? "Regenerating…"
