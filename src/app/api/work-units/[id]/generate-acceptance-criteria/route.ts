@@ -10,11 +10,23 @@ import { prisma } from "@/lib/prisma";
 import { generateAcceptanceCriteria } from "@/lib/anthropic/generateAcceptanceCriteria";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
+
+    // Optional JSON body: { codebaseContext?: string }. The web UI sends no
+    // body; MCP/agent callers may include a located knowledge-graph slice.
+    let codebaseContext: string | undefined;
+    try {
+      const body = await request.json();
+      if (body && typeof body.codebaseContext === "string") {
+        codebaseContext = body.codebaseContext;
+      }
+    } catch {
+      // No body or invalid JSON — proceed without context (unchanged behavior).
+    }
 
     const workUnit = await prisma.workUnit.findUnique({
       where: { id },
@@ -27,6 +39,7 @@ export async function POST(
     const { acceptanceCriteria, verification } = await generateAcceptanceCriteria({
       title: workUnit.title,
       description: workUnit.description,
+      codebaseContext,
     });
 
     const updated = await prisma.workUnit.update({

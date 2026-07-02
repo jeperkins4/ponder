@@ -83,4 +83,21 @@ describe("POST /api/work-units/[id]/generate-acceptance-criteria", () => {
     expect(res.status).toBe(404);
     expect(generateAcceptanceCriteria).not.toHaveBeenCalled();
   });
+
+  it("passes codebaseContext from the request body to the generator", async () => {
+    const res = await POST(
+      new Request("http://localhost/x", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codebaseContext: '{"domain":"Projects"}' }),
+      }) as never,
+      { params: Promise.resolve({ id: workUnitId }) }
+    );
+    expect(res.status).toBe(200);
+    expect(generateAcceptanceCriteria).toHaveBeenCalledWith({
+      title: "Region Definition",
+      description: "Admins assign regions",
+      codebaseContext: '{"domain":"Projects"}',
+    });
+  });
 });
