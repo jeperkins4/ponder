@@ -712,4 +712,49 @@ describe("WorkUnitDetailModal", () => {
       );
     });
   });
+
+  describe("Regenerate acceptance criteria", () => {
+    it("POSTs to the generate endpoint and updates the displayed AC/verification", async () => {
+      const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+        if (url.endsWith("/generate-acceptance-criteria") && init?.method === "POST") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                acceptanceCriteria: "Freshly generated AC",
+                verification: "Freshly generated verification",
+              }),
+          } as Response);
+        }
+        // notes + attachments load as empty on open
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
+      });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const onUpdated = vi.fn();
+      const unit = { ...baseWorkUnit, acceptanceCriteria: null, verification: null };
+      render(
+        <WorkUnitDetailModal workUnit={unit} isOpen={true} onClose={vi.fn()} onUpdated={onUpdated} />
+      );
+
+      // starts as "None yet"
+      expect(screen.getByTestId("work-unit-detail-ac")).toHaveTextContent("None yet");
+
+      fireEvent.click(screen.getByTestId("work-unit-detail-regenerate-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-detail-ac")).toHaveTextContent(
+          "Freshly generated AC"
+        );
+      });
+      expect(screen.getByTestId("work-unit-detail-verification")).toHaveTextContent(
+        "Freshly generated verification"
+      );
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/api/work-units/${unit.id}/generate-acceptance-criteria`,
+        expect.objectContaining({ method: "POST" })
+      );
+      expect(onUpdated).toHaveBeenCalled();
+    });
+  });
 });
