@@ -4,9 +4,8 @@
 
 Done. Branch `feature/dnd-kit-reordering`.
 
-Commit hash: **verify below** (this file is written before the commit step; the
-final commit hash is confirmed via `git log --oneline -1` after committing —
-see the last section of this report and the task's closing message).
+Commit hash: `4156ff1` — "feat: reorder cards within/between columns with
+@dnd-kit" (confirmed via `git log --oneline -1`).
 
 ## Summary
 
@@ -248,6 +247,4 @@ database.
 ## Commit
 
 Branch: `feature/dnd-kit-reordering`.
-Commit message: `feat: reorder cards within/between columns with @dnd-kit`.
-Hash confirmed via `git log --oneline -1` after committing (see final
-message to the user for the exact hash).
+Commit `4156ff1`: `feat: reorder cards within/between columns with @dnd-kit`.
