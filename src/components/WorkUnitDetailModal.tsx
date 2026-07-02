@@ -68,6 +68,8 @@ export function WorkUnitDetailModal({
   const [editVerification, setEditVerification] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState<string | null>(null);
 
   const [notes, setNotes] = useState<WorkNoteDTO[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
@@ -203,6 +205,30 @@ export function WorkUnitDetailModal({
   const cancelEditing = () => {
     setIsEditing(false);
     setSaveError(null);
+  };
+
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    setRegenError(null);
+    try {
+      const response = await fetch(
+        `/api/work-units/${workUnit.id}/generate-acceptance-criteria`,
+        { method: "POST" }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setRegenError(data.error || "Failed to generate");
+        setRegenerating(false);
+        return;
+      }
+      setAcceptanceCriteria(data.acceptanceCriteria);
+      setVerification(data.verification);
+      setRegenerating(false);
+      onUpdated?.();
+    } catch (err) {
+      setRegenError(err instanceof Error ? err.message : "An error occurred");
+      setRegenerating(false);
+    }
   };
 
   const saveEditing = async () => {
@@ -476,6 +502,25 @@ export function WorkUnitDetailModal({
                 >
                   {verification || "None yet"}
                 </p>
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={handleRegenerate}
+                  disabled={regenerating}
+                  data-testid="work-unit-detail-regenerate-button"
+                  className={`px-3 py-1.5 rounded-lg border text-sm font-semibold ${fieldClass} hover:opacity-80 disabled:opacity-50 ${focusRing}`}
+                >
+                  {regenerating
+                    ? "Regenerating…"
+                    : "✨ Regenerate acceptance criteria & verification"}
+                </button>
+                {regenError && (
+                  <p role="alert" className="mt-1 text-sm text-red-600">
+                    {regenError}
+                  </p>
+                )}
               </div>
             </div>
           ) : (
