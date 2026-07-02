@@ -11,9 +11,10 @@
     "lint:fix": "eslint . --fix",
     "knip": "knip",
     "test": "dotenv -e .env.test -- vitest",
+    "test:ci": "dotenv -e .env.test -- vitest run --no-file-parallelism",
     "test:watch": "dotenv -e .env.test -- vitest --watch",
     "test:ui": "dotenv -e .env.test -- vitest --ui",
-    "db:push:test": "dotenv -e .env.test -- prisma db push --skip-generate",
+    "db:push:test": "dotenv -e .env.test -- prisma db push",
     "mcp": "tsx src/mcp/server.ts"
   },
   "dependencies": {
