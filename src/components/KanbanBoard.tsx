@@ -7,9 +7,11 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCorners,
+  pointerWithin,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -31,6 +33,16 @@ import { useTheme } from "@/hooks/useTheme";
 type ColumnRefMap = Record<Column, HTMLDivElement | null>;
 
 const ONBOARDING_STORAGE_KEY = "boardOnboarded";
+
+// Prefer the droppable the pointer is actually over (cursor-based), falling back
+// to closest-corners only when the pointer isn't within any droppable. This
+// makes dragging a card *back* to an earlier/shorter lane reliable: the target
+// is chosen by where the cursor is, not by the dragged card's rectangle (which
+// keeps overlapping the source column with closestCorners alone).
+const boardCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  return pointerCollisions.length > 0 ? pointerCollisions : closestCorners(args);
+};
 
 export interface KanbanBoardProps {
   /** Scopes the board to a single project's stories. Omit to load all stories
@@ -299,7 +311,7 @@ export function KanbanBoard({
 
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={boardCollisionDetection}
           onDragEnd={handleDragEnd}
         >
           <div className="overflow-x-auto">
@@ -437,7 +449,7 @@ function KanbanColumn({
   return (
     <section
       aria-label={`${columnLabel} column, ${totalWorkUnits} ${itemWord}`}
-      className={`rounded-xl border p-6 transition-all duration-200 ${
+      className={`flex flex-col rounded-xl border p-6 transition-all duration-200 ${
         isDark
           ? "bg-ponder-dark-surface border-ponder-dark-border hover:border-ponder-dark-purple hover:shadow-ponder-card-hover"
           : "bg-ponder-light-surface border-ponder-light-card-border hover:border-ponder-light-purple hover:shadow-ponder-card-hover"
@@ -451,7 +463,7 @@ function KanbanColumn({
       </div>
 
       <div
-        className="space-y-4"
+        className="space-y-4 flex-1 min-h-[120px]"
         ref={(el) => {
           columnRef?.(el);
           setDroppableRef(el);
