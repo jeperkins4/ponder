@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { WorkUnitDTO, Column } from "@/lib/types";
+import { WorkUnitDetailModal } from "@/components/WorkUnitDetailModal";
 
 type PriorityLevel = "HIGH" | "MEDIUM" | "LOW";
 
@@ -65,6 +66,7 @@ export function WorkUnitCard({
     description: workUnit.description,
   });
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   // The card div (view mode) and the title input (edit mode) are two
   // different DOM nodes that never exist at the same time, since the
@@ -149,10 +151,14 @@ export function WorkUnitCard({
     }
   };
 
+  const handleDetailUpdated = () => {
+    onUpdate?.(workUnit.id, {});
+  };
+
   const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      setIsEditing(true);
+      setIsDetailOpen(true);
     } else if (e.key === "Delete") {
       e.preventDefault();
       handleDelete();
@@ -165,8 +171,27 @@ export function WorkUnitCard({
     }
   };
 
+  // WorkUnitDetailModal is rendered as a sibling of the card (not a
+  // descendant) below, outside both the edit-mode and view-mode branches.
+  // Nesting it inside the clickable/keydown-handling card div would let its
+  // overlay clicks and internal keydowns (e.g. Enter/Delete inside its
+  // textareas) bubble back up into the card's own onClick/onKeyDown
+  // handlers, and its `fixed` overlay would be positioned relative to the
+  // card once `hover:-translate-y-0.5` makes the card a containing block.
+  const detailModal = (
+    <WorkUnitDetailModal
+      workUnit={workUnit}
+      storyKey={storyKey}
+      storyUrl={storyUrl}
+      isOpen={isDetailOpen}
+      onClose={() => setIsDetailOpen(false)}
+      onUpdated={handleDetailUpdated}
+    />
+  );
+
   if (isEditing) {
     return (
+      <>
       <div
         role="article"
         aria-label={cardAriaLabel}
@@ -212,16 +237,20 @@ export function WorkUnitCard({
           </button>
         </div>
       </div>
+      {detailModal}
+      </>
     );
   }
 
   return (
+    <>
     <div
       ref={cardRef}
       role="article"
       aria-label={cardAriaLabel}
-      className={`p-3 bg-ponder-light-surface border border-ponder-light-card-border rounded-xl shadow-ponder-card hover:shadow-ponder-card-hover hover:-translate-y-0.5 transition-all ${focusRing}`}
+      className={`p-3 bg-ponder-light-surface border border-ponder-light-card-border rounded-xl shadow-ponder-card hover:shadow-ponder-card-hover hover:-translate-y-0.5 transition-all cursor-pointer ${focusRing}`}
       tabIndex={0}
+      onClick={() => setIsDetailOpen(true)}
       onKeyDown={handleCardKeyDown}
       data-testid={`work-unit-card-${workUnit.id}`}
     >
@@ -280,7 +309,10 @@ export function WorkUnitCard({
 
       <div className="flex gap-2">
         <button
-          onClick={() => setIsEditing(true)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsEditing(true);
+          }}
           aria-label={`Edit work unit: ${workUnit.title}`}
           className={`px-2 py-1.5 text-xs font-instrument font-semibold bg-ponder-light-purple text-white hover:bg-ponder-light-purple-dark rounded-lg transition-colors ${focusRing}`}
           data-testid={`edit-button-${workUnit.id}`}
@@ -288,7 +320,10 @@ export function WorkUnitCard({
           Edit
         </button>
         <button
-          onClick={handleDelete}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDelete();
+          }}
           aria-label={`${isDeleting ? "Confirm delete" : "Delete"} work unit: ${
             workUnit.title
           }`}
@@ -303,7 +338,10 @@ export function WorkUnitCard({
         </button>
         {isDeleting && (
           <button
-            onClick={() => setIsDeleting(false)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsDeleting(false);
+            }}
             aria-label={`Cancel delete of ${workUnit.title}`}
             className={`px-2 py-1.5 text-xs font-instrument font-semibold bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors ${focusRing}`}
             data-testid={`cancel-delete-button-${workUnit.id}`}
@@ -313,5 +351,7 @@ export function WorkUnitCard({
         )}
       </div>
     </div>
+    {detailModal}
+    </>
   );
 }

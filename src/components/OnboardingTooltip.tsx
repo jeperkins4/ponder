@@ -94,8 +94,8 @@ export function OnboardingTooltip({ isOpen, onDismiss }: OnboardingTooltipProps)
           </li>
           <li>• Drag tasks between columns to track progress</li>
           <li>
-            • Use keyboard: Enter to edit, Delete key to remove, arrow keys to
-            move between columns
+            • Use keyboard: Enter to open a task&apos;s details, Delete key to
+            remove, arrow keys to move between columns
           </li>
         </ul>
         <button

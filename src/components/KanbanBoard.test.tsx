@@ -499,9 +499,10 @@ describe("KanbanBoard", () => {
         expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
       });
 
-      // Enter edit mode on wu-1 via keyboard, focus should land on its title input.
-      const card = screen.getByTestId("work-unit-card-wu-1");
-      fireEvent.keyDown(card, { key: "Enter" });
+      // Enter edit mode on wu-1 via the Edit button, focus should land on its
+      // title input. (Enter on the card itself now opens the detail modal.)
+      const editButton = screen.getByTestId("edit-button-wu-1");
+      fireEvent.click(editButton);
 
       const titleInput = screen.getByTestId("edit-title-input");
       expect(document.activeElement).toBe(titleInput);
