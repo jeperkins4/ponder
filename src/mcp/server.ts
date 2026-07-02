@@ -24,6 +24,7 @@ import {
   listWorkUnits,
   markDone,
   moveWorkUnit,
+  regenerateAcceptance,
   updateWorkUnit,
 } from "./tools";
 
@@ -106,6 +107,22 @@ export function createServer(client: PonderClient): McpServer {
     },
     async ({ workUnitId, title, description }) =>
       updateWorkUnit(client, { workUnitId, title, description })
+  );
+
+  server.registerTool(
+    "regenerate_acceptance",
+    {
+      description:
+        "(Re)generate a work unit's acceptance criteria and verification with Claude. " +
+        "Pass codebaseContext (a located slice of the repo's Understand-Anything " +
+        "knowledge-graph.json) to ground the output in real files, layers, and tests.",
+      inputSchema: {
+        workUnitId: z.string(),
+        codebaseContext: z.string().optional(),
+      },
+    },
+    async ({ workUnitId, codebaseContext }) =>
+      regenerateAcceptance(client, { workUnitId, codebaseContext })
   );
 
   return server;

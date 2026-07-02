@@ -186,3 +186,19 @@ export async function updateWorkUnit(
     );
   }
 }
+
+/** Regenerate a work unit's AC/verification, optionally grounded in a graph slice. */
+export async function regenerateAcceptance(
+  client: PonderClient,
+  args: { workUnitId: string; codebaseContext?: string }
+): Promise<McpTextResult> {
+  const { acceptanceCriteria, verification } = await client.regenerateAcceptance(
+    args.workUnitId,
+    args.codebaseContext
+  );
+  return textResult(
+    `Regenerated work unit ${args.workUnitId}.\n\n` +
+      `Acceptance Criteria:\n${acceptanceCriteria}\n\n` +
+      `Verification:\n${verification}`
+  );
+}

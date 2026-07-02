@@ -51,6 +51,17 @@ export class PonderClient {
     );
   }
 
+  async regenerateAcceptance(
+    id: string,
+    codebaseContext?: string
+  ): Promise<{ acceptanceCriteria: string; verification: string }> {
+    return this.request<{ acceptanceCriteria: string; verification: string }>(
+      "POST",
+      `/api/work-units/${encodeURIComponent(id)}/generate-acceptance-criteria`,
+      codebaseContext !== undefined ? { codebaseContext } : {}
+    );
+  }
+
   private async request<T>(
     method: string,
     path: string,

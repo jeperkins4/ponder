@@ -5,6 +5,7 @@ import {
   listWorkUnits,
   markDone,
   moveWorkUnit,
+  regenerateAcceptance,
   updateWorkUnit,
 } from "./tools";
 import type { PonderClient } from "./client";
@@ -343,5 +344,24 @@ describe("updateWorkUnit", () => {
 
     expect(text).toMatch(/error/i);
     expect(text).toContain("500");
+  });
+});
+
+describe("regenerateAcceptance", () => {
+  it("regenerateAcceptance returns a text summary of the new AC/verification", async () => {
+    const fakeClient = {
+      regenerateAcceptance: async (id: string, ctx?: string) => {
+        expect(id).toBe("wu1");
+        expect(ctx).toBe('{"domain":"Projects"}');
+        return { acceptanceCriteria: "- a", verification: "run t" };
+      },
+    } as unknown as PonderClient;
+
+    const result = await regenerateAcceptance(fakeClient, {
+      workUnitId: "wu1",
+      codebaseContext: '{"domain":"Projects"}',
+    });
+    expect(result.content[0].text).toContain("Acceptance Criteria");
+    expect(result.content[0].text).toContain("run t");
   });
 });
