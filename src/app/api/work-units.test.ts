@@ -145,6 +145,43 @@ describe("Work Unit API Endpoints", () => {
     expect(body.order).toBe(0); // Should remain unchanged
   });
 
+  it("PATCH should update acceptanceCriteria and verification", async () => {
+    const workUnit = await prisma.workUnit.create({
+      data: {
+        storyId,
+        title: "Needs AC/verification",
+        description: null,
+        column: "todo",
+        order: 0,
+      },
+    });
+    workUnitId = workUnit.id;
+
+    const req = new Request("http://localhost/api/work-units/test-id", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        acceptanceCriteria: "Given/when/then criteria",
+        verification: "Run the integration suite",
+      }),
+    });
+
+    const res = await PATCH(req as never, {
+      params: Promise.resolve({ id: workUnitId }),
+    });
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.id).toBe(workUnitId);
+    expect(body.acceptanceCriteria).toBe("Given/when/then criteria");
+    expect(body.verification).toBe("Run the integration suite");
+    expect(body.title).toBe("Needs AC/verification"); // Should remain unchanged
+
+    const persisted = await prisma.workUnit.findUnique({ where: { id: workUnitId } });
+    expect(persisted?.acceptanceCriteria).toBe("Given/when/then criteria");
+    expect(persisted?.verification).toBe("Run the integration suite");
+  });
+
   it("PATCH should return 404 for non-existent work unit", async () => {
     const req = new Request("http://localhost/api/work-units/non-existent", {
       method: "PATCH",

@@ -22,8 +22,11 @@ const mockStories: StoryDTO[] = [
         storyId: "story-1",
         title: "Work unit 1",
         description: "Work unit description",
+        acceptanceCriteria: null,
+        verification: null,
         column: "todo",
         order: 1,
+        subNumber: 1,
         createdAt: "2024-01-01T00:00:00Z",
         completedAt: null,
       },
@@ -32,8 +35,11 @@ const mockStories: StoryDTO[] = [
         storyId: "story-1",
         title: "Work unit 2",
         description: null,
+        acceptanceCriteria: null,
+        verification: null,
         column: "in_progress",
         order: 2,
+        subNumber: 2,
         createdAt: "2024-01-01T00:00:00Z",
         completedAt: null,
       },
@@ -42,8 +48,11 @@ const mockStories: StoryDTO[] = [
         storyId: "story-1",
         title: "Work unit 4",
         description: null,
+        acceptanceCriteria: null,
+        verification: null,
         column: "code_review",
         order: 3,
+        subNumber: 3,
         createdAt: "2024-01-01T00:00:00Z",
         completedAt: null,
       },
@@ -66,8 +75,11 @@ const mockStories: StoryDTO[] = [
         storyId: "story-2",
         title: "Work unit 3",
         description: null,
+        acceptanceCriteria: null,
+        verification: null,
         column: "done",
         order: 1,
+        subNumber: null,
         createdAt: "2024-01-02T00:00:00Z",
         completedAt: "2024-01-02T10:00:00Z",
       },
@@ -153,8 +165,10 @@ describe("KanbanBoard", () => {
   it("numbers sub-stories of a decomposed story sequentially and stably", async () => {
     render(<KanbanBoard />);
     await waitFor(() => {
-      // story-1's three work units (wu-1, wu-2, wu-4) get PROJ-1-1/-2/-3 by
-      // creation order (id tiebreak, since the mock createdAt values match).
+      // story-1's three work units (wu-1, wu-2, wu-4) render PROJ-1-1/-2/-3
+      // straight from each work unit's stored, stable `subNumber` field —
+      // not recomputed at render time, so the number survives a sibling
+      // being deleted.
       expect(screen.getByTestId("work-unit-story-key-wu-1")).toHaveTextContent(
         "PROJ-1-1"
       );
@@ -249,8 +263,11 @@ describe("KanbanBoard", () => {
             storyId: "story-1",
             title: "Work unit 1",
             description: "Work unit description",
+            acceptanceCriteria: null,
+            verification: null,
             column: "done", // All work units are in Done column
             order: 1,
+            subNumber: null,
             createdAt: "2024-01-01T00:00:00Z",
             completedAt: null,
           },
@@ -482,9 +499,10 @@ describe("KanbanBoard", () => {
         expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
       });
 
-      // Enter edit mode on wu-1 via keyboard, focus should land on its title input.
-      const card = screen.getByTestId("work-unit-card-wu-1");
-      fireEvent.keyDown(card, { key: "Enter" });
+      // Enter edit mode on wu-1 via the Edit button, focus should land on its
+      // title input. (Enter on the card itself now opens the detail modal.)
+      const editButton = screen.getByTestId("edit-button-wu-1");
+      fireEvent.click(editButton);
 
       const titleInput = screen.getByTestId("edit-title-input");
       expect(document.activeElement).toBe(titleInput);

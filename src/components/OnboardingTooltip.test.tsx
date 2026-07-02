@@ -108,7 +108,7 @@ describe("OnboardingTooltip", () => {
       screen.getByText(/Drag tasks between columns to track progress/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Enter to edit, Delete key to remove/i)
+      screen.getByText(/Enter to open a task's details, Delete key to remove/i)
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Got it/i })

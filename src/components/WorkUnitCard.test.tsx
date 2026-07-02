@@ -8,8 +8,11 @@ const mockWorkUnit: WorkUnitDTO = {
   storyId: "story-123",
   title: "Test Work Unit",
   description: "This is a test description",
+  acceptanceCriteria: null,
+  verification: null,
   column: "todo",
   order: 0,
+  subNumber: null,
   createdAt: "2026-01-01T00:00:00Z",
   completedAt: null,
 };
@@ -344,13 +347,23 @@ describe("WorkUnitCard", () => {
   });
 
   describe("Keyboard navigation", () => {
-    it("activates edit mode when Enter is pressed on the card", () => {
+    it("opens the detail modal when Enter is pressed on the card", async () => {
+      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        json: async () => [],
+      } as Response);
+
       render(<WorkUnitCard workUnit={mockWorkUnit} />);
 
       const card = screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`);
       fireEvent.keyDown(card, { key: "Enter" });
 
-      expect(screen.getByTestId("edit-title-input")).toBeInTheDocument();
+      expect(screen.getByTestId("work-unit-detail-dialog")).toBeInTheDocument();
+      expect(screen.queryByTestId("edit-title-input")).not.toBeInTheDocument();
+
+      await screen.findByTestId("work-unit-detail-notes-empty");
+
+      fetchSpy.mockRestore();
     });
 
     it("shows delete confirmation when Delete is pressed on the card", () => {
@@ -626,6 +639,123 @@ describe("WorkUnitCard", () => {
           "Deleted work unit: Test Work Unit"
         );
       });
+    });
+  });
+
+  describe("Detail modal", () => {
+    it("opens the detail modal when the card body is clicked", async () => {
+      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        json: async () => [],
+      } as Response);
+
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      fireEvent.click(screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`));
+
+      expect(screen.getByTestId("work-unit-detail-dialog")).toBeInTheDocument();
+
+      await screen.findByTestId("work-unit-detail-notes-empty");
+
+      fetchSpy.mockRestore();
+    });
+
+    it("closes the detail modal when the overlay is clicked (does not re-open via the card's own onClick)", async () => {
+      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        json: async () => [],
+      } as Response);
+
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      fireEvent.click(screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`));
+      await screen.findByTestId("work-unit-detail-notes-empty");
+
+      fireEvent.click(screen.getByTestId("work-unit-detail-overlay"));
+
+      expect(screen.queryByTestId("work-unit-detail-dialog")).not.toBeInTheDocument();
+
+      fetchSpy.mockRestore();
+    });
+
+    it("does not open the detail modal when the Edit button is clicked", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      fireEvent.click(screen.getByTestId(`edit-button-${mockWorkUnit.id}`));
+
+      expect(screen.getByTestId("edit-title-input")).toBeInTheDocument();
+      expect(screen.queryByTestId("work-unit-detail-dialog")).not.toBeInTheDocument();
+    });
+
+    it("does not open the detail modal when the Delete button is clicked", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      fireEvent.click(screen.getByTestId(`delete-button-${mockWorkUnit.id}`));
+
+      expect(screen.queryByTestId("work-unit-detail-dialog")).not.toBeInTheDocument();
+    });
+
+    it("does not open the detail modal when the JIRA key link is clicked", () => {
+      render(
+        <WorkUnitCard
+          workUnit={mockWorkUnit}
+          storyKey="COM-540"
+          storyUrl="https://acme.atlassian.net/browse/COM-540"
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(`work-unit-story-key-${mockWorkUnit.id}`));
+
+      expect(screen.queryByTestId("work-unit-detail-dialog")).not.toBeInTheDocument();
+    });
+
+    it("closes the detail modal on Escape and returns focus to the card", async () => {
+      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        json: async () => [],
+      } as Response);
+
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      fireEvent.click(screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`));
+      expect(screen.getByTestId("work-unit-detail-dialog")).toBeInTheDocument();
+      await screen.findByTestId("work-unit-detail-notes-empty");
+
+      fireEvent.keyDown(document, { key: "Escape" });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("work-unit-detail-dialog")).not.toBeInTheDocument();
+      });
+
+      fetchSpy.mockRestore();
+    });
+
+    it("passes storyKey and storyUrl through to the detail modal header", async () => {
+      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        json: async () => [],
+      } as Response);
+
+      render(
+        <WorkUnitCard
+          workUnit={mockWorkUnit}
+          storyKey="COM-540"
+          storyUrl="https://acme.atlassian.net/browse/COM-540"
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`));
+
+      const link = screen.getByTestId("work-unit-detail-story-key");
+      expect(link).toHaveTextContent("COM-540");
+      expect(link).toHaveAttribute(
+        "href",
+        "https://acme.atlassian.net/browse/COM-540"
+      );
+
+      await screen.findByTestId("work-unit-detail-notes-empty");
+
+      fetchSpy.mockRestore();
     });
   });
 });

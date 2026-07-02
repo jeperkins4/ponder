@@ -10,9 +10,6 @@ import { prisma } from "@/lib/prisma";
 import { POST } from "./route";
 import * as breakdown from "@/lib/anthropic/breakdown";
 
-// Only `breakDownStory` talks to the network; keep `formatSubtaskDescription`
-// real so the "descriptions from formatSubtaskDescription" assertions guard
-// the actual formatter rather than a hand-copied stand-in.
 vi.mock("@/lib/anthropic/breakdown", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/anthropic/breakdown")>();
   return { ...actual, breakDownStory: vi.fn() };
@@ -37,7 +34,7 @@ describe("POST /api/projects/[projectId]/import/process", () => {
     expect(data.error).toContain("not found");
   });
 
-  it("breakDown:true creates N work units in the mapped column with formatted descriptions, and upserts the Story", async () => {
+  it("breakDown:true creates N work units in the mapped column with structured AC/verification, and upserts the Story", async () => {
     const project = await prisma.project.create({
       data: {
         name: "Process Route Team",
@@ -108,9 +105,74 @@ describe("POST /api/projects/[projectId]/import/process", () => {
       expect(workUnits.map((w) => w.title)).toEqual(["Subtask A", "Subtask B", "Subtask C"]);
       expect(workUnits.every((w) => w.column === "code_review")).toBe(true);
       expect(workUnits.map((w) => w.order)).toEqual([0, 1, 2]);
-      expect(workUnits[0].description).toBe(
-        "Subtask A\n\nAcceptance Criteria:\nA done\n\nVerification:\nRun test A"
+      // Sub-story numbers are assigned 1..N in draft order — stable and
+      // Ponder-local (never sent to JIRA).
+      expect(workUnits.map((w) => w.subNumber)).toEqual([1, 2, 3]);
+      expect(workUnits[0].description).toBeNull();
+      expect(workUnits[0].acceptanceCriteria).toBe("A done");
+      expect(workUnits[0].verification).toBe("Run test A");
+      expect(workUnits[1].acceptanceCriteria).toBe("B done");
+      expect(workUnits[1].verification).toBe("Run test B");
+      expect(workUnits[2].acceptanceCriteria).toBe("C done");
+      expect(workUnits[2].verification).toBe("Run test C");
+    } finally {
+      await prisma.workUnit.deleteMany({ where: { story: { jiraKey } } });
+      await prisma.story.deleteMany({ where: { jiraKey } });
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("breakDown:true with exactly one draft still gets a NULL subNumber (not a real decomposition)", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Process Route Single Draft",
+        type: "JIRA",
+        jiraProjectKey: "PROCS",
+        jiraSiteUrl: "https://example.atlassian.net/",
+        jiraEmail: "process-route-single@example.com",
+        jiraApiToken: "process-route-single-token",
+      },
+    });
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const jiraKey = `PROCS-${suffix}-1`;
+
+    vi.mocked(breakdown.breakDownStory).mockResolvedValueOnce([
+      { title: "Only subtask", acceptanceCriteria: "Done", verification: "Run test" },
+    ]);
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/process`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            items: [
+              {
+                jiraKey,
+                jiraId: jiraKey,
+                summary: "Story that breaks down into just one unit",
+                description: null,
+                jiraStatus: "To Do",
+                breakDown: true,
+              },
+            ],
+          }),
+        }
       );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+
+      const story = await prisma.story.findUnique({ where: { jiraKey } });
+      const workUnits = await prisma.workUnit.findMany({ where: { storyId: story!.id } });
+      expect(workUnits).toHaveLength(1);
+      // A single-draft "breakdown" is indistinguishable from a non-decomposed
+      // story, so it stays NULL — consistent with the backfill's cnt > 1 rule
+      // and with the single/fallback paths below.
+      expect(workUnits[0].subNumber).toBeNull();
     } finally {
       await prisma.workUnit.deleteMany({ where: { story: { jiraKey } } });
       await prisma.story.deleteMany({ where: { jiraKey } });
@@ -169,6 +231,10 @@ describe("POST /api/projects/[projectId]/import/process", () => {
       expect(workUnits[0].title).toBe("Simple story");
       expect(workUnits[0].column).toBe("todo");
       expect(workUnits[0].order).toBe(0);
+      expect(workUnits[0].acceptanceCriteria).toBeNull();
+      expect(workUnits[0].verification).toBeNull();
+      // Not a decomposition — stays NULL so the card renders the bare key.
+      expect(workUnits[0].subNumber).toBeNull();
     } finally {
       await prisma.workUnit.deleteMany({ where: { story: { jiraKey } } });
       await prisma.story.deleteMany({ where: { jiraKey } });
@@ -290,6 +356,10 @@ describe("POST /api/projects/[projectId]/import/process", () => {
       const workUnits = await prisma.workUnit.findMany({ where: { storyId: story!.id } });
       expect(workUnits).toHaveLength(1);
       expect(workUnits[0].title).toBe("Story with failing breakdown");
+      expect(workUnits[0].acceptanceCriteria).toBeNull();
+      expect(workUnits[0].verification).toBeNull();
+      // Failed breakdown falls back to a single card, same as breakDown:false.
+      expect(workUnits[0].subNumber).toBeNull();
     } finally {
       await prisma.workUnit.deleteMany({ where: { story: { jiraKey } } });
       await prisma.story.deleteMany({ where: { jiraKey } });
