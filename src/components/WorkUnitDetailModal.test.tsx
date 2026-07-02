@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { WorkUnitDetailModal } from "./WorkUnitDetailModal";
-import { WorkUnitDTO, WorkNoteDTO } from "@/lib/types";
+import { WorkUnitDTO, WorkNoteDTO, AttachmentDTO } from "@/lib/types";
 
 const baseWorkUnit: WorkUnitDTO = {
   id: "wu-1",
@@ -24,6 +24,11 @@ function mockFetch({
   patchOk = true,
   postNoteResponse,
   postNoteOk = true,
+  attachments = [] as AttachmentDTO[],
+  attachmentsOk = true,
+  uploadResponse,
+  uploadOk = true,
+  deleteOk = true,
 }: {
   notes?: WorkNoteDTO[];
   notesOk?: boolean;
@@ -31,6 +36,11 @@ function mockFetch({
   patchOk?: boolean;
   postNoteResponse?: unknown;
   postNoteOk?: boolean;
+  attachments?: AttachmentDTO[];
+  attachmentsOk?: boolean;
+  uploadResponse?: unknown;
+  uploadOk?: boolean;
+  deleteOk?: boolean;
 } = {}) {
   return vi.fn((url: string, init?: RequestInit) => {
     if (url.endsWith("/notes") && (!init || init.method === undefined)) {
@@ -45,6 +55,28 @@ function mockFetch({
         status: postNoteOk ? 201 : 400,
         json: () =>
           Promise.resolve(postNoteOk ? postNoteResponse : { error: "Failed to add note" }),
+      } as Response);
+    }
+    if (url.endsWith("/attachments") && (!init || init.method === undefined)) {
+      return Promise.resolve({
+        ok: attachmentsOk,
+        json: () =>
+          Promise.resolve(attachmentsOk ? attachments : { error: "Failed to load screenshots" }),
+      } as Response);
+    }
+    if (url.endsWith("/attachments") && init?.method === "POST") {
+      return Promise.resolve({
+        ok: uploadOk,
+        status: uploadOk ? 201 : 400,
+        json: () =>
+          Promise.resolve(uploadOk ? uploadResponse : { error: "Failed to upload screenshot" }),
+      } as Response);
+    }
+    if (url.startsWith("/api/attachments/") && init?.method === "DELETE") {
+      return Promise.resolve({
+        ok: deleteOk,
+        json: () =>
+          Promise.resolve(deleteOk ? { ok: true } : { error: "Failed to delete screenshot" }),
       } as Response);
     }
     if (init?.method === "PATCH") {
@@ -277,7 +309,7 @@ describe("WorkUnitDetailModal", () => {
     expect(addButton).toBeDisabled();
     fireEvent.click(addButton);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1); // only the initial GET
+    expect(fetchMock).toHaveBeenCalledTimes(2); // only the initial notes + attachments GETs
   });
 
   it("shows an inline error when posting a note fails", async () => {
@@ -450,6 +482,234 @@ describe("WorkUnitDetailModal", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("work-unit-detail-notes-empty")).toBeInTheDocument();
+    });
+  });
+
+  describe("screenshots", () => {
+    it("fetches and renders existing attachments as thumbnails on open", async () => {
+      const attachments: AttachmentDTO[] = [
+        {
+          id: "a1",
+          workUnitId: "wu-1",
+          filename: "shot.png",
+          mimeType: "image/png",
+          size: 1234,
+          createdAt: "2026-01-01T00:00:00Z",
+          url: "/api/attachments/a1",
+        },
+      ];
+      global.fetch = mockFetch({ attachments }) as unknown as typeof fetch;
+
+      render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
+
+      const img = await screen.findByAltText("shot.png");
+      expect(img).toHaveAttribute("src", "/api/attachments/a1");
+    });
+
+    it("shows an empty state when there are no screenshots", async () => {
+      global.fetch = mockFetch({ attachments: [] }) as unknown as typeof fetch;
+
+      render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-detail-attachments-empty")).toHaveTextContent(
+          "No screenshots yet"
+        );
+      });
+    });
+
+    it("uploads a file selected via the file picker and shows the new thumbnail", async () => {
+      const created: AttachmentDTO = {
+        id: "a2",
+        workUnitId: "wu-1",
+        filename: "picked.png",
+        mimeType: "image/png",
+        size: 42,
+        createdAt: "2026-01-02T00:00:00Z",
+        url: "/api/attachments/a2",
+      };
+      const fetchMock = mockFetch({ attachments: [], uploadResponse: created });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-detail-attachments-empty")).toBeInTheDocument();
+      });
+
+      const file = new File(["binary"], "picked.png", { type: "image/png" });
+      const input = screen.getByTestId("work-unit-detail-attachment-input");
+      fireEvent.change(input, { target: { files: [file] } });
+
+      await waitFor(() => {
+        expect(screen.getByAltText("picked.png")).toBeInTheDocument();
+      });
+
+      const uploadCall = fetchMock.mock.calls.find(
+        ([url, init]) =>
+          typeof url === "string" && url.endsWith("/attachments") && init?.method === "POST"
+      );
+      expect(uploadCall).toBeDefined();
+      expect(uploadCall![0]).toBe(`/api/work-units/${baseWorkUnit.id}/attachments`);
+      const formData = uploadCall![1]?.body as FormData;
+      expect(formData.get("file")).toBe(file);
+    });
+
+    it("uploads an image pasted from the clipboard", async () => {
+      const created: AttachmentDTO = {
+        id: "a3",
+        workUnitId: "wu-1",
+        filename: "clipboard.png",
+        mimeType: "image/png",
+        size: 42,
+        createdAt: "2026-01-03T00:00:00Z",
+        url: "/api/attachments/a3",
+      };
+      const fetchMock = mockFetch({ attachments: [], uploadResponse: created });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-detail-attachments-empty")).toBeInTheDocument();
+      });
+
+      const file = new File(["binary"], "clipboard.png", { type: "image/png" });
+      const clipboardData = {
+        items: [{ kind: "file", type: "image/png", getAsFile: () => file }],
+      };
+      fireEvent.paste(screen.getByTestId("work-unit-detail-dialog"), { clipboardData });
+
+      await waitFor(() => {
+        expect(screen.getByAltText("clipboard.png")).toBeInTheDocument();
+      });
+
+      const uploadCall = fetchMock.mock.calls.find(
+        ([url, init]) =>
+          typeof url === "string" && url.endsWith("/attachments") && init?.method === "POST"
+      );
+      expect(uploadCall).toBeDefined();
+    });
+
+    it("does not upload when pasted clipboard data has no image items", async () => {
+      const fetchMock = mockFetch({ attachments: [] });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-detail-attachments-empty")).toBeInTheDocument();
+      });
+      const callCountBefore = fetchMock.mock.calls.length;
+
+      const clipboardData = {
+        items: [{ kind: "string", type: "text/plain", getAsFile: () => null }],
+      };
+      fireEvent.paste(screen.getByTestId("work-unit-detail-dialog"), { clipboardData });
+
+      // No new fetch calls beyond the initial GETs.
+      expect(fetchMock.mock.calls.length).toBe(callCountBefore);
+    });
+
+    it("does not upload when a non-image file is selected via the file picker", async () => {
+      const fetchMock = mockFetch({ attachments: [] });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-detail-attachments-empty")).toBeInTheDocument();
+      });
+      const callCountBefore = fetchMock.mock.calls.length;
+
+      const file = new File(["text"], "notes.txt", { type: "text/plain" });
+      const input = screen.getByTestId("work-unit-detail-attachment-input");
+      fireEvent.change(input, { target: { files: [file] } });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-detail-attachments-upload-error")).toBeInTheDocument();
+      });
+      expect(fetchMock.mock.calls.length).toBe(callCountBefore);
+    });
+
+    it("does not upload when a non-image file is dropped", async () => {
+      const fetchMock = mockFetch({ attachments: [] });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-detail-attachments-empty")).toBeInTheDocument();
+      });
+      const callCountBefore = fetchMock.mock.calls.length;
+
+      const file = new File(["text"], "notes.txt", { type: "text/plain" });
+      const dropzone = screen.getByTestId("work-unit-detail-attachments-dropzone");
+      fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-detail-attachments-upload-error")).toBeInTheDocument();
+      });
+      expect(fetchMock.mock.calls.length).toBe(callCountBefore);
+    });
+
+    it("uploads a dropped image file", async () => {
+      const created: AttachmentDTO = {
+        id: "a4",
+        workUnitId: "wu-1",
+        filename: "dropped.png",
+        mimeType: "image/png",
+        size: 42,
+        createdAt: "2026-01-04T00:00:00Z",
+        url: "/api/attachments/a4",
+      };
+      const fetchMock = mockFetch({ attachments: [], uploadResponse: created });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-detail-attachments-empty")).toBeInTheDocument();
+      });
+
+      const file = new File(["binary"], "dropped.png", { type: "image/png" });
+      const dropzone = screen.getByTestId("work-unit-detail-attachments-dropzone");
+      fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
+
+      await waitFor(() => {
+        expect(screen.getByAltText("dropped.png")).toBeInTheDocument();
+      });
+    });
+
+    it("deletes an attachment and removes its thumbnail", async () => {
+      const attachments: AttachmentDTO[] = [
+        {
+          id: "a5",
+          workUnitId: "wu-1",
+          filename: "removeme.png",
+          mimeType: "image/png",
+          size: 42,
+          createdAt: "2026-01-05T00:00:00Z",
+          url: "/api/attachments/a5",
+        },
+      ];
+      const fetchMock = mockFetch({ attachments });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
+
+      await screen.findByAltText("removeme.png");
+
+      fireEvent.click(screen.getByTestId("work-unit-detail-attachment-delete-a5"));
+
+      await waitFor(() => {
+        expect(screen.queryByAltText("removeme.png")).not.toBeInTheDocument();
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/attachments/a5",
+        expect.objectContaining({ method: "DELETE" })
+      );
     });
   });
 });
