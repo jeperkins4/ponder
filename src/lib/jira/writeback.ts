@@ -70,6 +70,52 @@ export async function transitionIssue(
   }
 }
 
+/** A file to upload as a JIRA attachment. */
+export type AttachmentFile = {
+  buffer: Buffer | ArrayBuffer;
+  filename: string;
+  mimeType: string;
+};
+
+/**
+ * Uploads a file as an attachment on an issue.
+ * POST `${siteUrl}/rest/api/3/issue/${issueKey}/attachments` with a
+ * multipart/form-data body containing a single `file` field. Requires the
+ * `X-Atlassian-Token: no-check` header (JIRA rejects attachment uploads
+ * without it). The `Content-Type` header is intentionally left unset so
+ * `fetch` can generate the multipart boundary itself.
+ * @throws Error if the request fails
+ */
+export async function uploadAttachment(
+  issueKey: string,
+  file: AttachmentFile,
+  config: JiraConfig
+): Promise<void> {
+  const url = new URL(config.siteUrl);
+  url.pathname = `/rest/api/3/issue/${issueKey}/attachments`;
+
+  const bytes: Uint8Array = Buffer.isBuffer(file.buffer)
+    ? new Uint8Array(file.buffer.buffer, file.buffer.byteOffset, file.buffer.byteLength)
+    : new Uint8Array(file.buffer);
+
+  const form = new FormData();
+  form.append("file", new File([bytes as BlobPart], file.filename, { type: file.mimeType }));
+
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers: {
+      Authorization: basicAuthHeader(config),
+      Accept: "application/json",
+      "X-Atlassian-Token": "no-check",
+    },
+    body: form,
+  });
+
+  if (!response.ok) {
+    throw new Error(`JIRA API error: ${response.status}`);
+  }
+}
+
 /**
  * Adds a comment to an issue.
  * POST `${siteUrl}/rest/api/3/issue/${issueKey}/comment` with body

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getTransitions, transitionIssue, addComment } from "./writeback";
+import { getTransitions, transitionIssue, addComment, uploadAttachment } from "./writeback";
 import type { JiraConfig } from "./client";
 
 describe("JIRA write-back client", () => {
@@ -105,6 +105,63 @@ describe("JIRA write-back client", () => {
       await expect(
         addComment("TEAM-1", "text", mockConfig)
       ).rejects.toThrow("JIRA API error: 500");
+    });
+  });
+
+  describe("uploadAttachment", () => {
+    const file = {
+      buffer: Buffer.from("fake image bytes"),
+      filename: "screenshot.png",
+      mimeType: "image/png",
+    };
+
+    it("POSTs a multipart form with the file to the attachments endpoint", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await uploadAttachment("TEAM-1", file, mockConfig);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toBe(
+        "https://example.atlassian.net/rest/api/3/issue/TEAM-1/attachments"
+      );
+      expect(options.method).toBe("POST");
+
+      const headers = options.headers as Record<string, string>;
+      expect(headers["X-Atlassian-Token"]).toBe("no-check");
+      expect(headers.Authorization).toMatch(/^Basic /);
+      expect(headers["Content-Type"]).toBeUndefined();
+
+      expect(options.body).toBeInstanceOf(FormData);
+      const uploaded = (options.body as FormData).get("file") as File;
+      expect(uploaded).toBeTruthy();
+      expect(uploaded.name).toBe("screenshot.png");
+      expect(uploaded.type).toBe("image/png");
+    });
+
+    it("accepts an ArrayBuffer as well as a Buffer", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const arrayBuffer = new Uint8Array([1, 2, 3]).buffer;
+      await uploadAttachment(
+        "TEAM-1",
+        { buffer: arrayBuffer, filename: "a.png", mimeType: "image/png" },
+        mockConfig
+      );
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("throws on non-2xx response", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: false, status: 413 })
+      );
+
+      await expect(uploadAttachment("TEAM-1", file, mockConfig)).rejects.toThrow(
+        "JIRA API error: 413"
+      );
     });
   });
 });
