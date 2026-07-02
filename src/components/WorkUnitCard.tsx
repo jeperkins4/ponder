@@ -250,6 +250,11 @@ export function WorkUnitCard({
       aria-label={cardAriaLabel}
       className={`p-3 bg-ponder-light-surface border border-ponder-light-card-border rounded-xl shadow-ponder-card hover:shadow-ponder-card-hover hover:-translate-y-0.5 transition-all cursor-pointer ${focusRing}`}
       tabIndex={0}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", workUnit.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
       onClick={() => setIsDetailOpen(true)}
       onKeyDown={handleCardKeyDown}
       data-testid={`work-unit-card-${workUnit.id}`}

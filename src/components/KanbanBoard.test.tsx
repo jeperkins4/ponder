@@ -181,6 +181,45 @@ describe("KanbanBoard", () => {
     });
   });
 
+  it("moves a card to another column on drop via the move endpoint", async () => {
+    render(<KanbanBoard />);
+    await waitFor(() => {
+      expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
+    });
+
+    // wu-1 is in "todo"; drop it on the "done" column.
+    const doneZone = screen.getByTestId("column-dropzone-done");
+    fireEvent.drop(doneZone, { dataTransfer: { getData: () => "wu-1" } });
+
+    await waitFor(() => {
+      const moveCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+        (c) => String(c[0]).includes("/api/work-units/wu-1/move")
+      );
+      expect(moveCall).toBeTruthy();
+      expect(moveCall![1].method).toBe("POST");
+      expect(JSON.parse(moveCall![1].body)).toMatchObject({ column: "done" });
+    });
+  });
+
+  it("does not call the move endpoint when a card is dropped on its own column", async () => {
+    render(<KanbanBoard />);
+    await waitFor(() => {
+      expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
+    });
+
+    // wu-1 already lives in "todo" — dropping it there is a no-op.
+    const todoZone = screen.getByTestId("column-dropzone-todo");
+    fireEvent.drop(todoZone, { dataTransfer: { getData: () => "wu-1" } });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument()
+    );
+    const moveCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+      (c) => String(c[0]).includes("/move")
+    );
+    expect(moveCall).toBeUndefined();
+  });
+
   it("handles loading state", () => {
     // Create a fetch that never resolves
     global.fetch = vi.fn(
