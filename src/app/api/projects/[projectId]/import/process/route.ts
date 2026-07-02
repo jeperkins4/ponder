@@ -13,6 +13,10 @@ import { prisma } from "@/lib/prisma";
 import { extractProjectKey } from "@/lib/jira/client";
 import { jiraStatusToColumn } from "@/lib/columns";
 import { breakDownStory } from "@/lib/anthropic/breakdown";
+import {
+  parseWorkUnitDescription,
+  stripParentKeyFromTitle,
+} from "@/lib/workUnitDescription";
 
 export interface ImportProcessItem {
   jiraKey: string;
@@ -113,7 +117,7 @@ export async function POST(
               data: {
                 storyId: story.id,
                 projectId: project.id,
-                title: draft.title,
+                title: stripParentKeyFromTitle(draft.title, item.jiraKey),
                 description: null,
                 acceptanceCriteria: draft.acceptanceCriteria,
                 verification: draft.verification,
@@ -125,14 +129,15 @@ export async function POST(
             workUnitsCreated++;
           }
         } else {
+          const parsed = parseWorkUnitDescription(item.description);
           await prisma.workUnit.create({
             data: {
               storyId: story.id,
               projectId: project.id,
               title: item.summary,
-              description: item.description,
-              acceptanceCriteria: null,
-              verification: null,
+              description: parsed.description,
+              acceptanceCriteria: parsed.acceptanceCriteria,
+              verification: parsed.verification,
               column,
               order: 0,
               subNumber: null,
@@ -141,14 +146,15 @@ export async function POST(
           workUnitsCreated++;
         }
       } else {
+        const parsed = parseWorkUnitDescription(item.description);
         await prisma.workUnit.create({
           data: {
             storyId: story.id,
             projectId: project.id,
             title: item.summary,
-            description: item.description,
-            acceptanceCriteria: null,
-            verification: null,
+            description: parsed.description,
+            acceptanceCriteria: parsed.acceptanceCriteria,
+            verification: parsed.verification,
             column,
             order: 0,
             subNumber: null,

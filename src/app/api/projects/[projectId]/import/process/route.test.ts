@@ -242,6 +242,60 @@ describe("POST /api/projects/[projectId]/import/process", () => {
     }
   });
 
+  it("extracts embedded AC/Verification from a single-card description into structured fields", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Process Route Parse",
+        type: "JIRA",
+        jiraProjectKey: "PROCP",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "process-parse@example.com",
+        jiraApiToken: "process-parse-token",
+      },
+    });
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const jiraKey = `PROCP-${suffix}-1`;
+    const description = [
+      "Add a clock icon",
+      "",
+      "Acceptance Criteria:",
+      "Icon appears when a waitlist exists.",
+      "",
+      "Verification:",
+      "Add a team to a waitlist and confirm.",
+    ].join("\n");
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/process`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            items: [
+              { jiraKey, jiraId: jiraKey, summary: "Add a clock icon", description, jiraStatus: "To Do", breakDown: false },
+            ],
+          }),
+        }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+      expect(res.status).toBe(200);
+
+      const story = await prisma.story.findUnique({ where: { jiraKey } });
+      const workUnits = await prisma.workUnit.findMany({ where: { storyId: story!.id } });
+      expect(workUnits).toHaveLength(1);
+      expect(workUnits[0].acceptanceCriteria).toBe("Icon appears when a waitlist exists.");
+      expect(workUnits[0].verification).toBe("Add a team to a waitlist and confirm.");
+      // AC/Verification no longer duplicated in the description.
+      expect(workUnits[0].description).toBe("Add a clock icon");
+    } finally {
+      await prisma.workUnit.deleteMany({ where: { story: { jiraKey } } });
+      await prisma.story.deleteMany({ where: { jiraKey } });
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
   it("maps jiraStatus to the correct column for both breakdown paths", async () => {
     const project = await prisma.project.create({
       data: {
