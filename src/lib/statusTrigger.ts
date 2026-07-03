@@ -130,7 +130,10 @@ export async function applyStoryStatusSync(
   try {
     const story = (await prisma.story.findUnique({
       where: { id: storyId },
-      include: { workUnits: { include: { attachments: true } }, project: true },
+      include: {
+        workUnits: { where: { archivedAt: null }, include: { attachments: true } },
+        project: true,
+      },
     })) as StoryWithRelations | null;
 
     if (!story) {
@@ -249,6 +252,22 @@ export type TransitionStoryToQAResult =
   | { ok: false; error: string };
 
 /**
+ * Archives every one of a story's currently-active Done work units — sets
+ * `archivedAt` so they're excluded from the board and stats going forward,
+ * without deleting the row (retained for future reporting). Called only
+ * after `transitionStoryToQA` has already confirmed every one of the
+ * story's active work units is Done, so this intentionally does not
+ * re-check that condition itself.
+ */
+async function archiveDoneWorkUnits(storyId: string, prisma: PrismaClient): Promise<number> {
+  const result = await prisma.workUnit.updateMany({
+    where: { storyId, archivedAt: null, column: "done" },
+    data: { archivedAt: new Date() },
+  });
+  return result.count;
+}
+
+/**
  * Explicitly transitions a story's JIRA issue to "QA". Unlike
  * `applyStoryStatusSync` (an automatic, never-throwing side effect of an
  * unrelated board action), this is a primary, human-triggered action — every
@@ -266,7 +285,7 @@ export async function transitionStoryToQA(
 ): Promise<TransitionStoryToQAResult> {
   const story = (await prisma.story.findUnique({
     where: { id: storyId },
-    include: { workUnits: true, project: true },
+    include: { workUnits: { where: { archivedAt: null } }, project: true },
   })) as (Story & { workUnits: WorkUnit[]; project: Project | null }) | null;
 
   if (!story) {
@@ -310,6 +329,8 @@ export async function transitionStoryToQA(
       where: { id: storyId },
       data: { jiraStatus: "QA" },
     });
+
+    await archiveDoneWorkUnits(storyId, prisma);
 
     return { ok: true };
   } catch (err) {

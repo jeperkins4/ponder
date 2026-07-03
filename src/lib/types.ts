@@ -20,6 +20,7 @@ export interface WorkUnitDTO {
   subNumber: number | null; // stable 1-based decomposition suffix (e.g. COM-540-1); Ponder-local, never sent to JIRA
   createdAt: string; // ISO string
   completedAt: string | null; // ISO string
+  archivedAt: string | null; // ISO string
 }
 
 /** @public consumed starting in Task 2/3 (work-unit detail modal work notes) */

@@ -22,7 +22,7 @@ export async function GET(
       where: { id: projectId },
       include: {
         _count: {
-          select: { stories: true, workUnits: true },
+          select: { stories: true, workUnits: { where: { archivedAt: null } } },
         },
       },
     });
@@ -74,7 +74,7 @@ export async function PUT(
       },
       include: {
         _count: {
-          select: { stories: true, workUnits: true },
+          select: { stories: true, workUnits: { where: { archivedAt: null } } },
         },
       },
     });

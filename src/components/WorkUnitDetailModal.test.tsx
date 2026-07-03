@@ -15,6 +15,7 @@ const baseWorkUnit: WorkUnitDTO = {
   subNumber: 1,
   createdAt: "2026-01-01T00:00:00Z",
   completedAt: null,
+  archivedAt: null,
 };
 
 function mockFetch({
@@ -196,6 +197,7 @@ describe("WorkUnitDetailModal", () => {
     const workUnit: WorkUnitDTO = {
       ...baseWorkUnit,
       completedAt: "2026-01-05T00:00:00Z",
+      archivedAt: null,
     };
 
     render(

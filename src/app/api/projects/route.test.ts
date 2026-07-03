@@ -167,6 +167,44 @@ describe("GET /api/projects", () => {
     const data = await res.json();
     expect(data).toEqual([]);
   });
+
+  it("does not count archived work units in workUnitCount", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Team A", type: "STANDALONE" },
+    });
+    const uniqueKey = `PROJSTATSARCH-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const story = await prisma.story.create({
+      data: {
+        jiraKey: uniqueKey,
+        jiraId: uniqueKey,
+        projectKey: "PROJ",
+        summary: "Story",
+        jiraStatus: "To Do",
+        url: `https://example.atlassian.net/browse/${uniqueKey}`,
+        lastSyncedAt: new Date(),
+        projectId: project.id,
+      },
+    });
+    const activeWU = await prisma.workUnit.create({
+      data: { storyId: story.id, projectId: project.id, title: "Active", column: "todo", order: 0 },
+    });
+    const archivedWU = await prisma.workUnit.create({
+      data: { storyId: story.id, projectId: project.id, title: "Archived", column: "done", order: 1, archivedAt: new Date() },
+    });
+
+    try {
+      const req = new Request("http://localhost:3000/api/projects");
+      const res = await GET(req as never);
+      const data = await res.json();
+      const returned = data.find((p: { id: string }) => p.id === project.id);
+
+      expect(returned.workUnitCount).toBe(1);
+    } finally {
+      await prisma.workUnit.delete({ where: { id: activeWU.id } });
+      await prisma.workUnit.delete({ where: { id: archivedWU.id } });
+      await prisma.story.delete({ where: { id: story.id } });
+    }
+  });
 });
 
 describe("GET /api/projects/[projectId]", () => {
@@ -218,6 +256,45 @@ describe("GET /api/projects/[projectId]", () => {
       params: Promise.resolve({ projectId: "nonexistent" }),
     });
     expect(res.status).toBe(404);
+  });
+
+  it("does not count archived work units in workUnitCount", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Team A", type: "STANDALONE" },
+    });
+    const uniqueKey = `PROJSTATSARCH1-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const story = await prisma.story.create({
+      data: {
+        jiraKey: uniqueKey,
+        jiraId: uniqueKey,
+        projectKey: "PROJ",
+        summary: "Story",
+        jiraStatus: "To Do",
+        url: `https://example.atlassian.net/browse/${uniqueKey}`,
+        lastSyncedAt: new Date(),
+        projectId: project.id,
+      },
+    });
+    const activeWU = await prisma.workUnit.create({
+      data: { storyId: story.id, projectId: project.id, title: "Active", column: "todo", order: 0 },
+    });
+    const archivedWU = await prisma.workUnit.create({
+      data: { storyId: story.id, projectId: project.id, title: "Archived", column: "done", order: 1, archivedAt: new Date() },
+    });
+
+    try {
+      const req = new Request(`http://localhost:3000/api/projects/${project.id}`);
+      const res = await GET_ONE(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+      const data = await res.json();
+
+      expect(data.workUnitCount).toBe(1);
+    } finally {
+      await prisma.workUnit.delete({ where: { id: activeWU.id } });
+      await prisma.workUnit.delete({ where: { id: archivedWU.id } });
+      await prisma.story.delete({ where: { id: story.id } });
+    }
   });
 });
 

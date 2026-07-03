@@ -468,6 +468,31 @@ describe("applyStoryStatusSync", () => {
     });
   });
 
+  it("ignores archived work units when computing the desired status", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id, jiraStatus: "To Do" });
+    await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Active", column: "todo", order: 0 },
+    });
+    await prisma.workUnit.create({
+      data: {
+        storyId: story.id,
+        title: "Archived in-progress card",
+        column: "in_progress",
+        order: 1,
+        archivedAt: new Date(),
+      },
+    });
+
+    const deps = fakeDeps();
+    const result = await applyStoryStatusSync(story.id, prisma, deps);
+
+    // Only the active (non-archived, still-todo) work unit should count — if
+    // the archived in_progress card were counted, this would transition to
+    // "In Progress". It must not.
+    expect(result.transitioned).toBe(false);
+  });
+
   afterAll(async () => {
     await prisma.$disconnect();
   });
@@ -633,5 +658,71 @@ describe("transitionStoryToQA", () => {
     const result = await transitionStoryToQA(story.id, prisma, deps);
 
     expect(result).toEqual({ ok: false, error: expect.stringContaining("500") });
+  });
+
+  it("ignores archived work units when checking whether every card is done", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+    await prisma.workUnit.create({
+      data: {
+        storyId: story.id,
+        title: "Archived leftover",
+        column: "in_progress",
+        order: 1,
+        archivedAt: new Date(),
+      },
+    });
+
+    const deps = fakeQaDeps();
+    const result = await transitionStoryToQA(story.id, prisma, deps);
+
+    // The archived work unit is still "in_progress", but since it's
+    // archived it must not block the transition.
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("archives every one of the story's work units after a successful transition to QA", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    const wu1 = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+    const wu2 = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 2", column: "done", order: 1 },
+    });
+
+    const deps = fakeQaDeps();
+    const result = await transitionStoryToQA(story.id, prisma, deps);
+
+    expect(result).toEqual({ ok: true });
+
+    const updated1 = await prisma.workUnit.findUnique({ where: { id: wu1.id } });
+    const updated2 = await prisma.workUnit.findUnique({ where: { id: wu2.id } });
+    expect(updated1?.archivedAt).not.toBeNull();
+    expect(updated2?.archivedAt).not.toBeNull();
+  });
+
+  it("does not archive anything when the transition fails (a sibling isn't done)", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    const wu1 = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+    const wu2 = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 2", column: "code_review", order: 1 },
+    });
+
+    const deps = fakeQaDeps();
+    const result = await transitionStoryToQA(story.id, prisma, deps);
+
+    expect(result.ok).toBe(false);
+
+    const updated1 = await prisma.workUnit.findUnique({ where: { id: wu1.id } });
+    const updated2 = await prisma.workUnit.findUnique({ where: { id: wu2.id } });
+    expect(updated1?.archivedAt).toBeNull();
+    expect(updated2?.archivedAt).toBeNull();
   });
 });
