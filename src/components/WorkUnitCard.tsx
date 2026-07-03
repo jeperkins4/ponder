@@ -72,6 +72,7 @@ export function WorkUnitCard({
   });
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isMovingToQA, setIsMovingToQA] = useState(false);
 
   // The card div (view mode) and the title input (edit mode) are two
   // different DOM nodes that never exist at the same time, since the
@@ -193,6 +194,28 @@ export function WorkUnitCard({
       console.error("Error deleting work unit:", error);
       alert("Failed to delete work unit");
       setIsDeleting(false);
+    }
+  };
+
+  const handleMoveToQA = async () => {
+    setIsMovingToQA(true);
+    try {
+      const response = await fetch(`/api/work-units/${workUnit.id}/move-to-qa`, {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Failed to move story to QA");
+        return;
+      }
+
+      onStatusMessage?.(`Moved "${storyKey}" to JIRA QA`);
+    } catch (error) {
+      console.error("Error moving story to QA:", error);
+      alert("Failed to move story to QA");
+    } finally {
+      setIsMovingToQA(false);
     }
   };
 
@@ -408,6 +431,24 @@ export function WorkUnitCard({
             data-testid={`cancel-delete-button-${workUnit.id}`}
           >
             Cancel
+          </button>
+        )}
+        {workUnit.column === "done" && storyKey && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleMoveToQA();
+            }}
+            disabled={isMovingToQA}
+            aria-label={`Move ${storyKey} to JIRA QA`}
+            className={`px-2 py-1.5 text-xs font-instrument font-semibold rounded-lg transition-colors disabled:opacity-50 ${focusRing} ${
+              isDark
+                ? "bg-emerald-900/50 text-emerald-200 hover:bg-emerald-900/70"
+                : "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+            }`}
+            data-testid={`move-to-qa-button-${workUnit.id}`}
+          >
+            {isMovingToQA ? "Moving…" : "Move to QA"}
           </button>
         )}
       </div>

@@ -243,3 +243,77 @@ export async function applyStoryStatusSync(
     return { transitioned: false, commented: false, warning: message };
   }
 }
+
+export type TransitionStoryToQAResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Explicitly transitions a story's JIRA issue to "QA". Unlike
+ * `applyStoryStatusSync` (an automatic, never-throwing side effect of an
+ * unrelated board action), this is a primary, human-triggered action — every
+ * failure mode is returned as a clear `{ ok: false, error }` result so the
+ * caller (the Move-to-QA button) can show the user what happened, rather than
+ * being silently swallowed.
+ *
+ * Requires every one of the story's work units to be in the `done` column;
+ * otherwise returns an error without calling JIRA at all.
+ */
+export async function transitionStoryToQA(
+  storyId: string,
+  prisma: PrismaClient,
+  deps: Pick<ApplyStoryStatusSyncDeps, "getTransitions" | "transitionIssue"> = defaultDeps
+): Promise<TransitionStoryToQAResult> {
+  const story = (await prisma.story.findUnique({
+    where: { id: storyId },
+    include: { workUnits: true, project: true },
+  })) as (Story & { workUnits: WorkUnit[]; project: Project | null }) | null;
+
+  if (!story) {
+    return { ok: false, error: `Story not found: ${storyId}` };
+  }
+
+  if (story.workUnits.length === 0 || !story.workUnits.every((w) => w.column === "done")) {
+    return {
+      ok: false,
+      error: "All work units for this story must be Done before moving it to QA",
+    };
+  }
+
+  if (!hasJiraCredentials(story.project)) {
+    return {
+      ok: false,
+      error: `Story ${story.jiraKey} has no fully-configured JIRA project`,
+    };
+  }
+
+  const config: JiraConfig = {
+    siteUrl: story.project.jiraSiteUrl,
+    email: story.project.jiraEmail,
+    apiToken: story.project.jiraApiToken,
+  };
+
+  try {
+    const transitions = await deps.getTransitions(story.jiraKey, config);
+    const transition = pickTransitionByStatusName(transitions, "QA");
+
+    if (!transition) {
+      return {
+        ok: false,
+        error: `No "QA" transition available for ${story.jiraKey} from its current status`,
+      };
+    }
+
+    await deps.transitionIssue(story.jiraKey, transition.id, config);
+
+    await prisma.story.update({
+      where: { id: storyId },
+      data: { jiraStatus: "QA" },
+    });
+
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
