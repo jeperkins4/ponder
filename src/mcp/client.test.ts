@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { PonderClient } from "./client";
-import type { ProjectWithStats, StoryDTO, WorkUnitDTO } from "@/lib/types";
+import type { AttachmentDTO, ProjectWithStats, StoryDTO, WorkUnitDTO } from "@/lib/types";
 
 function fakeFetch(response: {
   ok: boolean;
@@ -189,6 +189,62 @@ describe("PonderClient", () => {
     const client = new PonderClient(baseUrl, fetchImpl);
 
     await expect(client.getProjects()).rejects.toThrow(/404/);
+  });
+
+  it("addAttachment() POSTs a multipart body with the file to the attachments endpoint", async () => {
+    const attachment: AttachmentDTO = {
+      id: "a1",
+      workUnitId: "w1",
+      filename: "screenshot.png",
+      mimeType: "image/png",
+      size: 4,
+      createdAt: "2026-07-02T00:00:00.000Z",
+      url: "/api/attachments/a1",
+    };
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return {
+        ok: true,
+        status: 201,
+        json: async () => attachment,
+      } as Response;
+    }) as unknown as typeof fetch;
+
+    const client = new PonderClient("http://ponder.test", fetchImpl);
+    const result = await client.addAttachment(
+      "w1",
+      Buffer.from("fake-bytes"),
+      "screenshot.png",
+      "image/png"
+    );
+
+    expect(result).toEqual(attachment);
+    expect(calls[0].url).toBe(
+      "http://ponder.test/api/work-units/w1/attachments"
+    );
+    expect(calls[0].init.method).toBe("POST");
+
+    const body = calls[0].init.body as FormData;
+    expect(body).toBeInstanceOf(FormData);
+    const file = body.get("file") as File;
+    expect(file.name).toBe("screenshot.png");
+    expect(file.type).toBe("image/png");
+    expect(file.size).toBe(10);
+  });
+
+  it("addAttachment() throws with a message containing the status on a non-2xx response", async () => {
+    const fetchImpl = (async () => ({
+      ok: false,
+      status: 413,
+      json: async () => ({}),
+    })) as unknown as typeof fetch;
+
+    const client = new PonderClient("http://ponder.test", fetchImpl);
+
+    await expect(
+      client.addAttachment("w1", Buffer.from("x"), "big.png", "image/png")
+    ).rejects.toThrow(/413/);
   });
 
   it("respects a custom baseUrl", async () => {
