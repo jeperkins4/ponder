@@ -9,6 +9,7 @@ import { prisma } from "./prisma";
 import {
   applyStoryStatusSync,
   computeDesiredJiraStatus,
+  transitionStoryToQA,
   type ApplyStoryStatusSyncDeps,
 } from "./statusTrigger";
 import type { JiraTransition } from "@/lib/jira/transitions";
@@ -469,5 +470,168 @@ describe("applyStoryStatusSync", () => {
 
   afterAll(async () => {
     await prisma.$disconnect();
+  });
+});
+
+describe("transitionStoryToQA", () => {
+  let testCounter = 0;
+
+  beforeEach(async () => {
+    await prisma.workUnit.deleteMany({});
+    await prisma.story.deleteMany({});
+    await prisma.project.deleteMany({});
+    testCounter++;
+  });
+
+  async function makeJiraProject() {
+    return prisma.project.create({
+      data: {
+        name: `QA Test Project ${testCounter}`,
+        type: "JIRA",
+        jiraProjectKey: "TEAM",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "user@example.com",
+        jiraApiToken: "token-123",
+      },
+    });
+  }
+
+  async function makeStory(overrides: Partial<Parameters<typeof prisma.story.create>[0]["data"]> = {}) {
+    return prisma.story.create({
+      data: {
+        jiraKey: `TEAM-QA-${testCounter}`,
+        jiraId: `9100${testCounter}`,
+        projectKey: "TEAM",
+        summary: "Test story",
+        description: "A test story",
+        jiraStatus: "Code Revew",
+        url: `https://example.atlassian.net/browse/TEAM-QA-${testCounter}`,
+        lastSyncedAt: new Date(),
+        ...overrides,
+      },
+    });
+  }
+
+  function fakeQaDeps(
+    overrides: Partial<Pick<ApplyStoryStatusSyncDeps, "getTransitions" | "transitionIssue">> = {}
+  ) {
+    return {
+      getTransitions: vi.fn(async (): Promise<JiraTransition[]> => [
+        { id: "2", name: "QA", to: { name: "QA", statusCategory: { key: "indeterminate" } } },
+        { id: "3", name: "Code Revew", to: { name: "Code Revew", statusCategory: { key: "indeterminate" } } },
+      ]),
+      transitionIssue: vi.fn(async () => {}),
+      ...overrides,
+    };
+  }
+
+  it("transitions to QA when every work unit is done", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+    await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 2", column: "done", order: 1 },
+    });
+
+    const deps = fakeQaDeps();
+    const result = await transitionStoryToQA(story.id, prisma, deps);
+
+    expect(result).toEqual({ ok: true });
+    expect(deps.transitionIssue).toHaveBeenCalledWith(story.jiraKey, "2", expect.any(Object));
+
+    const updated = await prisma.story.findUnique({ where: { id: story.id } });
+    expect(updated?.jiraStatus).toBe("QA");
+  });
+
+  it("returns an error without transitioning when a sibling work unit isn't done", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+    await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 2", column: "code_review", order: 1 },
+    });
+
+    const deps = fakeQaDeps();
+    const result = await transitionStoryToQA(story.id, prisma, deps);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/done/i);
+    }
+    expect(deps.transitionIssue).not.toHaveBeenCalled();
+
+    const updated = await prisma.story.findUnique({ where: { id: story.id } });
+    expect(updated?.jiraStatus).toBe("Code Revew");
+  });
+
+  it("returns an error when the story has no work units", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+
+    const result = await transitionStoryToQA(story.id, prisma, fakeQaDeps());
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("returns an error for a missing story", async () => {
+    const result = await transitionStoryToQA("does-not-exist", prisma, fakeQaDeps());
+
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("not found") });
+  });
+
+  it("returns an error when the project has no JIRA credentials", async () => {
+    const project = await prisma.project.create({
+      data: { name: "No Creds Project", type: "STANDALONE" },
+    });
+    const story = await makeStory({ projectId: project.id });
+    await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+
+    const result = await transitionStoryToQA(story.id, prisma, fakeQaDeps());
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("returns an error when no QA transition is available from the story's current status", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+
+    const deps = fakeQaDeps({
+      getTransitions: vi.fn(async (): Promise<JiraTransition[]> => [
+        { id: "3", name: "Code Revew", to: { name: "Code Revew", statusCategory: { key: "indeterminate" } } },
+      ]),
+    });
+    const result = await transitionStoryToQA(story.id, prisma, deps);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/QA/);
+    }
+  });
+
+  it("surfaces a JIRA API failure as an error result instead of throwing", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+
+    const deps = fakeQaDeps({
+      transitionIssue: vi.fn(async () => {
+        throw new Error("JIRA API error: 500");
+      }),
+    });
+
+    const result = await transitionStoryToQA(story.id, prisma, deps);
+
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("500") });
   });
 });
