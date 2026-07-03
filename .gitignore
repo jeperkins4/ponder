@@ -3,6 +3,12 @@
 # Subagent-driven-development scratch (task ledgers, briefs, review diffs)
 .superpowers/
 
+# design-is skill audit scratch (scope/evidence/scorecard/verdict/handoff)
+DESIGN-IS-*/
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
+
 # Dependencies
 node_modules/
 /.pnp
