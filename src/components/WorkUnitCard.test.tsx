@@ -128,6 +128,85 @@ describe("WorkUnitCard", () => {
     });
   });
 
+  describe("Move to QA", () => {
+    const doneWorkUnit: WorkUnitDTO = { ...mockWorkUnit, column: "done" };
+
+    it("renders the button only for a Done, JIRA-linked card", () => {
+      const { rerender } = render(
+        <WorkUnitCard workUnit={doneWorkUnit} storyKey="COM-1" />
+      );
+      expect(
+        screen.getByTestId(`move-to-qa-button-${doneWorkUnit.id}`)
+      ).toBeInTheDocument();
+
+      rerender(<WorkUnitCard workUnit={mockWorkUnit} storyKey="COM-1" />);
+      expect(
+        screen.queryByTestId(`move-to-qa-button-${mockWorkUnit.id}`)
+      ).not.toBeInTheDocument();
+
+      rerender(<WorkUnitCard workUnit={doneWorkUnit} />);
+      expect(
+        screen.queryByTestId(`move-to-qa-button-${doneWorkUnit.id}`)
+      ).not.toBeInTheDocument();
+    });
+
+    it("POSTs to the move-to-qa endpoint and reports success via onStatusMessage", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true }),
+      } as Response);
+
+      const onStatusMessage = vi.fn();
+      render(
+        <WorkUnitCard
+          workUnit={doneWorkUnit}
+          storyKey="COM-1"
+          onStatusMessage={onStatusMessage}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(`move-to-qa-button-${doneWorkUnit.id}`));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/work-units/${doneWorkUnit.id}/move-to-qa`,
+          expect.objectContaining({ method: "POST" })
+        );
+        expect(onStatusMessage).toHaveBeenCalledWith(
+          expect.stringContaining("COM-1")
+        );
+      });
+    });
+
+    it("alerts with the server's error message on failure, without calling onStatusMessage", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: "All work units for this story must be Done before moving it to QA" }),
+      } as Response);
+      const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+
+      const onStatusMessage = vi.fn();
+      render(
+        <WorkUnitCard
+          workUnit={doneWorkUnit}
+          storyKey="COM-1"
+          onStatusMessage={onStatusMessage}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(`move-to-qa-button-${doneWorkUnit.id}`));
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith(
+          expect.stringContaining("must be Done")
+        );
+      });
+      expect(onStatusMessage).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
+    });
+  });
+
   describe("Delete functionality", () => {
     it("triggers DELETE request when delete button is confirmed", async () => {
       const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValueOnce({
