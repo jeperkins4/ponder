@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
       where: { id: storyId },
       include: {
         workUnits: {
+          where: { archivedAt: null },
           orderBy: { order: "asc" },
         },
       },
