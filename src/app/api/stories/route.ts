@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
         subNumber: wu.subNumber,
         createdAt: wu.createdAt.toISOString(),
         completedAt: wu.completedAt?.toISOString() ?? null,
+        archivedAt: wu.archivedAt?.toISOString() ?? null,
       })),
     }));
 

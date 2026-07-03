@@ -94,4 +94,44 @@ describe("GET /api/stories", () => {
       await prisma.story.delete({ where: { id: story.id } });
     }
   });
+
+  it("serializes archivedAt as null for a non-archived work unit", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const story = await prisma.story.create({
+      data: {
+        jiraKey: `ARCH-${suffix}`,
+        jiraId: `ARCH-${suffix}`,
+        projectKey: "ARCH",
+        summary: "Archive field story",
+        jiraStatus: "To Do",
+        url: `https://example.atlassian.net/browse/ARCH-${suffix}`,
+        lastSyncedAt: new Date(),
+      },
+    });
+    const workUnit = await prisma.workUnit.create({
+      data: {
+        storyId: story.id,
+        title: "Archive field work unit",
+        column: "todo",
+        order: 1,
+      },
+    });
+
+    try {
+      const req = new NextRequest("http://localhost:3000/api/stories");
+      const res = await GET(req);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+
+      const foundStory = data.find((s: { id: string }) => s.id === story.id);
+      expect(foundStory).toBeDefined();
+      const foundWorkUnit = foundStory.workUnits.find(
+        (wu: { id: string }) => wu.id === workUnit.id
+      );
+      expect(foundWorkUnit.archivedAt).toBeNull();
+    } finally {
+      await prisma.workUnit.delete({ where: { id: workUnit.id } });
+      await prisma.story.delete({ where: { id: story.id } });
+    }
+  });
 });

@@ -15,6 +15,7 @@ const mockWorkUnit: WorkUnitDTO = {
   subNumber: null,
   createdAt: "2026-01-01T00:00:00Z",
   completedAt: null,
+  archivedAt: null,
 };
 
 describe("WorkUnitCard", () => {

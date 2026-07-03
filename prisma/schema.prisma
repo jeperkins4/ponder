@@ -59,6 +59,7 @@ model WorkUnit {
   subNumber          Int?      // stable 1-based decomposition suffix (e.g. COM-540-1); null = not decomposed, Ponder-local only, never sent to JIRA
   createdAt          DateTime  @default(now())
   completedAt        DateTime?
+  archivedAt         DateTime?
 
   workNotes   WorkNote[]
   attachments Attachment[]

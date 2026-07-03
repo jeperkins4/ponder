@@ -20,6 +20,7 @@ function workUnitToDTO(wu: {
   subNumber: number | null;
   createdAt: Date;
   completedAt: Date | null;
+  archivedAt: Date | null;
 }): WorkUnitDTO {
   return {
     id: wu.id,
@@ -33,6 +34,7 @@ function workUnitToDTO(wu: {
     subNumber: wu.subNumber,
     createdAt: wu.createdAt.toISOString(),
     completedAt: wu.completedAt?.toISOString() ?? null,
+    archivedAt: wu.archivedAt?.toISOString() ?? null,
   };
 }
 
@@ -130,6 +132,7 @@ export async function POST(request: NextRequest) {
         subNumber: wu.subNumber,
         createdAt: wu.createdAt.toISOString(),
         completedAt: wu.completedAt?.toISOString() ?? null,
+        archivedAt: wu.archivedAt?.toISOString() ?? null,
       })),
     };
 
