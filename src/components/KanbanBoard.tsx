@@ -72,6 +72,25 @@ export function KanbanBoard({
   const [statusMessage, setStatusMessage] = useState("");
   const [showOnboarding, setShowOnboarding] = useState(false);
 
+  // Auto-dismisses the visible toast ~3s after it appears; a new message
+  // resets the timer. The underlying `statusMessage` state also still drives
+  // the screen-reader announcement (see the aria-live region below) — this
+  // effect only controls how long it stays visually shown.
+  useEffect(() => {
+    if (!statusMessage) return;
+    if (statusToastTimeoutRef.current) {
+      clearTimeout(statusToastTimeoutRef.current);
+    }
+    statusToastTimeoutRef.current = setTimeout(() => {
+      setStatusMessage("");
+    }, 3000);
+    return () => {
+      if (statusToastTimeoutRef.current) {
+        clearTimeout(statusToastTimeoutRef.current);
+      }
+    };
+  }, [statusMessage]);
+
   useEffect(() => {
     // `?reset-onboarding=true` lets us re-trigger the tooltip for manual
     // testing without clearing localStorage by hand.
@@ -141,6 +160,8 @@ export function KanbanBoard({
     code_review: null,
     done: null,
   });
+
+  const statusToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setColumnRef = useCallback(
     (column: Column) => (el: HTMLDivElement | null) => {
@@ -353,8 +374,23 @@ export function KanbanBoard({
         Skip to main content
       </a>
 
-      {/* Announces save/delete outcomes to screen readers without moving focus. */}
-      <div aria-live="polite" aria-atomic="true" className="sr-only">
+      {/* Announces save/delete/move outcomes to screen readers (aria-live,
+          always present) AND shows them as a visible, auto-dismissing toast
+          when there's an active message — single element, single source of
+          truth for both concerns. */}
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        className={
+          statusMessage
+            ? `fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border px-4 py-2.5 text-sm font-medium shadow-lg ${
+                isDark
+                  ? "bg-ponder-dark-surface border-ponder-dark-border text-ponder-dark-text"
+                  : "bg-white border-ponder-light-card-border text-ponder-light-text"
+              }`
+            : "sr-only"
+        }
+      >
         {statusMessage}
       </div>
 
