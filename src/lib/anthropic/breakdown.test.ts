@@ -119,4 +119,26 @@ describe("breakDownStory", () => {
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe(story.summary);
   });
+
+  it("appends codebase context and grounds the system prompt when provided", async () => {
+    const { client, create } = makeFakeClient({
+      content: [
+        {
+          type: "tool_use",
+          id: "toolu_9",
+          name: "record_subtasks",
+          input: { subtasks: [{ title: "t", acceptanceCriteria: "ac", verification: "v" }] },
+        },
+      ],
+    });
+
+    await breakDownStory(
+      { summary: "Archive a project", description: "soft archive", codebaseContext: '{"domain":"Projects"}' },
+      client
+    );
+
+    const sent = create.mock.calls[0][0];
+    expect(String(sent.messages[0].content)).toContain("CODEBASE CONTEXT");
+    expect(String(sent.system).toLowerCase()).toContain("do not invent");
+  });
 });

@@ -6,6 +6,10 @@
  */
 
 import { getAnthropicClient, type AnthropicLike, type AnthropicToolUseBlock } from "@/lib/anthropic/client";
+import {
+  buildContextUserBlock,
+  CODEBASE_GROUNDING_INSTRUCTION,
+} from "@/lib/anthropic/codebaseContext";
 
 export type SubtaskDraft = {
   title: string; // short description of the unit of work
@@ -90,20 +94,25 @@ function fallbackDraft(story: { summary: string; description: string | null }): 
  * Claude returns zero subtasks.
  */
 export async function breakDownStory(
-  story: { summary: string; description: string | null },
+  story: { summary: string; description: string | null; codebaseContext?: string },
   client?: AnthropicLike
 ): Promise<SubtaskDraft[]> {
   const anthropic = client ?? getAnthropicClient();
   const model = process.env.ANTHROPIC_BREAKDOWN_MODEL ?? "claude-sonnet-5";
 
-  const userContent = story.description
-    ? `${story.summary}\n\n${story.description}`
-    : story.summary;
+  const base = story.description ? `${story.summary}\n\n${story.description}` : story.summary;
+  const hasContext = Boolean(story.codebaseContext && story.codebaseContext.trim());
+  const userContent = hasContext
+    ? `${base}\n\n${buildContextUserBlock(story.codebaseContext!.trim())}`
+    : base;
+  const system = hasContext
+    ? `${SYSTEM_PROMPT}\n\n${CODEBASE_GROUNDING_INSTRUCTION}`
+    : SYSTEM_PROMPT;
 
   const response = await anthropic.messages.create({
     model,
     max_tokens: 2000,
-    system: SYSTEM_PROMPT,
+    system,
     messages: [{ role: "user", content: userContent }],
     tools: [SUBTASKS_TOOL],
     tool_choice: { type: "tool", name: TOOL_NAME },

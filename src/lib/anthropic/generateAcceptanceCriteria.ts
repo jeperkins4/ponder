@@ -10,6 +10,10 @@ import {
   type AnthropicLike,
   type AnthropicToolUseBlock,
 } from "@/lib/anthropic/client";
+import {
+  buildContextUserBlock,
+  CODEBASE_GROUNDING_INSTRUCTION,
+} from "@/lib/anthropic/codebaseContext";
 
 export type GeneratedAcceptance = {
   acceptanceCriteria: string;
@@ -50,20 +54,27 @@ function isToolUseBlock(block: { type: string }): block is AnthropicToolUseBlock
 }
 
 export async function generateAcceptanceCriteria(
-  workUnit: { title: string; description: string | null },
+  workUnit: { title: string; description: string | null; codebaseContext?: string },
   client?: AnthropicLike
 ): Promise<GeneratedAcceptance> {
   const anthropic = client ?? getAnthropicClient();
   const model = process.env.ANTHROPIC_BREAKDOWN_MODEL ?? "claude-sonnet-5";
 
-  const userContent = workUnit.description
+  const base = workUnit.description
     ? `${workUnit.title}\n\n${workUnit.description}`
     : workUnit.title;
+  const hasContext = Boolean(workUnit.codebaseContext && workUnit.codebaseContext.trim());
+  const userContent = hasContext
+    ? `${base}\n\n${buildContextUserBlock(workUnit.codebaseContext!.trim())}`
+    : base;
+  const system = hasContext
+    ? `${SYSTEM_PROMPT}\n\n${CODEBASE_GROUNDING_INSTRUCTION}`
+    : SYSTEM_PROMPT;
 
   const response = await anthropic.messages.create({
     model,
     max_tokens: 2000,
-    system: SYSTEM_PROMPT,
+    system,
     messages: [{ role: "user", content: userContent }],
     tools: [ACCEPTANCE_TOOL],
     tool_choice: { type: "tool", name: TOOL_NAME },
