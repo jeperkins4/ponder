@@ -93,6 +93,13 @@ export function WorkUnitCard({
   const cancelButtonClass = isDark
     ? "bg-ponder-dark-border text-ponder-dark-text hover:bg-ponder-dark-card-border"
     : "bg-gray-200 text-gray-800 hover:bg-gray-300";
+  // Matches WorkUnitDetailModal's own fieldClass convention for form fields —
+  // the edit-mode input/textarea never had an explicit background class
+  // (just the browser's white default), so in dark mode they rendered as
+  // white boxes inside an otherwise dark card.
+  const fieldClass = isDark
+    ? "bg-ponder-dark-bg border-ponder-dark-border"
+    : "bg-white border-ponder-light-card-border";
 
   // Makes the card a @dnd-kit sortable item: whole-card dragging (both
   // pointer and keyboard, via the sensors configured on KanbanBoard's
@@ -244,7 +251,7 @@ export function WorkUnitCard({
           type="text"
           value={editData.title || ""}
           onChange={(e) => handleEditChange("title", e.target.value)}
-          className={`w-full px-2 py-1 mb-2 border ${isDark ? "border-ponder-dark-border" : "border-ponder-light-card-border"} rounded-lg font-instrument font-semibold ${focusRing}`}
+          className={`w-full px-2 py-1 mb-2 border ${fieldClass} ${textClass} rounded-lg font-instrument font-semibold ${focusRing}`}
           placeholder="Title"
           aria-label={`Edit title: ${workUnit.title}`}
           data-testid="edit-title-input"
@@ -252,7 +259,7 @@ export function WorkUnitCard({
         <textarea
           value={editData.description || ""}
           onChange={(e) => handleEditChange("description", e.target.value)}
-          className={`w-full px-2 py-1 mb-2 border ${isDark ? "border-ponder-dark-border" : "border-ponder-light-card-border"} rounded-lg font-instrument ${mutedTextClass} ${focusRing}`}
+          className={`w-full px-2 py-1 mb-2 border ${fieldClass} rounded-lg font-instrument ${mutedTextClass} ${focusRing}`}
           placeholder="Description"
           rows={3}
           aria-label={`Edit description: ${workUnit.title}`}
