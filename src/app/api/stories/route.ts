@@ -14,9 +14,19 @@ export async function GET(request: NextRequest) {
     const projectId = request.nextUrl.searchParams.get("projectId");
 
     const stories = await prisma.story.findMany({
-      where: projectId ? { projectId } : undefined,
+      where: {
+        ...(projectId ? { projectId } : {}),
+        // A story is visible unless it has work units AND every one of them
+        // is archived. Stories with zero work units remain visible (that's
+        // pre-existing, out-of-scope behavior for this filter).
+        OR: [
+          { workUnits: { none: {} } },
+          { workUnits: { some: { archivedAt: null } } },
+        ],
+      },
       include: {
         workUnits: {
+          where: { archivedAt: null },
           orderBy: { order: "asc" },
         },
       },

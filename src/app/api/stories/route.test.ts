@@ -134,4 +134,67 @@ describe("GET /api/stories", () => {
       await prisma.story.delete({ where: { id: story.id } });
     }
   });
+
+  it("excludes archived work units from a story's workUnits array", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const story = await prisma.story.create({
+      data: {
+        jiraKey: `ARCHWU-${suffix}`,
+        jiraId: `ARCHWU-${suffix}`,
+        projectKey: "ARCHWU",
+        summary: "Archived work unit story",
+        jiraStatus: "To Do",
+        url: `https://example.atlassian.net/browse/ARCHWU-${suffix}`,
+        lastSyncedAt: new Date(),
+      },
+    });
+    const activeWU = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Active", column: "done", order: 0 },
+    });
+    const archivedWU = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Archived", column: "done", order: 1, archivedAt: new Date() },
+    });
+
+    try {
+      const res = await GET(new NextRequest("http://localhost:3000/api/stories"));
+      const data = await res.json();
+      const returnedStory = data.find((s: { id: string }) => s.id === story.id);
+
+      const returnedIds = returnedStory.workUnits.map((w: { id: string }) => w.id);
+      expect(returnedIds).toContain(activeWU.id);
+      expect(returnedIds).not.toContain(archivedWU.id);
+    } finally {
+      await prisma.workUnit.delete({ where: { id: activeWU.id } });
+      await prisma.workUnit.delete({ where: { id: archivedWU.id } });
+      await prisma.story.delete({ where: { id: story.id } });
+    }
+  });
+
+  it("excludes a story entirely once every one of its work units is archived", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const story = await prisma.story.create({
+      data: {
+        jiraKey: `FULLARCH-${suffix}`,
+        jiraId: `FULLARCH-${suffix}`,
+        projectKey: "FULLARCH",
+        summary: "Fully archived story",
+        jiraStatus: "To Do",
+        url: `https://example.atlassian.net/browse/FULLARCH-${suffix}`,
+        lastSyncedAt: new Date(),
+      },
+    });
+    const archivedWU = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Archived", column: "done", order: 0, archivedAt: new Date() },
+    });
+
+    try {
+      const res = await GET(new NextRequest("http://localhost:3000/api/stories"));
+      const data = await res.json();
+
+      expect(data.find((s: { id: string }) => s.id === story.id)).toBeUndefined();
+    } finally {
+      await prisma.workUnit.delete({ where: { id: archivedWU.id } });
+      await prisma.story.delete({ where: { id: story.id } });
+    }
+  });
 });

@@ -130,7 +130,10 @@ export async function applyStoryStatusSync(
   try {
     const story = (await prisma.story.findUnique({
       where: { id: storyId },
-      include: { workUnits: { include: { attachments: true } }, project: true },
+      include: {
+        workUnits: { where: { archivedAt: null }, include: { attachments: true } },
+        project: true,
+      },
     })) as StoryWithRelations | null;
 
     if (!story) {
@@ -266,7 +269,7 @@ export async function transitionStoryToQA(
 ): Promise<TransitionStoryToQAResult> {
   const story = (await prisma.story.findUnique({
     where: { id: storyId },
-    include: { workUnits: true, project: true },
+    include: { workUnits: { where: { archivedAt: null } }, project: true },
   })) as (Story & { workUnits: WorkUnit[]; project: Project | null }) | null;
 
   if (!story) {

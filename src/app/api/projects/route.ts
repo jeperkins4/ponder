@@ -14,7 +14,7 @@ export async function GET(_request: NextRequest) {
     const projects = await prisma.project.findMany({
       include: {
         _count: {
-          select: { stories: true, workUnits: true },
+          select: { stories: true, workUnits: { where: { archivedAt: null } } },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       },
       include: {
         _count: {
-          select: { stories: true, workUnits: true },
+          select: { stories: true, workUnits: { where: { archivedAt: null } } },
         },
       },
     });
