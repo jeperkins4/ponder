@@ -772,4 +772,32 @@ describe("WorkUnitCard", () => {
       fetchSpy.mockRestore();
     });
   });
+
+  describe("Theme awareness", () => {
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    it("uses light-theme classes by default", async () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`)
+        ).toHaveClass("bg-ponder-light-surface");
+      });
+    });
+
+    it("uses dark-theme classes when ponderTheme is set to dark", async () => {
+      localStorage.setItem("ponderTheme", "dark");
+
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId(`work-unit-card-${mockWorkUnit.id}`)
+        ).toHaveClass("bg-ponder-dark-surface");
+      });
+    });
+  });
 });

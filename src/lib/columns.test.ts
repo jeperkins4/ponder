@@ -11,12 +11,12 @@ describe("COLUMNS", () => {
     ]);
   });
 
-  it("pairs each key with a human-readable label", () => {
+  it("pairs each key with a human-readable label and a dot accent color", () => {
     expect(COLUMNS).toEqual([
-      { key: "todo", label: "To Do" },
-      { key: "in_progress", label: "In Progress" },
-      { key: "code_review", label: "Code Review" },
-      { key: "done", label: "Done" },
+      { key: "todo", label: "To Do", dotColorClass: "bg-gray-400" },
+      { key: "in_progress", label: "In Progress", dotColorClass: "bg-blue-500" },
+      { key: "code_review", label: "Code Review", dotColorClass: "bg-purple-500" },
+      { key: "done", label: "Done", dotColorClass: "bg-emerald-500" },
     ]);
   });
 });

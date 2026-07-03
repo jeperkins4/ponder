@@ -5,6 +5,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { WorkUnitDTO, Column } from "@/lib/types";
 import { WorkUnitDetailModal } from "@/components/WorkUnitDetailModal";
+import { useTheme } from "@/hooks/useTheme";
 
 type PriorityLevel = "HIGH" | "MEDIUM" | "LOW";
 
@@ -28,26 +29,28 @@ const columnLabels: Record<Column, string> = {
   done: "Done",
 };
 
-const columnColors: Record<Column, string> = {
+const columnColorsLight: Record<Column, string> = {
   todo: "bg-gray-100 text-gray-800",
   in_progress: "bg-blue-100 text-blue-800",
   code_review: "bg-purple-100 text-purple-800",
   done: "bg-green-100 text-green-800",
 };
+const columnColorsDark: Record<Column, string> = {
+  todo: "bg-gray-800 text-gray-200",
+  in_progress: "bg-blue-900/50 text-blue-200",
+  code_review: "bg-purple-900/50 text-purple-200",
+  done: "bg-green-900/50 text-green-200",
+};
 
-const priorityStyles: Record<PriorityLevel, { dot: string; text: string }> = {
-  HIGH: {
-    dot: "bg-red-500",
-    text: "text-red-700",
-  },
-  MEDIUM: {
-    dot: "bg-amber-400",
-    text: "text-amber-700",
-  },
-  LOW: {
-    dot: "bg-gray-500",
-    text: "text-gray-600",
-  },
+const priorityStylesLight: Record<PriorityLevel, { dot: string; text: string }> = {
+  HIGH: { dot: "bg-red-500", text: "text-red-700" },
+  MEDIUM: { dot: "bg-amber-400", text: "text-amber-700" },
+  LOW: { dot: "bg-gray-500", text: "text-gray-600" },
+};
+const priorityStylesDark: Record<PriorityLevel, { dot: string; text: string }> = {
+  HIGH: { dot: "bg-red-500", text: "text-red-400" },
+  MEDIUM: { dot: "bg-amber-400", text: "text-amber-400" },
+  LOW: { dot: "bg-gray-500", text: "text-gray-400" },
 };
 
 const focusRing = "focus:ring-2 focus:ring-ponder-light-purple focus:outline-none";
@@ -76,6 +79,27 @@ export function WorkUnitCard({
   const cardRef = useRef<HTMLDivElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const wasEditingRef = useRef(false);
+
+  const { isDark } = useTheme();
+  const columnColors = isDark ? columnColorsDark : columnColorsLight;
+  const priorityStyles = isDark ? priorityStylesDark : priorityStylesLight;
+  const surfaceClass = isDark
+    ? "bg-ponder-dark-surface border-ponder-dark-border"
+    : "bg-ponder-light-surface border-ponder-light-card-border";
+  const textClass = isDark ? "text-ponder-dark-text" : "text-ponder-light-text";
+  const mutedTextClass = isDark
+    ? "text-ponder-dark-text-muted"
+    : "text-ponder-light-text-muted";
+  const cancelButtonClass = isDark
+    ? "bg-ponder-dark-border text-ponder-dark-text hover:bg-ponder-dark-card-border"
+    : "bg-gray-200 text-gray-800 hover:bg-gray-300";
+  // Matches WorkUnitDetailModal's own fieldClass convention for form fields —
+  // the edit-mode input/textarea never had an explicit background class
+  // (just the browser's white default), so in dark mode they rendered as
+  // white boxes inside an otherwise dark card.
+  const fieldClass = isDark
+    ? "bg-ponder-dark-bg border-ponder-dark-border"
+    : "bg-white border-ponder-light-card-border";
 
   // Makes the card a @dnd-kit sortable item: whole-card dragging (both
   // pointer and keyboard, via the sensors configured on KanbanBoard's
@@ -217,7 +241,7 @@ export function WorkUnitCard({
         ref={setSortableRef}
         role="article"
         aria-label={cardAriaLabel}
-        className={`p-3 bg-ponder-light-surface border border-ponder-light-card-border rounded-xl shadow-ponder-card ${focusRing}`}
+        className={`p-3 border ${surfaceClass} rounded-xl shadow-ponder-card ${focusRing}`}
         style={dragStyle}
         tabIndex={0}
         data-testid={`work-unit-card-${workUnit.id}`}
@@ -227,7 +251,7 @@ export function WorkUnitCard({
           type="text"
           value={editData.title || ""}
           onChange={(e) => handleEditChange("title", e.target.value)}
-          className={`w-full px-2 py-1 mb-2 border border-ponder-light-card-border rounded-lg font-instrument font-semibold ${focusRing}`}
+          className={`w-full px-2 py-1 mb-2 border ${fieldClass} ${textClass} rounded-lg font-instrument font-semibold ${focusRing}`}
           placeholder="Title"
           aria-label={`Edit title: ${workUnit.title}`}
           data-testid="edit-title-input"
@@ -235,7 +259,7 @@ export function WorkUnitCard({
         <textarea
           value={editData.description || ""}
           onChange={(e) => handleEditChange("description", e.target.value)}
-          className={`w-full px-2 py-1 mb-2 border border-ponder-light-card-border rounded-lg font-instrument text-ponder-light-text-muted ${focusRing}`}
+          className={`w-full px-2 py-1 mb-2 border ${fieldClass} rounded-lg font-instrument ${mutedTextClass} ${focusRing}`}
           placeholder="Description"
           rows={3}
           aria-label={`Edit description: ${workUnit.title}`}
@@ -253,7 +277,7 @@ export function WorkUnitCard({
           <button
             onClick={handleCancelEdit}
             aria-label={`Cancel editing ${workUnit.title}`}
-            className={`px-3 py-1.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-instrument font-semibold text-sm ${focusRing}`}
+            className={`px-3 py-1.5 ${cancelButtonClass} rounded-lg font-instrument font-semibold text-sm ${focusRing}`}
             data-testid="cancel-edit-button"
           >
             Cancel
@@ -276,7 +300,7 @@ export function WorkUnitCard({
       {...listeners}
       role="article"
       aria-label={cardAriaLabel}
-      className={`p-3 bg-ponder-light-surface border border-ponder-light-card-border rounded-xl shadow-ponder-card hover:shadow-ponder-card-hover hover:-translate-y-0.5 transition-all cursor-pointer ${focusRing}`}
+      className={`p-3 border ${surfaceClass} rounded-xl shadow-ponder-card hover:shadow-ponder-card-hover hover:-translate-y-0.5 transition-all cursor-pointer ${focusRing}`}
       style={dragStyle}
       tabIndex={0}
       onClick={() => setIsDetailOpen(true)}
@@ -307,7 +331,7 @@ export function WorkUnitCard({
               </a>
             ) : (
               <span
-                className="inline-block mb-1 font-instrument text-xs font-semibold text-ponder-light-text-muted"
+                className={`inline-block mb-1 font-instrument text-xs font-semibold ${mutedTextClass}`}
                 data-testid={`work-unit-story-key-${workUnit.id}`}
               >
                 {storyKey}
@@ -322,7 +346,7 @@ export function WorkUnitCard({
             </div>
           )}
           <h3
-            className="font-instrument font-semibold text-sm text-ponder-light-text leading-tight"
+            className={`font-instrument font-semibold text-sm ${textClass} leading-tight`}
             data-testid={`work-unit-title-${workUnit.id}`}
           >
             {workUnit.title}
@@ -339,7 +363,7 @@ export function WorkUnitCard({
       </div>
 
       {workUnit.description && (
-        <p className="text-xs font-instrument text-ponder-light-text-muted mb-3 line-clamp-2">
+        <p className={`text-xs font-instrument ${mutedTextClass} mb-3 line-clamp-2`}>
           {workUnit.description}
         </p>
       )}
@@ -380,7 +404,7 @@ export function WorkUnitCard({
               setIsDeleting(false);
             }}
             aria-label={`Cancel delete of ${workUnit.title}`}
-            className={`px-2 py-1.5 text-xs font-instrument font-semibold bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors ${focusRing}`}
+            className={`px-2 py-1.5 text-xs font-instrument font-semibold ${cancelButtonClass} rounded-lg transition-colors ${focusRing}`}
             data-testid={`cancel-delete-button-${workUnit.id}`}
           >
             Cancel

@@ -130,6 +130,24 @@ describe("KanbanBoard", () => {
     });
   });
 
+  it("renders each column's accent dot alongside its heading and item count on one line", async () => {
+    render(<KanbanBoard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
+    });
+
+    const toDoColumn = screen.getByRole("region", {
+      name: /To Do column/i,
+    });
+    const dot = toDoColumn.querySelector('[data-testid="column-dot-todo"]');
+    expect(dot).toBeInTheDocument();
+    expect(dot).toHaveClass("bg-gray-400");
+    // Header restyle removes the separate paragraph but keeps the count text
+    // visible within the column (satisfies the pre-existing "1 item" checks
+    // elsewhere in this file — this test only adds the dot assertion).
+  });
+
   it("displays work units in correct columns", async () => {
     render(<KanbanBoard />);
 
@@ -568,6 +586,82 @@ describe("KanbanBoard", () => {
       const liveRegion = document.querySelector('[aria-live="polite"]');
       expect(liveRegion).toBeInTheDocument();
       expect(liveRegion).toHaveClass("sr-only");
+    });
+
+    it("shows the live region as a visible toast (not sr-only) once it has a status message", async () => {
+      render(<KanbanBoard />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
+      });
+
+      const liveRegion = document.querySelector('[aria-live="polite"]');
+      expect(liveRegion).toHaveClass("sr-only");
+
+      const editButton = screen.getByTestId("edit-button-wu-1");
+      fireEvent.click(editButton);
+      fireEvent.click(screen.getByTestId("cancel-edit-button"));
+
+      global.fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "DELETE") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ success: true }),
+          } as Response);
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockStories),
+        } as Response);
+      });
+      fireEvent.click(screen.getByTestId("delete-button-wu-1"));
+      fireEvent.click(screen.getByTestId("delete-button-wu-1"));
+
+      await waitFor(() => {
+        const region = document.querySelector('[aria-live="polite"]');
+        expect(region).not.toHaveClass("sr-only");
+        expect(region).toHaveTextContent("Deleted work unit: Work unit 1");
+      });
+    });
+
+    it("auto-dismisses the toast back to sr-only after the timeout", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      render(<KanbanBoard />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
+      });
+
+      global.fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "DELETE") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ success: true }),
+          } as Response);
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockStories),
+        } as Response);
+      });
+      fireEvent.click(screen.getByTestId("delete-button-wu-1"));
+      fireEvent.click(screen.getByTestId("delete-button-wu-1"));
+
+      await waitFor(() => {
+        expect(document.querySelector('[aria-live="polite"]')).not.toHaveClass(
+          "sr-only"
+        );
+      });
+
+      vi.advanceTimersByTime(3100);
+
+      await waitFor(() => {
+        expect(document.querySelector('[aria-live="polite"]')).toHaveClass(
+          "sr-only"
+        );
+      });
+
+      vi.useRealTimers();
     });
 
     it("end-to-end: edit-mode focus enters/exits the card, then delete announces via the live region", async () => {

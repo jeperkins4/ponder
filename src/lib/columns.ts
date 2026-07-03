@@ -1,10 +1,10 @@
 import type { Column } from "@/lib/types";
 
-export const COLUMNS: { key: Column; label: string }[] = [
-  { key: "todo", label: "To Do" },
-  { key: "in_progress", label: "In Progress" },
-  { key: "code_review", label: "Code Review" },
-  { key: "done", label: "Done" },
+export const COLUMNS: { key: Column; label: string; dotColorClass: string }[] = [
+  { key: "todo", label: "To Do", dotColorClass: "bg-gray-400" },
+  { key: "in_progress", label: "In Progress", dotColorClass: "bg-blue-500" },
+  { key: "code_review", label: "Code Review", dotColorClass: "bg-purple-500" },
+  { key: "done", label: "Done", dotColorClass: "bg-emerald-500" },
 ];
 
 // Import target columns only. `done` is a local-only lane (no JIRA status maps
