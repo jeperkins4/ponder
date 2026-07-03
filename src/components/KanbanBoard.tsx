@@ -315,12 +315,20 @@ export function KanbanBoard({
           onDragEnd={handleDragEnd}
         >
           <div className="overflow-x-auto">
-            <div className="grid grid-cols-4 gap-4 min-w-[900px]">
-              {COLUMNS.map(({ key, label }) => (
+            <div
+              className={`grid grid-cols-4 min-w-[900px] rounded-2xl border overflow-hidden ${
+                isDark
+                  ? "border-ponder-dark-border"
+                  : "border-ponder-light-card-border"
+              }`}
+            >
+              {COLUMNS.map(({ key, label, dotColorClass }, index) => (
                 <KanbanColumn
                   key={key}
                   column={key}
                   columnLabel={label}
+                  dotColorClass={dotColorClass}
+                  isFirstColumn={index === 0}
                   stories={stories}
                   onRefresh={() => fetchStories({ silent: true })}
                   columnRef={setColumnRef(key)}
@@ -381,6 +389,8 @@ export function KanbanBoard({
 interface KanbanColumnProps {
   column: Column;
   columnLabel: string;
+  dotColorClass: string;
+  isFirstColumn: boolean;
   stories: StoryDTO[];
   onRefresh: () => void;
   columnRef?: (el: HTMLDivElement | null) => void;
@@ -395,6 +405,8 @@ interface KanbanColumnProps {
 function KanbanColumn({
   column,
   columnLabel,
+  dotColorClass,
+  isFirstColumn,
   stories,
   onRefresh,
   columnRef,
@@ -444,22 +456,42 @@ function KanbanColumn({
   // Registers the whole column body as a droppable target (id = the column
   // key) so a card can be dropped into an empty column, or below the last
   // card, and still resolve to this column.
-  const { setNodeRef: setDroppableRef } = useDroppable({ id: column });
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: column });
 
   return (
     <section
       aria-label={`${columnLabel} column, ${totalWorkUnits} ${itemWord}`}
-      className={`flex flex-col rounded-xl border p-6 transition-all duration-200 ${
-        isDark
-          ? "bg-ponder-dark-surface border-ponder-dark-border hover:border-ponder-dark-purple hover:shadow-ponder-card-hover"
-          : "bg-ponder-light-surface border-ponder-light-card-border hover:border-ponder-light-purple hover:shadow-ponder-card-hover"
+      className={`flex flex-col p-6 transition-colors duration-150 ${
+        isFirstColumn
+          ? ""
+          : isDark
+          ? "border-l border-ponder-dark-border"
+          : "border-l border-ponder-light-card-border"
+      } ${
+        isOver
+          ? isDark
+            ? "bg-ponder-dark-purple/10"
+            : "bg-ponder-light-purple/5"
+          : isDark
+          ? "bg-ponder-dark-surface"
+          : "bg-ponder-light-surface"
       }`}
     >
-      <div className={`mb-6 pb-4 border-b ${isDark ? "border-ponder-dark-border" : "border-ponder-light-card-border"}`}>
-        <h2 className={`text-lg font-semibold ${isDark ? "text-ponder-dark-text" : "text-ponder-light-text"} font-space-grotesk`}>{columnLabel}</h2>
-        <p className={`text-sm ${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} mt-1`}>
+      <div
+        className={`mb-6 pb-4 border-b flex items-center gap-2 ${
+          isDark ? "border-ponder-dark-border" : "border-ponder-light-card-border"
+        }`}
+      >
+        <span
+          data-testid={`column-dot-${column}`}
+          className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColorClass}`}
+        />
+        <h2 className={`text-lg font-semibold ${isDark ? "text-ponder-dark-text" : "text-ponder-light-text"} font-space-grotesk`}>
+          {columnLabel}
+        </h2>
+        <span className={`text-sm ${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"}`}>
           {totalWorkUnits} {itemWord}
-        </p>
+        </span>
       </div>
 
       <div

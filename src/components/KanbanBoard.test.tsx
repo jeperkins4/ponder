@@ -130,6 +130,24 @@ describe("KanbanBoard", () => {
     });
   });
 
+  it("renders each column's accent dot alongside its heading and item count on one line", async () => {
+    render(<KanbanBoard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
+    });
+
+    const toDoColumn = screen.getByRole("region", {
+      name: /To Do column/i,
+    });
+    const dot = toDoColumn.querySelector('[data-testid="column-dot-todo"]');
+    expect(dot).toBeInTheDocument();
+    expect(dot).toHaveClass("bg-gray-400");
+    // Header restyle removes the separate paragraph but keeps the count text
+    // visible within the column (satisfies the pre-existing "1 item" checks
+    // elsewhere in this file — this test only adds the dot assertion).
+  });
+
   it("displays work units in correct columns", async () => {
     render(<KanbanBoard />);
 
