@@ -1,5 +1,8 @@
 .worktrees
 
+# Subagent-driven-development scratch (task ledgers, briefs, review diffs)
+.superpowers/
+
 # Dependencies
 node_modules/
 /.pnp
