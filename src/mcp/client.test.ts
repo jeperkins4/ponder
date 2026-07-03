@@ -166,6 +166,24 @@ describe("PonderClient", () => {
     });
   });
 
+  it("regenerateAcceptance POSTs an empty body when no context is provided", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fakeFetch = (async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ acceptanceCriteria: "- a", verification: "run t" }),
+      } as Response;
+    }) as unknown as typeof fetch;
+
+    const client = new PonderClient("http://ponder.test", fakeFetch);
+    await client.regenerateAcceptance("wu1");
+
+    expect(calls[0].init.method).toBe("POST");
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({});
+  });
+
   it("throws with a message containing the status on a non-2xx response", async () => {
     const fetchImpl = fakeFetch({ ok: false, status: 404, json: {} });
     const client = new PonderClient(baseUrl, fetchImpl);

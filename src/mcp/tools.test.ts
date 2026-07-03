@@ -364,4 +364,18 @@ describe("regenerateAcceptance", () => {
     expect(result.content[0].text).toContain("Acceptance Criteria");
     expect(result.content[0].text).toContain("run t");
   });
+
+  it("returns an error-text result when the client throws", async () => {
+    const fakeClient = {
+      regenerateAcceptance: async () => {
+        throw new Error("Ponder API error: 500 POST /api/work-units/wu1/generate-acceptance-criteria");
+      },
+    } as unknown as PonderClient;
+
+    const result = await regenerateAcceptance(fakeClient, { workUnitId: "wu1" });
+    const text = result.content[0].text;
+
+    expect(text).toMatch(/error/i);
+    expect(text).toContain("500");
+  });
 });

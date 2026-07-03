@@ -83,4 +83,28 @@ describe("generateAcceptanceCriteria", () => {
     expect(userMsg).toContain("prisma/schema.prisma#Project");
     expect(String(sent.system).toLowerCase()).toContain("do not invent");
   });
+
+  it("treats whitespace-only codebaseContext as absent (no context block, ungrounded prompt)", async () => {
+    const { client, create } = makeFakeClient({
+      content: [
+        {
+          type: "tool_use",
+          id: "toolu_3",
+          name: "record_acceptance",
+          input: { acceptanceCriteria: "- x", verification: "run y" },
+        },
+      ],
+    });
+
+    await generateAcceptanceCriteria(
+      { title: "Archive a project", description: "Soft-archive.", codebaseContext: "   " },
+      client
+    );
+
+    const sent = create.mock.calls[0][0];
+    expect(String(sent.messages[0].content)).not.toContain("CODEBASE CONTEXT");
+    // "fabricate" is unique to CODEBASE_GROUNDING_INSTRUCTION; the base prompt
+    // has no such word (it does contain "do not invent", so that's ambiguous).
+    expect(String(sent.system).toLowerCase()).not.toContain("fabricate");
+  });
 });
