@@ -19,6 +19,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod/v3";
 import { PonderClient } from "./client";
 import {
+  attachImage,
   listProjects,
   listStories,
   listWorkUnits,
@@ -123,6 +124,24 @@ export function createServer(client: PonderClient): McpServer {
     },
     async ({ workUnitId, codebaseContext }) =>
       regenerateAcceptance(client, { workUnitId, codebaseContext })
+  );
+
+  server.registerTool(
+    "attach_image",
+    {
+      description:
+        "Attach a local image file (e.g. a screenshot) to a work unit as " +
+        "evidence. filePath must be readable by the MCP server process. " +
+        "Supported extensions: .png, .jpg, .jpeg, .gif, .webp. Max 10 MB " +
+        "(enforced server-side).",
+      inputSchema: {
+        workUnitId: z.string(),
+        filePath: z.string(),
+        filename: z.string().optional(),
+      },
+    },
+    async ({ workUnitId, filePath, filename }) =>
+      attachImage(client, { workUnitId, filePath, filename })
   );
 
   return server;

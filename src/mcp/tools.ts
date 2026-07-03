@@ -9,6 +9,7 @@
 import { COLUMNS } from "@/lib/columns";
 import type { Column, StoryDTO } from "@/lib/types";
 import type { PonderClient } from "./client";
+import { readLocalImage } from "./readLocalImage";
 
 export interface McpTextResult {
   [x: string]: unknown;
@@ -201,6 +202,32 @@ export async function regenerateAcceptance(
       `Regenerated work unit ${args.workUnitId}.\n\n` +
         `Acceptance Criteria:\n${acceptanceCriteria}\n\n` +
         `Verification:\n${verification}`
+    );
+  } catch (error) {
+    return textResult(
+      `Error: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/** Attach a local image file (e.g. a screenshot) to a work unit as evidence. */
+export async function attachImage(
+  client: PonderClient,
+  args: { workUnitId: string; filePath: string; filename?: string }
+): Promise<McpTextResult> {
+  try {
+    const { buffer, filename, mimeType } = await readLocalImage(
+      args.filePath,
+      args.filename
+    );
+    const attachment = await client.addAttachment(
+      args.workUnitId,
+      buffer,
+      filename,
+      mimeType
+    );
+    return textResult(
+      `Attached "${attachment.filename}" (${attachment.mimeType}, ${attachment.size} bytes) to work unit ${args.workUnitId}.`
     );
   } catch (error) {
     return textResult(

@@ -6,7 +6,7 @@
  * duplication. This client performs no business logic of its own.
  */
 
-import type { Column, ProjectWithStats, StoryDTO, WorkUnitDTO } from "@/lib/types";
+import type { AttachmentDTO, Column, ProjectWithStats, StoryDTO, WorkUnitDTO } from "@/lib/types";
 
 export class PonderClient {
   private readonly baseUrl: string;
@@ -60,6 +60,38 @@ export class PonderClient {
       `/api/work-units/${encodeURIComponent(id)}/generate-acceptance-criteria`,
       codebaseContext !== undefined ? { codebaseContext } : {}
     );
+  }
+
+  /**
+   * Uploads a local image as a work-unit attachment. Bespoke (not routed
+   * through the shared `request` helper below): that helper always
+   * JSON-encodes its body, but the existing attachments endpoint expects
+   * multipart/form-data with the file under a "file" field.
+   */
+  async addAttachment(
+    workUnitId: string,
+    buffer: Buffer,
+    filename: string,
+    mimeType: string
+  ): Promise<AttachmentDTO> {
+    const path = `/api/work-units/${encodeURIComponent(workUnitId)}/attachments`;
+    const formData = new FormData();
+    formData.append(
+      "file",
+      new Blob([buffer as BlobPart], { type: mimeType }),
+      filename
+    );
+
+    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ponder API error: ${response.status} POST ${path}`);
+    }
+
+    return (await response.json()) as AttachmentDTO;
   }
 
   private async request<T>(

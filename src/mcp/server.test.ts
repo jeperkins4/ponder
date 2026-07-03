@@ -3,7 +3,7 @@ import { createServer } from "./server";
 import type { PonderClient } from "./client";
 
 describe("createServer", () => {
-  it("does not throw and registers the seven expected tools", () => {
+  it("does not throw and registers the eight expected tools", () => {
     // A fake client is enough — no tool handler is invoked here, we're only
     // verifying registration. `createServer` must not spawn a stdio
     // transport as a side effect of being called (that only happens in
@@ -30,6 +30,7 @@ describe("createServer", () => {
         "mark_done",
         "update_work_unit",
         "regenerate_acceptance",
+        "attach_image",
       ].sort()
     );
   });

@@ -1,5 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import {
+  attachImage,
   listProjects,
   listStories,
   listWorkUnits,
@@ -377,5 +381,99 @@ describe("regenerateAcceptance", () => {
 
     expect(text).toMatch(/error/i);
     expect(text).toContain("500");
+  });
+});
+
+describe("attachImage", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(path.join(tmpdir(), "ponder-attachImage-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("reads the local file and uploads it via client.addAttachment", async () => {
+    const filePath = path.join(dir, "screenshot.png");
+    await writeFile(filePath, "fake-bytes");
+
+    const fakeClient = {
+      addAttachment: async (
+        workUnitId: string,
+        buffer: Buffer,
+        filename: string,
+        mimeType: string
+      ) => {
+        expect(workUnitId).toBe("wu1");
+        expect(buffer.toString()).toBe("fake-bytes");
+        expect(filename).toBe("screenshot.png");
+        expect(mimeType).toBe("image/png");
+        return {
+          id: "a1",
+          workUnitId: "wu1",
+          filename,
+          mimeType,
+          size: buffer.length,
+          createdAt: "2026-07-02T00:00:00.000Z",
+          url: "/api/attachments/a1",
+        };
+      },
+    } as unknown as PonderClient;
+
+    const result = await attachImage(fakeClient, {
+      workUnitId: "wu1",
+      filePath,
+    });
+
+    expect(result.content[0].text).toContain("screenshot.png");
+    expect(result.content[0].text).toContain("wu1");
+  });
+
+  it("returns an error-text result for an unsupported extension, without calling the client", async () => {
+    const filePath = path.join(dir, "notes.txt");
+    await writeFile(filePath, "not an image");
+    const addAttachment = vi.fn();
+    const fakeClient = { addAttachment } as unknown as PonderClient;
+
+    const result = await attachImage(fakeClient, {
+      workUnitId: "wu1",
+      filePath,
+    });
+
+    expect(result.content[0].text).toMatch(/error/i);
+    expect(addAttachment).not.toHaveBeenCalled();
+  });
+
+  it("returns an error-text result for a missing file", async () => {
+    const fakeClient = {
+      addAttachment: vi.fn(),
+    } as unknown as PonderClient;
+
+    const result = await attachImage(fakeClient, {
+      workUnitId: "wu1",
+      filePath: path.join(dir, "does-not-exist.png"),
+    });
+
+    expect(result.content[0].text).toMatch(/error/i);
+  });
+
+  it("returns an error-text result when the client throws", async () => {
+    const filePath = path.join(dir, "screenshot.png");
+    await writeFile(filePath, "fake-bytes");
+    const fakeClient = {
+      addAttachment: async () => {
+        throw new Error("Ponder API error: 413 POST /api/work-units/wu1/attachments");
+      },
+    } as unknown as PonderClient;
+
+    const result = await attachImage(fakeClient, {
+      workUnitId: "wu1",
+      filePath,
+    });
+
+    expect(result.content[0].text).toMatch(/error/i);
+    expect(result.content[0].text).toContain("413");
   });
 });
