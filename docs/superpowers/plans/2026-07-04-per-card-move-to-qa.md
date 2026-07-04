@@ -702,14 +702,16 @@ git commit -m "feat: wire move-to-qa route to reportWorkUnitToQA"
 
 ---
 
-### Task 4: WorkUnitCard — reported badge and differentiated toast messaging
+### Task 4: WorkUnitCard — retry-capable reported state and differentiated toast messaging
+
+**Revision note:** the original plan had the button replaced by an inert "Reported to JIRA ✓" badge with no way to re-trigger once `movedToQaReportedAt` was set. Task 2's review surfaced a real stuck-state risk: if the last card's JIRA transition itself fails (after that card's own comment/attachments already posted), there would be no way to retry. `reportWorkUnitToQA` was made idempotent to support safe re-calling (a repeat call skips re-posting the comment/attachments and just retries the readiness-check + transition). This task's UI is revised to match: the button always stays clickable, its label just changes once reported, so a stuck story can always be unstuck with another click.
 
 **Files:**
 - Modify: `src/components/WorkUnitCard.tsx`
 - Modify: `src/components/WorkUnitCard.test.tsx`
 
 **Interfaces:**
-- Consumes: `WorkUnitDTO.movedToQaReportedAt` (Task 1); `POST /api/work-units/[id]/move-to-qa` response `{ ok: true, transitioned: boolean }` (Task 3, exact shape).
+- Consumes: `WorkUnitDTO.movedToQaReportedAt` (Task 1); `POST /api/work-units/[id]/move-to-qa` response `{ ok: true, transitioned: boolean }` (Task 3, exact shape); the idempotent `reportWorkUnitToQA` (Task 2 fix) that safely allows repeat calls on an already-reported work unit.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -738,19 +740,48 @@ In `src/components/WorkUnitCard.test.tsx`, replace the existing `describe("Move 
       ).not.toBeInTheDocument();
     });
 
-    it("shows a Reported to JIRA badge instead of the button once movedToQaReportedAt is set", () => {
+    it("keeps the button clickable and relabels it once movedToQaReportedAt is set", () => {
       const reportedUnit: WorkUnitDTO = {
         ...doneWorkUnit,
         movedToQaReportedAt: "2026-07-04T00:00:00Z",
       };
       render(<WorkUnitCard workUnit={reportedUnit} storyKey="COM-1" />);
 
-      expect(screen.getByTestId(`move-to-qa-reported-badge-${reportedUnit.id}`)).toHaveTextContent(
-        /reported to jira/i
+      const button = screen.getByTestId(`move-to-qa-button-${reportedUnit.id}`);
+      expect(button).toHaveTextContent(/reported.*retry/i);
+      expect(button).not.toBeDisabled();
+    });
+
+    it("retries via the same button when already reported (e.g. after a failed transition)", async () => {
+      const reportedUnit: WorkUnitDTO = {
+        ...doneWorkUnit,
+        movedToQaReportedAt: "2026-07-04T00:00:00Z",
+      };
+      vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true, transitioned: true }),
+      } as Response);
+
+      const onStatusMessage = vi.fn();
+      render(
+        <WorkUnitCard
+          workUnit={reportedUnit}
+          storyKey="COM-1"
+          onStatusMessage={onStatusMessage}
+        />
       );
-      expect(
-        screen.queryByTestId(`move-to-qa-button-${reportedUnit.id}`)
-      ).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId(`move-to-qa-button-${reportedUnit.id}`));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/work-units/${reportedUnit.id}/move-to-qa`,
+          expect.objectContaining({ method: "POST" })
+        );
+        expect(onStatusMessage).toHaveBeenCalledWith(
+          expect.stringContaining("JIRA QA")
+        );
+      });
     });
 
     it("POSTs to the move-to-qa endpoint and reports a non-count message when not transitioned", async () => {
@@ -888,37 +919,34 @@ Replace the existing Move-to-QA button block (~line 436-453) with:
 
 ```tsx
         {workUnit.column === "done" && storyKey && (
-          workUnit.movedToQaReportedAt ? (
-            <span
-              className={`px-2 py-1.5 text-xs font-instrument font-semibold rounded-lg ${
-                isDark
-                  ? "bg-emerald-900/50 text-emerald-200"
-                  : "bg-emerald-100 text-emerald-800"
-              }`}
-              data-testid={`move-to-qa-reported-badge-${workUnit.id}`}
-            >
-              Reported to JIRA ✓
-            </span>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleMoveToQA();
-              }}
-              disabled={isMovingToQA}
-              aria-label={`Move ${storyKey} to JIRA QA`}
-              className={`px-2 py-1.5 text-xs font-instrument font-semibold rounded-lg transition-colors disabled:opacity-50 ${focusRing} ${
-                isDark
-                  ? "bg-emerald-900/50 text-emerald-200 hover:bg-emerald-900/70"
-                  : "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-              }`}
-              data-testid={`move-to-qa-button-${workUnit.id}`}
-            >
-              {isMovingToQA ? "Moving…" : "Move to QA"}
-            </button>
-          )
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleMoveToQA();
+            }}
+            disabled={isMovingToQA}
+            aria-label={
+              workUnit.movedToQaReportedAt
+                ? `Retry moving ${storyKey} to JIRA QA`
+                : `Move ${storyKey} to JIRA QA`
+            }
+            className={`px-2 py-1.5 text-xs font-instrument font-semibold rounded-lg transition-colors disabled:opacity-50 ${focusRing} ${
+              isDark
+                ? "bg-emerald-900/50 text-emerald-200 hover:bg-emerald-900/70"
+                : "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+            }`}
+            data-testid={`move-to-qa-button-${workUnit.id}`}
+          >
+            {isMovingToQA
+              ? "Moving…"
+              : workUnit.movedToQaReportedAt
+                ? "Reported ✓ (Retry)"
+                : "Move to QA"}
+          </button>
         )}
 ```
+
+The button is always clickable (never replaced by an inert badge) — a repeat click on an already-reported work unit calls the idempotent `reportWorkUnitToQA` again, which skips re-posting the comment/attachments and just retries the readiness-check + transition. This is what makes a stuck story (all cards reported, transition never succeeded) recoverable.
 
 - [ ] **Step 4: Run it to verify it passes**
 
