@@ -60,6 +60,10 @@ describe("Work Unit API Endpoints", () => {
     expect(body.workUnits[0].description).toBe("Do something");
     expect(body.workUnits[0].column).toBe("todo");
     expect(body.workUnits[0].order).toBe(0);
+    expect(body.workUnits[0].verificationRequestedAt).toBeNull();
+    expect(body.workUnits[0].verifiedAt).toBeNull();
+    expect(body.workUnits[0].verificationOutcome).toBeNull();
+    expect(body.workUnits[0].verificationSummary).toBeNull();
 
     // Save the work unit ID for later tests
     workUnitId = body.workUnits[0].id;
@@ -94,6 +98,10 @@ describe("Work Unit API Endpoints", () => {
     expect(body.description).toBe("A test work unit");
     expect(body.column).toBe("in_progress");
     expect(body.order).toBe(1);
+    expect(body.verificationRequestedAt).toBeNull();
+    expect(body.verifiedAt).toBeNull();
+    expect(body.verificationOutcome).toBeNull();
+    expect(body.verificationSummary).toBeNull();
   });
 
   it("GET should return 404 for non-existent work unit", async () => {
