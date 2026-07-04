@@ -403,35 +403,40 @@ export async function reportWorkUnitToQA(
     apiToken: story.project.jiraApiToken,
   };
 
-  const sections = [`${workUnit.title}`];
-  if (workUnit.description) sections.push(`Description:\n${workUnit.description}`);
-  if (workUnit.acceptanceCriteria) sections.push(`Acceptance Criteria:\n${workUnit.acceptanceCriteria}`);
-  if (workUnit.verification) sections.push(`Verification:\n${workUnit.verification}`);
-  const comment = sections.join("\n\n");
+  let reportedAt = workUnit.movedToQaReportedAt;
 
-  try {
-    await deps.addComment(story.jiraKey, comment, config);
+  if (!reportedAt) {
+    const sections = [`${workUnit.title}`];
+    if (workUnit.description) sections.push(`Description:\n${workUnit.description}`);
+    if (workUnit.acceptanceCriteria) sections.push(`Acceptance Criteria:\n${workUnit.acceptanceCriteria}`);
+    if (workUnit.verification) sections.push(`Verification:\n${workUnit.verification}`);
+    const comment = sections.join("\n\n");
 
-    for (const attachment of workUnit.attachments) {
-      const buffer = await deps.readAttachmentFile(attachment.id);
-      await deps.uploadAttachment(
-        story.jiraKey,
-        { buffer, filename: attachment.filename, mimeType: attachment.mimeType },
-        config
-      );
+    try {
+      await deps.addComment(story.jiraKey, comment, config);
+
+      for (const attachment of workUnit.attachments) {
+        const buffer = await deps.readAttachmentFile(attachment.id);
+        await deps.uploadAttachment(
+          story.jiraKey,
+          { buffer, filename: attachment.filename, mimeType: attachment.mimeType },
+          config
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
     }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: message };
+
+    reportedAt = new Date();
+    await prisma.workUnit.update({
+      where: { id: workUnitId },
+      data: { movedToQaReportedAt: reportedAt },
+    });
   }
 
-  await prisma.workUnit.update({
-    where: { id: workUnitId },
-    data: { movedToQaReportedAt: new Date() },
-  });
-
   const siblingsAfterReport = story.workUnits.map((w) =>
-    w.id === workUnitId ? { column: w.column, movedToQaReportedAt: new Date() } : w
+    w.id === workUnitId ? { column: w.column, movedToQaReportedAt: reportedAt } : w
   );
 
   if (!computeStoryQaReadiness(siblingsAfterReport)) {

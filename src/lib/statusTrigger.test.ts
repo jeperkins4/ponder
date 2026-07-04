@@ -952,6 +952,37 @@ describe("reportWorkUnitToQA", () => {
     expect(updated?.movedToQaReportedAt).toBeNull();
   });
 
+  it("retries the transition without re-posting the comment or attachments when already reported", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    const wu1 = await prisma.workUnit.create({
+      data: {
+        storyId: story.id,
+        title: "Task 1",
+        column: "done",
+        order: 0,
+        movedToQaReportedAt: new Date(),
+      },
+    });
+    const wu2 = await prisma.workUnit.create({
+      data: {
+        storyId: story.id,
+        title: "Task 2",
+        column: "done",
+        order: 1,
+        movedToQaReportedAt: new Date(), // already reported once, but transition failed last time
+      },
+    });
+
+    const deps = fakeReportDeps();
+    const result = await reportWorkUnitToQA(wu2.id, prisma, deps);
+
+    expect(result).toEqual({ ok: true, transitioned: true });
+    expect(deps.addComment).not.toHaveBeenCalled();
+    expect(deps.uploadAttachment).not.toHaveBeenCalled();
+    expect(deps.transitionIssue).toHaveBeenCalledWith(story.jiraKey, "2", expect.any(Object));
+  });
+
   it("returns an error for a missing work unit", async () => {
     const result = await reportWorkUnitToQA("does-not-exist", prisma, fakeReportDeps());
     expect(result.ok).toBe(false);
