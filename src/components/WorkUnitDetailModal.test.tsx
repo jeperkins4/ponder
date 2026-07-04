@@ -217,7 +217,8 @@ describe("WorkUnitDetailModal", () => {
     });
   });
 
-  it("shows the verification result when the work unit has been verified", () => {
+  it("shows the verification result when the work unit has been verified", async () => {
+    global.fetch = mockFetch({ notes: [] }) as unknown as typeof fetch;
     const verifiedUnit: WorkUnitDTO = {
       ...baseWorkUnit,
       verifiedAt: "2026-07-04T12:00:00Z",
@@ -235,9 +236,15 @@ describe("WorkUnitDetailModal", () => {
     const result = screen.getByTestId("work-unit-detail-verification-result");
     expect(result).toHaveTextContent(/passed/i);
     expect(result).toHaveTextContent("Confirmed the fix resolves the bug.");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("work-unit-detail-notes-empty")).toBeInTheDocument();
+    });
   });
 
-  it("omits the verification result section when never verified", () => {
+  it("omits the verification result section when never verified", async () => {
+    global.fetch = mockFetch({ notes: [] }) as unknown as typeof fetch;
+
     render(
       <WorkUnitDetailModal
         workUnit={baseWorkUnit}
@@ -247,6 +254,10 @@ describe("WorkUnitDetailModal", () => {
     );
 
     expect(screen.queryByTestId("work-unit-detail-verification-result")).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("work-unit-detail-notes-empty")).toBeInTheDocument();
+    });
   });
 
   it("fetches and lists notes chronologically on open", async () => {
