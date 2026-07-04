@@ -45,6 +45,8 @@ Toast messaging (`onStatusMessage`) differs by outcome:
 - Not yet transitioned: `"Reported <title> to JIRA — waiting on N more sub-stories"`
 - Transitioned (this click was the last one): today's existing `"Moved <storyKey> to JIRA QA"`
 
+Shipped deviation: the not-yet-transitioned toast is implemented as just `Reported "<title>" to JIRA"`, without the "waiting on N more" count. This is a deliberate simplification, not an oversight — the `POST /api/work-units/[id]/move-to-qa` response shape (`{ ok: true, transitioned: boolean }`) doesn't carry a remaining-sibling count, and `WorkUnitCard` has no access to sibling data to compute one itself. This could be added later by extending the response shape if the count is judged worth the added complexity.
+
 ## Error Handling
 
 - Comment-post or attachment-upload failure: whole click fails, alert shown, nothing marked reported — same error-surfacing pattern as today's Move-to-QA (not the silent non-blocking pattern used by the automatic Code-Review-comment sync elsewhere in this codebase).

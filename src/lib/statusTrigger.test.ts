@@ -981,6 +981,9 @@ describe("reportWorkUnitToQA", () => {
     expect(deps.addComment).not.toHaveBeenCalled();
     expect(deps.uploadAttachment).not.toHaveBeenCalled();
     expect(deps.transitionIssue).toHaveBeenCalledWith(story.jiraKey, "2", expect.any(Object));
+
+    const wu1After = await prisma.workUnit.findUnique({ where: { id: wu1.id } });
+    expect(wu1After?.movedToQaReportedAt).toEqual(wu1.movedToQaReportedAt);
   });
 
   it("returns an error for a missing work unit", async () => {
