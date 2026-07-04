@@ -129,6 +129,7 @@ describe("GET /api/stories", () => {
         (wu: { id: string }) => wu.id === workUnit.id
       );
       expect(foundWorkUnit.archivedAt).toBeNull();
+      expect(foundWorkUnit.movedToQaReportedAt).toBeNull();
     } finally {
       await prisma.workUnit.delete({ where: { id: workUnit.id } });
       await prisma.story.delete({ where: { id: story.id } });

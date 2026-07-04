@@ -22,6 +22,7 @@ function workUnitToDTO(wu: {
   createdAt: Date;
   completedAt: Date | null;
   archivedAt: Date | null;
+  movedToQaReportedAt: Date | null;
 }): WorkUnitDTO {
   return {
     id: wu.id,
@@ -36,6 +37,7 @@ function workUnitToDTO(wu: {
     createdAt: wu.createdAt.toISOString(),
     completedAt: wu.completedAt?.toISOString() ?? null,
     archivedAt: wu.archivedAt?.toISOString() ?? null,
+    movedToQaReportedAt: wu.movedToQaReportedAt?.toISOString() ?? null,
   };
 }
 

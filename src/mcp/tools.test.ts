@@ -69,6 +69,7 @@ const stories: StoryDTO[] = [
         createdAt: new Date().toISOString(),
         completedAt: null,
         archivedAt: null,
+        movedToQaReportedAt: null,
       },
       {
         id: "w2",
@@ -83,6 +84,7 @@ const stories: StoryDTO[] = [
         createdAt: new Date().toISOString(),
         completedAt: null,
         archivedAt: null,
+        movedToQaReportedAt: null,
       },
       {
         id: "w3",
@@ -97,6 +99,7 @@ const stories: StoryDTO[] = [
         createdAt: new Date().toISOString(),
         completedAt: null,
         archivedAt: null,
+        movedToQaReportedAt: null,
       },
       {
         id: "w4",
@@ -111,6 +114,7 @@ const stories: StoryDTO[] = [
         createdAt: new Date().toISOString(),
         completedAt: null,
         archivedAt: null,
+        movedToQaReportedAt: null,
       },
     ],
   },
@@ -238,6 +242,7 @@ const movedWorkUnit: WorkUnitDTO = {
   createdAt: new Date().toISOString(),
   completedAt: null,
   archivedAt: null,
+  movedToQaReportedAt: null,
 };
 
 describe("moveWorkUnit", () => {

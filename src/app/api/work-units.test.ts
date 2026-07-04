@@ -94,6 +94,7 @@ describe("Work Unit API Endpoints", () => {
     expect(body.description).toBe("A test work unit");
     expect(body.column).toBe("in_progress");
     expect(body.order).toBe(1);
+    expect(body.movedToQaReportedAt).toBeNull();
   });
 
   it("GET should return 404 for non-existent work unit", async () => {

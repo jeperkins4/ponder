@@ -21,6 +21,7 @@ export interface WorkUnitDTO {
   createdAt: string; // ISO string
   completedAt: string | null; // ISO string
   archivedAt: string | null; // ISO string
+  movedToQaReportedAt: string | null; // ISO string
 }
 
 /** @public consumed starting in Task 2/3 (work-unit detail modal work notes) */
