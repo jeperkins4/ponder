@@ -98,6 +98,7 @@ describe("Work Unit API Endpoints", () => {
     expect(body.description).toBe("A test work unit");
     expect(body.column).toBe("in_progress");
     expect(body.order).toBe(1);
+    expect(body.movedToQaReportedAt).toBeNull();
     expect(body.verificationRequestedAt).toBeNull();
     expect(body.verifiedAt).toBeNull();
     expect(body.verificationOutcome).toBeNull();

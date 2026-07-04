@@ -9,7 +9,9 @@ import { prisma } from "./prisma";
 import {
   applyStoryStatusSync,
   computeDesiredJiraStatus,
+  computeStoryQaReadiness,
   transitionStoryToQA,
+  reportWorkUnitToQA,
   type ApplyStoryStatusSyncDeps,
 } from "./statusTrigger";
 import type { JiraTransition } from "@/lib/jira/transitions";
@@ -39,6 +41,39 @@ describe("computeDesiredJiraStatus", () => {
     expect(
       computeDesiredJiraStatus([{ column: "done" }, { column: "done" }])
     ).toBe("Code Revew");
+  });
+});
+
+describe("computeStoryQaReadiness", () => {
+  it("returns false when there are no work units", () => {
+    expect(computeStoryQaReadiness([])).toBe(false);
+  });
+
+  it("returns false when any work unit isn't done", () => {
+    expect(
+      computeStoryQaReadiness([
+        { column: "done", movedToQaReportedAt: new Date() },
+        { column: "code_review", movedToQaReportedAt: null },
+      ])
+    ).toBe(false);
+  });
+
+  it("returns false when any done work unit hasn't been reported", () => {
+    expect(
+      computeStoryQaReadiness([
+        { column: "done", movedToQaReportedAt: new Date() },
+        { column: "done", movedToQaReportedAt: null },
+      ])
+    ).toBe(false);
+  });
+
+  it("returns true when every work unit is done and reported", () => {
+    expect(
+      computeStoryQaReadiness([
+        { column: "done", movedToQaReportedAt: new Date() },
+        { column: "done", movedToQaReportedAt: new Date() },
+      ])
+    ).toBe(true);
   });
 });
 
@@ -724,5 +759,245 @@ describe("transitionStoryToQA", () => {
     const updated2 = await prisma.workUnit.findUnique({ where: { id: wu2.id } });
     expect(updated1?.archivedAt).toBeNull();
     expect(updated2?.archivedAt).toBeNull();
+  });
+});
+
+describe("reportWorkUnitToQA", () => {
+  let testCounter = 0;
+
+  beforeEach(async () => {
+    await prisma.workUnit.deleteMany({});
+    await prisma.story.deleteMany({});
+    await prisma.project.deleteMany({});
+    testCounter++;
+  });
+
+  async function makeJiraProject() {
+    return prisma.project.create({
+      data: {
+        name: `Report Test Project ${testCounter}`,
+        type: "JIRA",
+        jiraProjectKey: "TEAM",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "user@example.com",
+        jiraApiToken: "token-123",
+      },
+    });
+  }
+
+  async function makeStory(overrides: Partial<Parameters<typeof prisma.story.create>[0]["data"]> = {}) {
+    return prisma.story.create({
+      data: {
+        jiraKey: `TEAM-RPT-${testCounter}`,
+        jiraId: `9200${testCounter}`,
+        projectKey: "TEAM",
+        summary: "Test story",
+        jiraStatus: "Code Revew",
+        url: `https://example.atlassian.net/browse/TEAM-RPT-${testCounter}`,
+        lastSyncedAt: new Date(),
+        ...overrides,
+      },
+    });
+  }
+
+  function fakeReportDeps(
+    overrides: Partial<{
+      getTransitions: ApplyStoryStatusSyncDeps["getTransitions"];
+      transitionIssue: ApplyStoryStatusSyncDeps["transitionIssue"];
+      addComment: ApplyStoryStatusSyncDeps["addComment"];
+      uploadAttachment: ApplyStoryStatusSyncDeps["uploadAttachment"];
+      readAttachmentFile: ApplyStoryStatusSyncDeps["readAttachmentFile"];
+    }> = {}
+  ) {
+    return {
+      getTransitions: vi.fn(async (): Promise<JiraTransition[]> => [
+        { id: "2", name: "QA", to: { name: "QA", statusCategory: { key: "indeterminate" } } },
+      ]),
+      transitionIssue: vi.fn(async () => {}),
+      addComment: vi.fn(async () => {}),
+      uploadAttachment: vi.fn(async () => {}),
+      readAttachmentFile: vi.fn(async () => Buffer.from("fake-image-bytes")),
+      ...overrides,
+    };
+  }
+
+  it("posts a comment built from the work unit's own fields, marks it reported, and does not transition when siblings aren't ready", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    const wu1 = await prisma.workUnit.create({
+      data: {
+        storyId: story.id,
+        title: "Task 1",
+        description: "Did the thing",
+        acceptanceCriteria: "AC text",
+        verification: "Verification text",
+        column: "done",
+        order: 0,
+      },
+    });
+    await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 2", column: "code_review", order: 1 },
+    });
+
+    const deps = fakeReportDeps();
+    const result = await reportWorkUnitToQA(wu1.id, prisma, deps);
+
+    expect(result).toEqual({ ok: true, transitioned: false });
+    expect(deps.addComment).toHaveBeenCalledWith(
+      story.jiraKey,
+      expect.stringContaining("Task 1"),
+      expect.any(Object)
+    );
+    expect(deps.addComment).toHaveBeenCalledWith(
+      story.jiraKey,
+      expect.stringContaining("AC text"),
+      expect.any(Object)
+    );
+    expect(deps.transitionIssue).not.toHaveBeenCalled();
+
+    const updated = await prisma.workUnit.findUnique({ where: { id: wu1.id } });
+    expect(updated?.movedToQaReportedAt).not.toBeNull();
+  });
+
+  it("uploads the work unit's own attachments", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    const wu = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+    await prisma.attachment.create({
+      data: { workUnitId: wu.id, filename: "shot.png", mimeType: "image/png", size: 123 },
+    });
+
+    const deps = fakeReportDeps();
+    await reportWorkUnitToQA(wu.id, prisma, deps);
+
+    expect(deps.readAttachmentFile).toHaveBeenCalledTimes(1);
+    expect(deps.uploadAttachment).toHaveBeenCalledWith(
+      story.jiraKey,
+      expect.objectContaining({ filename: "shot.png", mimeType: "image/png" }),
+      expect.any(Object)
+    );
+  });
+
+  it("transitions and archives when this was the last sibling to be reported", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    const wu1 = await prisma.workUnit.create({
+      data: {
+        storyId: story.id,
+        title: "Task 1",
+        column: "done",
+        order: 0,
+        movedToQaReportedAt: new Date(),
+      },
+    });
+    const wu2 = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 2", column: "done", order: 1 },
+    });
+
+    const deps = fakeReportDeps();
+    const result = await reportWorkUnitToQA(wu2.id, prisma, deps);
+
+    expect(result).toEqual({ ok: true, transitioned: true });
+    expect(deps.transitionIssue).toHaveBeenCalledWith(story.jiraKey, "2", expect.any(Object));
+
+    const updatedStory = await prisma.story.findUnique({ where: { id: story.id } });
+    expect(updatedStory?.jiraStatus).toBe("QA");
+
+    const updatedWu1 = await prisma.workUnit.findUnique({ where: { id: wu1.id } });
+    const updatedWu2 = await prisma.workUnit.findUnique({ where: { id: wu2.id } });
+    expect(updatedWu1?.archivedAt).not.toBeNull();
+    expect(updatedWu2?.archivedAt).not.toBeNull();
+  });
+
+  it("fails without marking reported when addComment rejects", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    const wu = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+
+    const deps = fakeReportDeps({
+      addComment: vi.fn(async () => {
+        throw new Error("JIRA API error: 500");
+      }),
+    });
+    const result = await reportWorkUnitToQA(wu.id, prisma, deps);
+
+    expect(result.ok).toBe(false);
+    const updated = await prisma.workUnit.findUnique({ where: { id: wu.id } });
+    expect(updated?.movedToQaReportedAt).toBeNull();
+  });
+
+  it("fails without marking reported when uploadAttachment rejects", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    const wu = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+    await prisma.attachment.create({
+      data: { workUnitId: wu.id, filename: "shot.png", mimeType: "image/png", size: 123 },
+    });
+
+    const deps = fakeReportDeps({
+      uploadAttachment: vi.fn(async () => {
+        throw new Error("JIRA API error: 500");
+      }),
+    });
+    const result = await reportWorkUnitToQA(wu.id, prisma, deps);
+
+    expect(result.ok).toBe(false);
+    const updated = await prisma.workUnit.findUnique({ where: { id: wu.id } });
+    expect(updated?.movedToQaReportedAt).toBeNull();
+  });
+
+  it("retries the transition without re-posting the comment or attachments when already reported", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    const wu1 = await prisma.workUnit.create({
+      data: {
+        storyId: story.id,
+        title: "Task 1",
+        column: "done",
+        order: 0,
+        movedToQaReportedAt: new Date(),
+      },
+    });
+    const wu2 = await prisma.workUnit.create({
+      data: {
+        storyId: story.id,
+        title: "Task 2",
+        column: "done",
+        order: 1,
+        movedToQaReportedAt: new Date(), // already reported once, but transition failed last time
+      },
+    });
+
+    const deps = fakeReportDeps();
+    const result = await reportWorkUnitToQA(wu2.id, prisma, deps);
+
+    expect(result).toEqual({ ok: true, transitioned: true });
+    expect(deps.addComment).not.toHaveBeenCalled();
+    expect(deps.uploadAttachment).not.toHaveBeenCalled();
+    expect(deps.transitionIssue).toHaveBeenCalledWith(story.jiraKey, "2", expect.any(Object));
+
+    const wu1After = await prisma.workUnit.findUnique({ where: { id: wu1.id } });
+    expect(wu1After?.movedToQaReportedAt).toEqual(wu1.movedToQaReportedAt);
+  });
+
+  it("returns an error for a missing work unit", async () => {
+    const result = await reportWorkUnitToQA("does-not-exist", prisma, fakeReportDeps());
+    expect(result.ok).toBe(false);
+  });
+
+  it("returns an error when the project has no JIRA credentials", async () => {
+    const story = await makeStory();
+    const wu = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+
+    const result = await reportWorkUnitToQA(wu.id, prisma, fakeReportDeps());
+    expect(result.ok).toBe(false);
   });
 });

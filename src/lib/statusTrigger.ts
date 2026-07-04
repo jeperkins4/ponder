@@ -61,6 +61,22 @@ export function computeDesiredJiraStatus(
   return null;
 }
 
+/** Minimal shape `computeStoryQaReadiness` needs from a work unit. */
+export type QaReadinessLike = { column: string; movedToQaReportedAt: Date | null };
+
+/**
+ * True once every one of a story's work units is both `column === "done"`
+ * and has been individually reported to JIRA via the Move-to-QA button
+ * (`movedToQaReportedAt` set). An empty list is never "ready" — there's
+ * nothing to transition.
+ */
+export function computeStoryQaReadiness(workUnits: QaReadinessLike[]): boolean {
+  if (workUnits.length === 0) {
+    return false;
+  }
+  return workUnits.every((w) => w.column === "done" && w.movedToQaReportedAt != null);
+}
+
 /**
  * Injectable dependency bag for `applyStoryStatusSync`. Defaults to the real
  * JIRA/Claude implementations; tests inject fakes instead.
@@ -337,4 +353,99 @@ export async function transitionStoryToQA(
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: message };
   }
+}
+
+/**
+ * Posts one work unit's own evidence (title/description/acceptanceCriteria/
+ * verification as a comment, its own attachments as JIRA attachments) to its
+ * parent story's JIRA issue, then marks it reported. If every one of the
+ * story's active work units is now Done AND reported, also runs
+ * `transitionStoryToQA` (JIRA transition to QA + archive-all) as a second
+ * step.
+ *
+ * Any failure posting the comment or uploading an attachment aborts before
+ * `movedToQaReportedAt` is set — nothing is marked reported, matching this
+ * action's human-triggered, error-surfacing contract (unlike
+ * `applyStoryStatusSync`'s non-blocking automatic sync).
+ */
+export async function reportWorkUnitToQA(
+  workUnitId: string,
+  prisma: PrismaClient,
+  deps: Pick<
+    ApplyStoryStatusSyncDeps,
+    "getTransitions" | "transitionIssue" | "addComment" | "uploadAttachment" | "readAttachmentFile"
+  > = defaultDeps
+): Promise<TransitionStoryToQAResult & { transitioned?: boolean }> {
+  const workUnit = await prisma.workUnit.findUnique({
+    where: { id: workUnitId },
+    include: {
+      attachments: true,
+      story: { include: { project: true, workUnits: { where: { archivedAt: null } } } },
+    },
+  });
+
+  if (!workUnit) {
+    return { ok: false, error: `Work unit not found: ${workUnitId}` };
+  }
+
+  const story = workUnit.story;
+
+  if (!hasJiraCredentials(story.project)) {
+    return {
+      ok: false,
+      error: `Story ${story.jiraKey} has no fully-configured JIRA project`,
+    };
+  }
+
+  const config: JiraConfig = {
+    siteUrl: story.project.jiraSiteUrl,
+    email: story.project.jiraEmail,
+    apiToken: story.project.jiraApiToken,
+  };
+
+  let reportedAt = workUnit.movedToQaReportedAt;
+
+  if (!reportedAt) {
+    const sections = [`${workUnit.title}`];
+    if (workUnit.description) sections.push(`Description:\n${workUnit.description}`);
+    if (workUnit.acceptanceCriteria) sections.push(`Acceptance Criteria:\n${workUnit.acceptanceCriteria}`);
+    if (workUnit.verification) sections.push(`Verification:\n${workUnit.verification}`);
+    const comment = sections.join("\n\n");
+
+    try {
+      await deps.addComment(story.jiraKey, comment, config);
+
+      for (const attachment of workUnit.attachments) {
+        const buffer = await deps.readAttachmentFile(attachment.id);
+        await deps.uploadAttachment(
+          story.jiraKey,
+          { buffer, filename: attachment.filename, mimeType: attachment.mimeType },
+          config
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
+    }
+
+    reportedAt = new Date();
+    await prisma.workUnit.update({
+      where: { id: workUnitId },
+      data: { movedToQaReportedAt: reportedAt },
+    });
+  }
+
+  const siblingsAfterReport = story.workUnits.map((w) =>
+    w.id === workUnitId ? { column: w.column, movedToQaReportedAt: reportedAt } : w
+  );
+
+  if (!computeStoryQaReadiness(siblingsAfterReport)) {
+    return { ok: true, transitioned: false };
+  }
+
+  const transitionResult = await transitionStoryToQA(story.id, prisma, deps);
+  if (!transitionResult.ok) {
+    return transitionResult;
+  }
+  return { ok: true, transitioned: true };
 }

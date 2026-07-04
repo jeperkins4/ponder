@@ -129,6 +129,7 @@ describe("GET /api/stories", () => {
         (wu: { id: string }) => wu.id === workUnit.id
       );
       expect(foundWorkUnit.archivedAt).toBeNull();
+      expect(foundWorkUnit.movedToQaReportedAt).toBeNull();
       expect(foundWorkUnit.verificationRequestedAt).toBeNull();
       expect(foundWorkUnit.verifiedAt).toBeNull();
       expect(foundWorkUnit.verificationOutcome).toBeNull();

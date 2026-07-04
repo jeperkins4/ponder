@@ -21,6 +21,7 @@ export interface WorkUnitDTO {
   createdAt: string; // ISO string
   completedAt: string | null; // ISO string
   archivedAt: string | null; // ISO string
+  movedToQaReportedAt: string | null; // ISO string
   verificationRequestedAt: string | null; // ISO string
   verifiedAt: string | null; // ISO string
   verificationOutcome: "passed" | "failed" | null;

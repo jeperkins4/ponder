@@ -50,6 +50,7 @@ export async function POST(
       createdAt: updated.createdAt.toISOString(),
       completedAt: updated.completedAt?.toISOString() ?? null,
       archivedAt: updated.archivedAt?.toISOString() ?? null,
+      movedToQaReportedAt: updated.movedToQaReportedAt?.toISOString() ?? null,
       verificationRequestedAt: updated.verificationRequestedAt?.toISOString() ?? null,
       verifiedAt: updated.verifiedAt?.toISOString() ?? null,
       verificationOutcome: updated.verificationOutcome as WorkUnitDTO["verificationOutcome"],
