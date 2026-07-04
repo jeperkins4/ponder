@@ -262,6 +262,28 @@ describe("PonderClient", () => {
     ).rejects.toThrow(/413/);
   });
 
+  describe("reportVerification", () => {
+    it("POSTs outcome/summary/verificationSteps and returns the updated work unit", async () => {
+      const workUnit = { id: "w1", verificationOutcome: "passed" } as WorkUnitDTO;
+      const fetchMock = vi.fn(async () => ({
+        ok: true,
+        json: async () => workUnit,
+      })) as unknown as typeof fetch;
+
+      const client = new PonderClient("http://localhost:3000", fetchMock);
+      const result = await client.reportVerification("w1", "passed", "Looks good", "1. Run it");
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://localhost:3000/api/work-units/w1/report-verification",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ outcome: "passed", summary: "Looks good", verificationSteps: "1. Run it" }),
+        })
+      );
+      expect(result).toEqual(workUnit);
+    });
+  });
+
   it("respects a custom baseUrl", async () => {
     const customBase = "http://example.com:9999";
     const fetchImpl = fakeFetch({ ok: true, json: [] });

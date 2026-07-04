@@ -26,6 +26,7 @@ import {
   markDone,
   moveWorkUnit,
   regenerateAcceptance,
+  reportVerification,
   updateWorkUnit,
 } from "./tools";
 
@@ -55,13 +56,16 @@ export function createServer(client: PonderClient): McpServer {
     "list_work_units",
     {
       description:
-        "List work units for a project, optionally filtered to a single column.",
+        "List work units for a project, optionally filtered to a single column, " +
+        "or to only those pending AI-agent verification (pendingVerification: true).",
       inputSchema: {
         projectId: z.string(),
         column: z.string().optional(),
+        pendingVerification: z.boolean().optional(),
       },
     },
-    async ({ projectId, column }) => listWorkUnits(client, { projectId, column })
+    async ({ projectId, column, pendingVerification }) =>
+      listWorkUnits(client, { projectId, column, pendingVerification })
   );
 
   server.registerTool(
@@ -142,6 +146,26 @@ export function createServer(client: PonderClient): McpServer {
     },
     async ({ workUnitId, filePath, filename }) =>
       attachImage(client, { workUnitId, filePath, filename })
+  );
+
+  server.registerTool(
+    "report_verification",
+    {
+      description:
+        "Report the result of an AI-agent verification run for a Code Review " +
+        "work unit (requested via the Verify button). Attach the supporting " +
+        "screenshot separately with attach_image before or after calling this. " +
+        "If the work unit had no documented verification steps, pass " +
+        "verificationSteps to record what you ran.",
+      inputSchema: {
+        workUnitId: z.string(),
+        outcome: z.enum(["passed", "failed"]),
+        summary: z.string(),
+        verificationSteps: z.string().optional(),
+      },
+    },
+    async ({ workUnitId, outcome, summary, verificationSteps }) =>
+      reportVerification(client, { workUnitId, outcome, summary, verificationSteps })
   );
 
   return server;

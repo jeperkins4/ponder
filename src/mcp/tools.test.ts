@@ -10,6 +10,7 @@ import {
   markDone,
   moveWorkUnit,
   regenerateAcceptance,
+  reportVerification,
   updateWorkUnit,
 } from "./tools";
 import type { PonderClient } from "./client";
@@ -69,6 +70,10 @@ const stories: StoryDTO[] = [
         createdAt: new Date().toISOString(),
         completedAt: null,
         archivedAt: null,
+        verificationRequestedAt: null,
+        verifiedAt: null,
+        verificationOutcome: null,
+        verificationSummary: null,
       },
       {
         id: "w2",
@@ -83,6 +88,10 @@ const stories: StoryDTO[] = [
         createdAt: new Date().toISOString(),
         completedAt: null,
         archivedAt: null,
+        verificationRequestedAt: null,
+        verifiedAt: null,
+        verificationOutcome: null,
+        verificationSummary: null,
       },
       {
         id: "w3",
@@ -97,6 +106,10 @@ const stories: StoryDTO[] = [
         createdAt: new Date().toISOString(),
         completedAt: null,
         archivedAt: null,
+        verificationRequestedAt: null,
+        verifiedAt: null,
+        verificationOutcome: null,
+        verificationSummary: null,
       },
       {
         id: "w4",
@@ -111,6 +124,10 @@ const stories: StoryDTO[] = [
         createdAt: new Date().toISOString(),
         completedAt: null,
         archivedAt: null,
+        verificationRequestedAt: null,
+        verifiedAt: null,
+        verificationOutcome: null,
+        verificationSummary: null,
       },
     ],
   },
@@ -225,6 +242,74 @@ describe("listWorkUnits", () => {
   });
 });
 
+describe("listWorkUnits with pendingVerification", () => {
+  const storiesWithPending: StoryDTO[] = [
+    {
+      ...stories[0],
+      workUnits: stories[0].workUnits.map((wu) =>
+        wu.id === "w4"
+          ? { ...wu, verificationRequestedAt: new Date().toISOString(), verification: null }
+          : wu
+      ),
+    },
+    stories[1],
+  ];
+
+  it("filters to work units with a pending verification request", async () => {
+    const client = fakeClient({ getStories: async () => storiesWithPending });
+
+    const result = await listWorkUnits(client, { projectId: "p1", pendingVerification: true });
+    const text = result.content[0].text;
+
+    expect(text).toContain("Task D");
+    expect(text).not.toContain("Task A");
+    expect(text).toMatch(/verification steps.*missing|missing.*verification steps/i);
+  });
+
+  it("returns a clear message when nothing is pending", async () => {
+    const client = fakeClient({ getStories: async () => stories });
+
+    const result = await listWorkUnits(client, { projectId: "p1", pendingVerification: true });
+
+    expect(result.content[0].text).toMatch(/no work units/i);
+  });
+});
+
+describe("reportVerification", () => {
+  it("calls client.reportVerification with the right args and confirms", async () => {
+    const reportVerificationMock = vi.fn(async () => ({
+      id: "w1",
+      verificationOutcome: "passed",
+    })) as unknown as PonderClient["reportVerification"];
+    const client = fakeClient({ reportVerification: reportVerificationMock });
+
+    const result = await reportVerification(client, {
+      workUnitId: "w1",
+      outcome: "passed",
+      summary: "All good",
+    });
+
+    expect(reportVerificationMock).toHaveBeenCalledWith("w1", "passed", "All good", undefined);
+    expect(result.content[0].text).toMatch(/passed/i);
+  });
+
+  it("returns an error-text result when the client throws", async () => {
+    const client = fakeClient({
+      reportVerification: async () => {
+        throw new Error("boom");
+      },
+    });
+
+    const result = await reportVerification(client, {
+      workUnitId: "w1",
+      outcome: "failed",
+      summary: "broke",
+    });
+
+    expect(result.content[0].text).toContain("boom");
+  });
+});
+
 const movedWorkUnit: WorkUnitDTO = {
   id: "w1",
   storyId: "s1",
@@ -238,6 +323,10 @@ const movedWorkUnit: WorkUnitDTO = {
   createdAt: new Date().toISOString(),
   completedAt: null,
   archivedAt: null,
+  verificationRequestedAt: null,
+  verifiedAt: null,
+  verificationOutcome: null,
+  verificationSummary: null,
 };
 
 describe("moveWorkUnit", () => {
