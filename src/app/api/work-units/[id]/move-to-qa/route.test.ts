@@ -2,16 +2,15 @@ import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 
 vi.mock("@/lib/statusTrigger", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/statusTrigger")>();
-  return { ...actual, transitionStoryToQA: vi.fn() };
+  return { ...actual, reportWorkUnitToQA: vi.fn() };
 });
 
 import { prisma } from "@/lib/prisma";
 import { POST } from "@/app/api/work-units/[id]/move-to-qa/route";
-import { transitionStoryToQA } from "@/lib/statusTrigger";
+import { reportWorkUnitToQA } from "@/lib/statusTrigger";
 
 describe("POST /api/work-units/[id]/move-to-qa", () => {
   let workUnitId: string;
-  let storyId: string;
   let counter = 0;
 
   beforeEach(async () => {
@@ -30,7 +29,6 @@ describe("POST /api/work-units/[id]/move-to-qa", () => {
         lastSyncedAt: new Date(),
       },
     });
-    storyId = story.id;
     const wu = await prisma.workUnit.create({
       data: { storyId: story.id, title: "Task", column: "done", order: 0 },
     });
@@ -42,8 +40,8 @@ describe("POST /api/work-units/[id]/move-to-qa", () => {
     await prisma.story.deleteMany({});
   });
 
-  it("returns 200 and calls transitionStoryToQA with the work unit's storyId on success", async () => {
-    vi.mocked(transitionStoryToQA).mockResolvedValueOnce({ ok: true });
+  it("returns 200 with transitioned: false and calls reportWorkUnitToQA with the work unit's id", async () => {
+    vi.mocked(reportWorkUnitToQA).mockResolvedValueOnce({ ok: true, transitioned: false });
 
     const res = await POST(new Request("http://localhost/x", { method: "POST" }) as never, {
       params: Promise.resolve({ id: workUnitId }),
@@ -51,14 +49,26 @@ describe("POST /api/work-units/[id]/move-to-qa", () => {
 
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data).toEqual({ ok: true });
-    expect(transitionStoryToQA).toHaveBeenCalledWith(storyId, expect.anything());
+    expect(data).toEqual({ ok: true, transitioned: false });
+    expect(reportWorkUnitToQA).toHaveBeenCalledWith(workUnitId, expect.anything());
   });
 
-  it("returns 422 with the error message when transitionStoryToQA reports failure", async () => {
-    vi.mocked(transitionStoryToQA).mockResolvedValueOnce({
+  it("returns 200 with transitioned: true when this was the last sibling reported", async () => {
+    vi.mocked(reportWorkUnitToQA).mockResolvedValueOnce({ ok: true, transitioned: true });
+
+    const res = await POST(new Request("http://localhost/x", { method: "POST" }) as never, {
+      params: Promise.resolve({ id: workUnitId }),
+    });
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toEqual({ ok: true, transitioned: true });
+  });
+
+  it("returns 422 with the error message when reportWorkUnitToQA reports failure", async () => {
+    vi.mocked(reportWorkUnitToQA).mockResolvedValueOnce({
       ok: false,
-      error: "All work units for this story must be Done before moving it to QA",
+      error: "JIRA API error: 500",
     });
 
     const res = await POST(new Request("http://localhost/x", { method: "POST" }) as never, {
@@ -67,7 +77,7 @@ describe("POST /api/work-units/[id]/move-to-qa", () => {
 
     expect(res.status).toBe(422);
     const data = await res.json();
-    expect(data.error).toContain("must be Done");
+    expect(data.error).toContain("JIRA API error");
   });
 
   it("returns 404 for a missing work unit", async () => {
@@ -76,6 +86,6 @@ describe("POST /api/work-units/[id]/move-to-qa", () => {
     });
 
     expect(res.status).toBe(404);
-    expect(transitionStoryToQA).not.toHaveBeenCalled();
+    expect(reportWorkUnitToQA).not.toHaveBeenCalled();
   });
 });
