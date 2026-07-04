@@ -73,6 +73,7 @@ export function WorkUnitCard({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isMovingToQA, setIsMovingToQA] = useState(false);
+  const [isRequestingVerification, setIsRequestingVerification] = useState(false);
 
   // The card div (view mode) and the title input (edit mode) are two
   // different DOM nodes that never exist at the same time, since the
@@ -216,6 +217,33 @@ export function WorkUnitCard({
       alert("Failed to move story to QA");
     } finally {
       setIsMovingToQA(false);
+    }
+  };
+
+  const handleRequestVerification = async () => {
+    setIsRequestingVerification(true);
+    try {
+      const response = await fetch(`/api/work-units/${workUnit.id}/request-verification`, {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Failed to request verification");
+        return;
+      }
+
+      onUpdate?.(workUnit.id, {
+        verificationRequestedAt: data.verificationRequestedAt,
+        verifiedAt: data.verifiedAt,
+        verificationOutcome: data.verificationOutcome,
+        verificationSummary: data.verificationSummary,
+      });
+    } catch (error) {
+      console.error("Error requesting verification:", error);
+      alert("Failed to request verification");
+    } finally {
+      setIsRequestingVerification(false);
     }
   };
 
@@ -451,6 +479,53 @@ export function WorkUnitCard({
             {isMovingToQA ? "Moving…" : "Move to QA"}
           </button>
         )}
+        {workUnit.column === "code_review" &&
+          (workUnit.verificationOutcome === "passed" ? (
+            <span
+              className={`px-2 py-1.5 text-xs font-instrument font-semibold rounded-lg ${
+                isDark
+                  ? "bg-green-900/50 text-green-200"
+                  : "bg-green-100 text-green-800"
+              }`}
+              data-testid={`verification-badge-${workUnit.id}`}
+            >
+              Verified ✓
+            </span>
+          ) : (
+            <>
+              {workUnit.verificationOutcome === "failed" && (
+                <span
+                  title={workUnit.verificationSummary ?? undefined}
+                  className={`px-2 py-1.5 text-xs font-instrument font-semibold rounded-lg ${
+                    isDark
+                      ? "bg-red-900/50 text-red-200"
+                      : "bg-red-100 text-red-800"
+                  }`}
+                  data-testid={`verification-badge-${workUnit.id}`}
+                >
+                  Verification failed
+                </span>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRequestVerification();
+                }}
+                disabled={isRequestingVerification || !!workUnit.verificationRequestedAt}
+                aria-label={`Request verification for ${workUnit.title}`}
+                className={`px-2 py-1.5 text-xs font-instrument font-semibold rounded-lg transition-colors disabled:opacity-50 ${focusRing} ${
+                  isDark
+                    ? "bg-blue-900/50 text-blue-200 hover:bg-blue-900/70"
+                    : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                }`}
+                data-testid={`verify-button-${workUnit.id}`}
+              >
+                {isRequestingVerification || workUnit.verificationRequestedAt
+                  ? "Verifying…"
+                  : "Verify"}
+              </button>
+            </>
+          ))}
       </div>
     </div>
     {detailModal}

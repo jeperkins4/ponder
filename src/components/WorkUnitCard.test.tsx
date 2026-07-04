@@ -16,6 +16,10 @@ const mockWorkUnit: WorkUnitDTO = {
   createdAt: "2026-01-01T00:00:00Z",
   completedAt: null,
   archivedAt: null,
+  verificationRequestedAt: null,
+  verifiedAt: null,
+  verificationOutcome: null,
+  verificationSummary: null,
 };
 
 describe("WorkUnitCard", () => {
@@ -203,6 +207,97 @@ describe("WorkUnitCard", () => {
         );
       });
       expect(onStatusMessage).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
+    });
+  });
+
+  describe("Verify", () => {
+    const codeReviewUnit: WorkUnitDTO = { ...mockWorkUnit, column: "code_review" };
+
+    it("renders an enabled Verify button only for a Code Review card with no request yet", () => {
+      const { rerender } = render(<WorkUnitCard workUnit={codeReviewUnit} />);
+      const button = screen.getByTestId(`verify-button-${codeReviewUnit.id}`);
+      expect(button).toBeInTheDocument();
+      expect(button).not.toBeDisabled();
+      expect(button).toHaveTextContent("Verify");
+
+      rerender(<WorkUnitCard workUnit={mockWorkUnit} />);
+      expect(screen.queryByTestId(`verify-button-${mockWorkUnit.id}`)).not.toBeInTheDocument();
+    });
+
+    it("POSTs to request-verification and shows a disabled Verifying… button while pending", async () => {
+      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...codeReviewUnit, verificationRequestedAt: "2026-07-04T00:00:00Z" }),
+      } as Response);
+
+      const onUpdate = vi.fn();
+      render(<WorkUnitCard workUnit={codeReviewUnit} onUpdate={onUpdate} />);
+
+      fireEvent.click(screen.getByTestId(`verify-button-${codeReviewUnit.id}`));
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledWith(
+          `/api/work-units/${codeReviewUnit.id}/request-verification`,
+          expect.objectContaining({ method: "POST" })
+        );
+      });
+      expect(onUpdate).toHaveBeenCalled();
+    });
+
+    it("shows a disabled Verifying… button when verificationRequestedAt is already set", () => {
+      const pendingUnit: WorkUnitDTO = {
+        ...codeReviewUnit,
+        verificationRequestedAt: "2026-07-04T00:00:00Z",
+      };
+      render(<WorkUnitCard workUnit={pendingUnit} />);
+      const button = screen.getByTestId(`verify-button-${pendingUnit.id}`);
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent("Verifying…");
+    });
+
+    it("shows a green Verified badge and no button when outcome is passed", () => {
+      const passedUnit: WorkUnitDTO = {
+        ...codeReviewUnit,
+        verifiedAt: "2026-07-04T00:00:00Z",
+        verificationOutcome: "passed",
+        verificationSummary: "Looks good",
+      };
+      render(<WorkUnitCard workUnit={passedUnit} />);
+      expect(screen.getByTestId(`verification-badge-${passedUnit.id}`)).toHaveTextContent(/verified/i);
+      expect(screen.queryByTestId(`verify-button-${passedUnit.id}`)).not.toBeInTheDocument();
+    });
+
+    it("shows a red Verification failed badge and a re-enabled button when outcome is failed", () => {
+      const failedUnit: WorkUnitDTO = {
+        ...codeReviewUnit,
+        verifiedAt: "2026-07-04T00:00:00Z",
+        verificationOutcome: "failed",
+        verificationSummary: "Still broken",
+      };
+      render(<WorkUnitCard workUnit={failedUnit} />);
+      const badge = screen.getByTestId(`verification-badge-${failedUnit.id}`);
+      expect(badge).toHaveTextContent(/verification failed/i);
+      expect(badge).toHaveAttribute("title", "Still broken");
+      expect(screen.getByTestId(`verify-button-${failedUnit.id}`)).not.toBeDisabled();
+    });
+
+    it("alerts with the server's error message on failure", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: "Work unit must be in Code Review to request verification" }),
+      } as Response);
+      const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+
+      render(<WorkUnitCard workUnit={codeReviewUnit} />);
+      fireEvent.click(screen.getByTestId(`verify-button-${codeReviewUnit.id}`));
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith(
+          expect.stringContaining("Code Review")
+        );
+      });
 
       alertSpy.mockRestore();
     });
