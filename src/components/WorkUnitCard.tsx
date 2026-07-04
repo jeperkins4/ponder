@@ -210,7 +210,12 @@ export function WorkUnitCard({
         return;
       }
 
-      onStatusMessage?.(`Moved "${storyKey}" to JIRA QA`);
+      if (data.transitioned) {
+        onStatusMessage?.(`Moved "${storyKey}" to JIRA QA`);
+      } else {
+        onStatusMessage?.(`Reported "${workUnit.title}" to JIRA`);
+      }
+      onUpdate?.(workUnit.id, {});
     } catch (error) {
       console.error("Error moving story to QA:", error);
       alert("Failed to move story to QA");
@@ -440,7 +445,11 @@ export function WorkUnitCard({
               handleMoveToQA();
             }}
             disabled={isMovingToQA}
-            aria-label={`Move ${storyKey} to JIRA QA`}
+            aria-label={
+              workUnit.movedToQaReportedAt
+                ? `Retry moving ${storyKey} to JIRA QA`
+                : `Move ${storyKey} to JIRA QA`
+            }
             className={`px-2 py-1.5 text-xs font-instrument font-semibold rounded-lg transition-colors disabled:opacity-50 ${focusRing} ${
               isDark
                 ? "bg-emerald-900/50 text-emerald-200 hover:bg-emerald-900/70"
@@ -448,7 +457,11 @@ export function WorkUnitCard({
             }`}
             data-testid={`move-to-qa-button-${workUnit.id}`}
           >
-            {isMovingToQA ? "Moving…" : "Move to QA"}
+            {isMovingToQA
+              ? "Moving…"
+              : workUnit.movedToQaReportedAt
+                ? "Reported ✓ (Retry)"
+                : "Move to QA"}
           </button>
         )}
       </div>

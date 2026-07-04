@@ -133,7 +133,7 @@ describe("WorkUnitCard", () => {
   describe("Move to QA", () => {
     const doneWorkUnit: WorkUnitDTO = { ...mockWorkUnit, column: "done" };
 
-    it("renders the button only for a Done, JIRA-linked card", () => {
+    it("renders the button only for a Done, JIRA-linked card with no report yet", () => {
       const { rerender } = render(
         <WorkUnitCard workUnit={doneWorkUnit} storyKey="COM-1" />
       );
@@ -152,10 +152,88 @@ describe("WorkUnitCard", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("POSTs to the move-to-qa endpoint and reports success via onStatusMessage", async () => {
+    it("keeps the button clickable and relabels it once movedToQaReportedAt is set", () => {
+      const reportedUnit: WorkUnitDTO = {
+        ...doneWorkUnit,
+        movedToQaReportedAt: "2026-07-04T00:00:00Z",
+      };
+      render(<WorkUnitCard workUnit={reportedUnit} storyKey="COM-1" />);
+
+      const button = screen.getByTestId(`move-to-qa-button-${reportedUnit.id}`);
+      expect(button).toHaveTextContent(/reported.*retry/i);
+      expect(button).not.toBeDisabled();
+    });
+
+    it("retries via the same button when already reported (e.g. after a failed transition)", async () => {
+      const reportedUnit: WorkUnitDTO = {
+        ...doneWorkUnit,
+        movedToQaReportedAt: "2026-07-04T00:00:00Z",
+      };
       vi.spyOn(global, "fetch").mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ ok: true }),
+        json: async () => ({ ok: true, transitioned: true }),
+      } as Response);
+
+      const onStatusMessage = vi.fn();
+      render(
+        <WorkUnitCard
+          workUnit={reportedUnit}
+          storyKey="COM-1"
+          onStatusMessage={onStatusMessage}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(`move-to-qa-button-${reportedUnit.id}`));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/work-units/${reportedUnit.id}/move-to-qa`,
+          expect.objectContaining({ method: "POST" })
+        );
+        expect(onStatusMessage).toHaveBeenCalledWith(
+          expect.stringContaining("JIRA QA")
+        );
+      });
+    });
+
+    it("POSTs to the move-to-qa endpoint and reports a non-count message when not transitioned", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true, transitioned: false }),
+      } as Response);
+
+      const onStatusMessage = vi.fn();
+      const onUpdate = vi.fn();
+      render(
+        <WorkUnitCard
+          workUnit={doneWorkUnit}
+          storyKey="COM-1"
+          onStatusMessage={onStatusMessage}
+          onUpdate={onUpdate}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(`move-to-qa-button-${doneWorkUnit.id}`));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/work-units/${doneWorkUnit.id}/move-to-qa`,
+          expect.objectContaining({ method: "POST" })
+        );
+        expect(onStatusMessage).toHaveBeenCalledWith(
+          expect.stringContaining(doneWorkUnit.title)
+        );
+        expect(onStatusMessage).not.toHaveBeenCalledWith(
+          expect.stringContaining("QA")
+        );
+        expect(onUpdate).toHaveBeenCalled();
+      });
+    });
+
+    it("reports the existing 'Moved to JIRA QA' message when transitioned is true", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true, transitioned: true }),
       } as Response);
 
       const onStatusMessage = vi.fn();
@@ -170,12 +248,11 @@ describe("WorkUnitCard", () => {
       fireEvent.click(screen.getByTestId(`move-to-qa-button-${doneWorkUnit.id}`));
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          `/api/work-units/${doneWorkUnit.id}/move-to-qa`,
-          expect.objectContaining({ method: "POST" })
-        );
         expect(onStatusMessage).toHaveBeenCalledWith(
           expect.stringContaining("COM-1")
+        );
+        expect(onStatusMessage).toHaveBeenCalledWith(
+          expect.stringContaining("JIRA QA")
         );
       });
     });
@@ -183,7 +260,7 @@ describe("WorkUnitCard", () => {
     it("alerts with the server's error message on failure, without calling onStatusMessage", async () => {
       vi.spyOn(global, "fetch").mockResolvedValueOnce({
         ok: false,
-        json: async () => ({ error: "All work units for this story must be Done before moving it to QA" }),
+        json: async () => ({ error: "JIRA API error: 500" }),
       } as Response);
       const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
 
@@ -200,7 +277,7 @@ describe("WorkUnitCard", () => {
 
       await waitFor(() => {
         expect(alertSpy).toHaveBeenCalledWith(
-          expect.stringContaining("must be Done")
+          expect.stringContaining("JIRA API error")
         );
       });
       expect(onStatusMessage).not.toHaveBeenCalled();
