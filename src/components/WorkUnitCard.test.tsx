@@ -265,7 +265,10 @@ describe("WorkUnitCard", () => {
         verificationSummary: "Looks good",
       };
       render(<WorkUnitCard workUnit={passedUnit} />);
-      expect(screen.getByTestId(`verification-badge-${passedUnit.id}`)).toHaveTextContent(/verified/i);
+      const badge = screen.getByTestId(`verification-badge-${passedUnit.id}`);
+      expect(badge).toHaveTextContent(/verified/i);
+      const expectedDate = new Date(passedUnit.verifiedAt!).toLocaleDateString();
+      expect(badge).toHaveTextContent(`Verified ✓ ${expectedDate}`);
       expect(screen.queryByTestId(`verify-button-${passedUnit.id}`)).not.toBeInTheDocument();
     });
 

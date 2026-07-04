@@ -489,7 +489,9 @@ export function WorkUnitCard({
               }`}
               data-testid={`verification-badge-${workUnit.id}`}
             >
-              Verified ✓
+              Verified ✓{" "}
+              {workUnit.verifiedAt &&
+                new Date(workUnit.verifiedAt).toLocaleDateString()}
             </span>
           ) : (
             <>
