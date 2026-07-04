@@ -16,6 +16,10 @@ const baseWorkUnit: WorkUnitDTO = {
   createdAt: "2026-01-01T00:00:00Z",
   completedAt: null,
   archivedAt: null,
+  verificationRequestedAt: null,
+  verifiedAt: null,
+  verificationOutcome: null,
+  verificationSummary: null,
 };
 
 function mockFetch({
@@ -207,6 +211,49 @@ describe("WorkUnitDetailModal", () => {
     const dates = screen.getByTestId("work-unit-detail-dates");
     expect(dates).toHaveTextContent("Created");
     expect(dates).toHaveTextContent("Completed");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("work-unit-detail-notes-empty")).toBeInTheDocument();
+    });
+  });
+
+  it("shows the verification result when the work unit has been verified", async () => {
+    global.fetch = mockFetch({ notes: [] }) as unknown as typeof fetch;
+    const verifiedUnit: WorkUnitDTO = {
+      ...baseWorkUnit,
+      verifiedAt: "2026-07-04T12:00:00Z",
+      verificationOutcome: "passed",
+      verificationSummary: "Confirmed the fix resolves the bug.",
+    };
+    render(
+      <WorkUnitDetailModal
+        workUnit={verifiedUnit}
+        isOpen={true}
+        onClose={() => {}}
+      />
+    );
+
+    const result = screen.getByTestId("work-unit-detail-verification-result");
+    expect(result).toHaveTextContent(/passed/i);
+    expect(result).toHaveTextContent("Confirmed the fix resolves the bug.");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("work-unit-detail-notes-empty")).toBeInTheDocument();
+    });
+  });
+
+  it("omits the verification result section when never verified", async () => {
+    global.fetch = mockFetch({ notes: [] }) as unknown as typeof fetch;
+
+    render(
+      <WorkUnitDetailModal
+        workUnit={baseWorkUnit}
+        isOpen={true}
+        onClose={() => {}}
+      />
+    );
+
+    expect(screen.queryByTestId("work-unit-detail-verification-result")).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByTestId("work-unit-detail-notes-empty")).toBeInTheDocument();

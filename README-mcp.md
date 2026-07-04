@@ -67,10 +67,11 @@ session) after adding the server so it picks up the new connection.
 | --- | --- | --- |
 | `list_projects` | _(none)_ | List all Ponder projects with story/work-unit stats. |
 | `list_stories` | `projectId` | List stories (with a per-column work-unit breakdown) for a project. |
-| `list_work_units` | `projectId`, `column?` | List work units for a project, optionally filtered to a single column (`todo`, `in_progress`, `code_review`, `done`). |
+| `list_work_units` | `projectId`, `column?`, `pendingVerification?` | List work units for a project, optionally filtered to a single column (`todo`, `in_progress`, `code_review`, `done`), or to only those pending AI-agent verification. |
 | `move_work_unit` | `workUnitId`, `column`, `order?` | Move a work unit to a column and optional position. |
 | `mark_done` | `workUnitId` | Convenience wrapper over `move_work_unit` that moves a work unit straight to Done. |
 | `update_work_unit` | `workUnitId`, `title?`, `description?` | Update a work unit's title and/or description (at least one required). |
+| `report_verification` | `workUnitId`, `outcome` (`passed`\|`failed`), `summary`, `verificationSteps?` | Report the result of an AI-agent verification run requested via Ponder's Verify button. Attach the screenshot separately with `attach_image`. |
 
 `move_work_unit` and `mark_done` may transition the linked JIRA issue as a
 side effect of Ponder's existing server-side write-back: moving to a
@@ -91,6 +92,7 @@ Once connected, you can ask Claude Code things like:
 - "Move work unit ck123abc to code_review."
 - "Mark work unit ck123abc done."
 - "Update work unit ck123abc's title to 'Fix pagination bug'."
+- "List work units pending verification for project acme-web, verify each one, attach a screenshot, and report the result."
 
 ## Troubleshooting
 

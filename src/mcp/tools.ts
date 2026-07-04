@@ -74,7 +74,7 @@ export async function listStories(
  */
 export async function listWorkUnits(
   client: PonderClient,
-  args: { projectId: string; column?: string }
+  args: { projectId: string; column?: string; pendingVerification?: boolean }
 ): Promise<McpTextResult> {
   const validColumns = COLUMNS.map((c) => c.key);
 
@@ -87,20 +87,33 @@ export async function listWorkUnits(
   const stories = await client.getStories(args.projectId);
   const column = args.column as Column | undefined;
 
-  const rows: { id: string; title: string; column: Column; jiraKey: string }[] = [];
+  const rows: {
+    id: string;
+    title: string;
+    column: Column;
+    jiraKey: string;
+    verification: string | null;
+  }[] = [];
   for (const story of stories) {
     for (const workUnit of story.workUnits) {
       if (column && workUnit.column !== column) continue;
+      if (args.pendingVerification) {
+        if (!workUnit.verificationRequestedAt || workUnit.verifiedAt) continue;
+      }
       rows.push({
         id: workUnit.id,
         title: workUnit.title,
         column: workUnit.column,
         jiraKey: story.jiraKey,
+        verification: workUnit.verification,
       });
     }
   }
 
   if (rows.length === 0) {
+    if (args.pendingVerification) {
+      return textResult(`No work units pending verification for project ${args.projectId}.`);
+    }
     return textResult(
       column
         ? `No work units in column "${column}" for project ${args.projectId}.`
@@ -108,9 +121,12 @@ export async function listWorkUnits(
     );
   }
 
-  const lines = rows.map(
-    (row) => `- ${row.title} (id: ${row.id}, column: ${row.column}, story: ${row.jiraKey})`
-  );
+  const lines = rows.map((row) => {
+    const verificationNote = args.pendingVerification
+      ? ` — verification steps: ${row.verification ?? "(missing — document them as you verify)"}`
+      : "";
+    return `- ${row.title} (id: ${row.id}, column: ${row.column}, story: ${row.jiraKey})${verificationNote}`;
+  });
 
   return textResult(`${rows.length} work unit(s):\n${lines.join("\n")}`);
 }
@@ -228,6 +244,33 @@ export async function attachImage(
     );
     return textResult(
       `Attached "${attachment.filename}" (${attachment.mimeType}, ${attachment.size} bytes) to work unit ${args.workUnitId}.`
+    );
+  } catch (error) {
+    return textResult(
+      `Error: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/** Report the outcome of an AI-agent verification run (see the Verify button). */
+export async function reportVerification(
+  client: PonderClient,
+  args: {
+    workUnitId: string;
+    outcome: "passed" | "failed";
+    summary: string;
+    verificationSteps?: string;
+  }
+): Promise<McpTextResult> {
+  try {
+    const workUnit = await client.reportVerification(
+      args.workUnitId,
+      args.outcome,
+      args.summary,
+      args.verificationSteps
+    );
+    return textResult(
+      `Recorded verification result "${args.outcome}" for work unit ${workUnit.id}.`
     );
   } catch (error) {
     return textResult(

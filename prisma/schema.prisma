@@ -60,6 +60,10 @@ model WorkUnit {
   createdAt          DateTime  @default(now())
   completedAt        DateTime?
   archivedAt         DateTime?
+  verificationRequestedAt DateTime?
+  verifiedAt              DateTime?
+  verificationOutcome     String?
+  verificationSummary     String?
 
   workNotes   WorkNote[]
   attachments Attachment[]

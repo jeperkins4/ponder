@@ -504,6 +504,29 @@ export function WorkUnitDetailModal({
                 </p>
               </div>
 
+              {workUnit.verifiedAt && (
+                <div
+                  data-testid="work-unit-detail-verification-result"
+                  className={`text-sm rounded-lg p-3 ${
+                    workUnit.verificationOutcome === "passed"
+                      ? isDark
+                        ? "bg-green-900/30 text-green-200"
+                        : "bg-green-50 text-green-800"
+                      : isDark
+                        ? "bg-red-900/30 text-red-200"
+                        : "bg-red-50 text-red-800"
+                  }`}
+                >
+                  <p className="font-semibold">
+                    Verification {workUnit.verificationOutcome === "passed" ? "passed" : "failed"} —{" "}
+                    {formatDateTime(workUnit.verifiedAt)}
+                  </p>
+                  {workUnit.verificationSummary && (
+                    <p className="mt-1 whitespace-pre-wrap">{workUnit.verificationSummary}</p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <button
                   type="button"

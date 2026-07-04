@@ -22,6 +22,10 @@ function workUnitToDTO(wu: {
   createdAt: Date;
   completedAt: Date | null;
   archivedAt: Date | null;
+  verificationRequestedAt: Date | null;
+  verifiedAt: Date | null;
+  verificationOutcome: string | null;
+  verificationSummary: string | null;
 }): WorkUnitDTO {
   return {
     id: wu.id,
@@ -36,6 +40,10 @@ function workUnitToDTO(wu: {
     createdAt: wu.createdAt.toISOString(),
     completedAt: wu.completedAt?.toISOString() ?? null,
     archivedAt: wu.archivedAt?.toISOString() ?? null,
+    verificationRequestedAt: wu.verificationRequestedAt?.toISOString() ?? null,
+    verifiedAt: wu.verifiedAt?.toISOString() ?? null,
+    verificationOutcome: wu.verificationOutcome as "passed" | "failed" | null,
+    verificationSummary: wu.verificationSummary,
   };
 }
 
