@@ -70,6 +70,10 @@ describe("PonderClient", () => {
       createdAt: new Date().toISOString(),
       completedAt: null,
       archivedAt: null,
+      verificationRequestedAt: null,
+      verifiedAt: null,
+      verificationOutcome: null,
+      verificationSummary: null,
     };
     const fetchImpl = fakeFetch({ ok: true, json: workUnit });
     const client = new PonderClient(baseUrl, fetchImpl);
@@ -100,6 +104,10 @@ describe("PonderClient", () => {
       createdAt: new Date().toISOString(),
       completedAt: null,
       archivedAt: null,
+      verificationRequestedAt: null,
+      verifiedAt: null,
+      verificationOutcome: null,
+      verificationSummary: null,
     };
     const fetchImpl = fakeFetch({ ok: true, json: workUnit });
     const client = new PonderClient(baseUrl, fetchImpl);
@@ -129,6 +137,10 @@ describe("PonderClient", () => {
       createdAt: new Date().toISOString(),
       completedAt: null,
       archivedAt: null,
+      verificationRequestedAt: null,
+      verifiedAt: null,
+      verificationOutcome: null,
+      verificationSummary: null,
     };
     const fetchImpl = fakeFetch({ ok: true, json: workUnit });
     const client = new PonderClient(baseUrl, fetchImpl);
