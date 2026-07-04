@@ -62,6 +62,21 @@ export class PonderClient {
     );
   }
 
+  async reportVerification(
+    id: string,
+    outcome: "passed" | "failed",
+    summary: string,
+    verificationSteps?: string
+  ): Promise<WorkUnitDTO> {
+    return this.request<WorkUnitDTO>(
+      "POST",
+      `/api/work-units/${encodeURIComponent(id)}/report-verification`,
+      verificationSteps !== undefined
+        ? { outcome, summary, verificationSteps }
+        : { outcome, summary }
+    );
+  }
+
   /**
    * Uploads a local image as a work-unit attachment. Bespoke (not routed
    * through the shared `request` helper below): that helper always

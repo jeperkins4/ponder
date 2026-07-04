@@ -22,6 +22,10 @@ export interface WorkUnitDTO {
   completedAt: string | null; // ISO string
   archivedAt: string | null; // ISO string
   movedToQaReportedAt: string | null; // ISO string
+  verificationRequestedAt: string | null; // ISO string
+  verifiedAt: string | null; // ISO string
+  verificationOutcome: "passed" | "failed" | null;
+  verificationSummary: string | null;
 }
 
 /** @public consumed starting in Task 2/3 (work-unit detail modal work notes) */

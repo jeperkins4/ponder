@@ -21,6 +21,10 @@ function makeWorkUnit(overrides: Partial<WorkUnitDTO>): WorkUnitDTO {
     completedAt: null,
     archivedAt: null,
     movedToQaReportedAt: null,
+    verificationRequestedAt: null,
+    verifiedAt: null,
+    verificationOutcome: null,
+    verificationSummary: null,
     ...overrides,
   };
 }

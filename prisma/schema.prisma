@@ -45,22 +45,26 @@ model Story {
 }
 
 model WorkUnit {
-  id                  String    @id @default(cuid())
-  storyId             String
-  story               Story     @relation(fields: [storyId], references: [id])
-  projectId           String?
-  project             Project?  @relation("ProjectWorkUnits", fields: [projectId], references: [id])
-  title               String
-  description         String?
-  acceptanceCriteria  String?
-  verification        String?
-  column              String // "todo" | "in_progress" | "done"
-  order               Int
-  subNumber           Int? // stable 1-based decomposition suffix (e.g. COM-540-1); null = not decomposed, Ponder-local only, never sent to JIRA
-  createdAt           DateTime  @default(now())
-  completedAt         DateTime?
-  archivedAt          DateTime?
-  movedToQaReportedAt DateTime?
+  id                      String    @id @default(cuid())
+  storyId                 String
+  story                   Story     @relation(fields: [storyId], references: [id])
+  projectId               String?
+  project                 Project?  @relation("ProjectWorkUnits", fields: [projectId], references: [id])
+  title                   String
+  description             String?
+  acceptanceCriteria      String?
+  verification            String?
+  column                  String // "todo" | "in_progress" | "done"
+  order                   Int
+  subNumber               Int? // stable 1-based decomposition suffix (e.g. COM-540-1); null = not decomposed, Ponder-local only, never sent to JIRA
+  createdAt               DateTime  @default(now())
+  completedAt             DateTime?
+  archivedAt              DateTime?
+  movedToQaReportedAt     DateTime?
+  verificationRequestedAt DateTime?
+  verifiedAt              DateTime?
+  verificationOutcome     String?
+  verificationSummary     String?
 
   workNotes   WorkNote[]
   attachments Attachment[]

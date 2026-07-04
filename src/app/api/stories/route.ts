@@ -58,6 +58,10 @@ export async function GET(request: NextRequest) {
         completedAt: wu.completedAt?.toISOString() ?? null,
         archivedAt: wu.archivedAt?.toISOString() ?? null,
         movedToQaReportedAt: wu.movedToQaReportedAt?.toISOString() ?? null,
+        verificationRequestedAt: wu.verificationRequestedAt?.toISOString() ?? null,
+        verifiedAt: wu.verifiedAt?.toISOString() ?? null,
+        verificationOutcome: wu.verificationOutcome as "passed" | "failed" | null,
+        verificationSummary: wu.verificationSummary,
       })),
     }));
 
