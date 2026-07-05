@@ -617,4 +617,64 @@ describe("POST /api/projects/[projectId]/import/process", () => {
       await prisma.project.delete({ where: { id: project.id } });
     }
   });
+
+  it("skips a duplicate jiraKey within the same request batch", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const jiraKey = `PROC-${suffix}-TWICE`;
+
+    const project = await prisma.project.create({
+      data: {
+        name: `Process Batch Dup Test ${suffix}`,
+        type: "JIRA",
+        jiraProjectKey: "PROC",
+        jiraSiteUrl: "https://example.atlassian.net/",
+        jiraEmail: "process-batchdup@example.com",
+        jiraApiToken: "process-batchdup-token",
+      },
+    });
+
+    const item = {
+      jiraKey,
+      jiraId: `id-${jiraKey}`,
+      summary: "Same story twice",
+      description: null,
+      jiraStatus: "To Do",
+      breakDown: false,
+    };
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/process`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: [item, { ...item }] }),
+        }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data).toEqual({
+        storiesProcessed: 1,
+        storiesSkipped: 1,
+        workUnitsCreated: 1,
+      });
+
+      const story = await prisma.story.findUnique({
+        where: { jiraKey },
+        include: { workUnits: true },
+      });
+      expect(story?.workUnits).toHaveLength(1);
+    } finally {
+      const story = await prisma.story.findUnique({ where: { jiraKey } });
+      if (story) {
+        await prisma.workUnit.deleteMany({ where: { storyId: story.id } });
+        await prisma.story.delete({ where: { id: story.id } });
+      }
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
 });

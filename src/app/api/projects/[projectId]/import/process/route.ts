@@ -67,6 +67,11 @@ export async function POST(
       prisma
     );
 
+    // Keys already handled earlier in THIS batch — the precomputed skip set
+    // can't see cards created mid-loop, so a duplicated item in one request
+    // would otherwise create cards twice.
+    const seenKeys = new Set<string>();
+
     const baseUrl = (project.jiraSiteUrl ?? "").replace(/\/$/, "");
 
     // Sequential: Claude breakdown calls are slow, and doing this serially
@@ -100,12 +105,14 @@ export async function POST(
         },
       });
 
-      if (alreadyImportedKeys.has(item.jiraKey)) {
+      if (alreadyImportedKeys.has(item.jiraKey) || seenKeys.has(item.jiraKey)) {
         // Already on the board: story fields were refreshed by the upsert
         // above, but no cards are created (and no Claude breakdown runs).
         storiesSkipped++;
         continue;
       }
+
+      seenKeys.add(item.jiraKey);
 
       const column = jiraStatusToColumn(item.jiraStatus);
 
