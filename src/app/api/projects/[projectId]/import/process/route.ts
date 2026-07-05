@@ -4,6 +4,9 @@
  * (by jiraKey) and creates work-unit card(s) placed in the story's target
  * column. If `breakDown` is set, Claude decomposes the story into N
  * subtask cards; otherwise a single card mirrors the story itself.
+ * Already-imported stories (those with active work units) are skipped:
+ * their Story fields are refreshed but no cards are created and no Claude
+ * breakdown runs.
  * Read-only preview of the same data is produced by the sibling
  * import/preview route (Task 3) — this route does the actual write.
  */
@@ -13,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { extractProjectKey } from "@/lib/jira/client";
 import { jiraStatusToColumn } from "@/lib/columns";
 import { breakDownStory } from "@/lib/anthropic/breakdown";
+import { findAlreadyImportedKeys } from "@/lib/importDedup";
 import {
   parseWorkUnitDescription,
   stripParentKeyFromTitle,
@@ -30,6 +34,7 @@ export interface ImportProcessItem {
 
 export interface ImportProcessResult {
   storiesProcessed: number;
+  storiesSkipped: number;
   workUnitsCreated: number;
 }
 
@@ -52,7 +57,15 @@ export async function POST(
     const items: ImportProcessItem[] = Array.isArray(body?.items) ? body.items : [];
 
     let storiesProcessed = 0;
+    let storiesSkipped = 0;
     let workUnitsCreated = 0;
+
+    // Server-side re-check of the de-dup predicate — the client's preview
+    // flag is advisory only. Computed once for the whole batch.
+    const alreadyImportedKeys = await findAlreadyImportedKeys(
+      items.map((item) => item.jiraKey),
+      prisma
+    );
 
     const baseUrl = (project.jiraSiteUrl ?? "").replace(/\/$/, "");
 
@@ -86,6 +99,13 @@ export async function POST(
           lastSyncedAt: new Date(),
         },
       });
+
+      if (alreadyImportedKeys.has(item.jiraKey)) {
+        // Already on the board: story fields were refreshed by the upsert
+        // above, but no cards are created (and no Claude breakdown runs).
+        storiesSkipped++;
+        continue;
+      }
 
       const column = jiraStatusToColumn(item.jiraStatus);
 
@@ -168,7 +188,7 @@ export async function POST(
       storiesProcessed++;
     }
 
-    const result: ImportProcessResult = { storiesProcessed, workUnitsCreated };
+    const result: ImportProcessResult = { storiesProcessed, storiesSkipped, workUnitsCreated };
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
     console.error("Error processing import:", error);
