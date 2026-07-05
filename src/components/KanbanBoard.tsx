@@ -143,8 +143,19 @@ export function KanbanBoard({
   // THEME_EVENT pattern in useTheme.ts) once an import finishes; refetch
   // silently so newly created cards show up without a loading flash.
   useEffect(() => {
-    const handleImportComplete = () => {
+    const handleImportComplete = (event: Event) => {
       fetchStories({ silent: true });
+      const detail = (event as CustomEvent).detail as
+        | { storiesProcessed: number; storiesSkipped: number }
+        | undefined;
+      if (detail) {
+        const imported = `${detail.storiesProcessed} imported`;
+        setStatusMessage(
+          detail.storiesSkipped > 0
+            ? `${imported}, ${detail.storiesSkipped} already on board`
+            : imported
+        );
+      }
     };
     window.addEventListener("ponder-jira-import-complete", handleImportComplete);
     return () =>

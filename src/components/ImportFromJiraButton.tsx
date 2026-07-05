@@ -19,12 +19,19 @@ export function ImportFromJiraButton({ projectId }: ImportFromJiraButtonProps) {
   const { isDark } = useTheme();
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
-  const handleImported = () => {
+  const handleImported = (result: {
+    storiesProcessed: number;
+    storiesSkipped: number;
+    workUnitsCreated: number;
+  }) => {
     // No shared refresh channel exists between this button (rendered via
     // KanbanBoard's headerActions) and KanbanBoard's own story-fetching
     // state, so we broadcast a DOM event the same way useTheme syncs theme
-    // changes across instances; KanbanBoard listens and silently refetches.
-    window.dispatchEvent(new Event("ponder-jira-import-complete"));
+    // changes across instances; KanbanBoard listens, silently refetches,
+    // and toasts the result counts.
+    window.dispatchEvent(
+      new CustomEvent("ponder-jira-import-complete", { detail: result })
+    );
   };
 
   return (
