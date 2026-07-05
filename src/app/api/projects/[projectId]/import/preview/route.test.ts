@@ -167,6 +167,7 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
           description: null,
           jiraStatus: "To Do",
           targetColumn: "todo",
+          alreadyImported: false,
         },
         {
           jiraKey: `PREVRT-${suffix}-2`,
@@ -175,6 +176,7 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
           description: null,
           jiraStatus: "In Progress",
           targetColumn: "in_progress",
+          alreadyImported: false,
         },
         {
           jiraKey: `PREVRT-${suffix}-3`,
@@ -183,6 +185,7 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
           description: "Has a description",
           jiraStatus: "Code Revew",
           targetColumn: "code_review",
+          alreadyImported: false,
         },
       ]);
 
@@ -225,6 +228,96 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
       const data = await res.json();
       expect(data.error).toContain("410");
     } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("flags stories that already have active cards as alreadyImported", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const activeKey = `PREV-${suffix}-ACTIVE`;
+    const archivedKey = `PREV-${suffix}-ARCHIVED`;
+    const freshKey = `PREV-${suffix}-FRESH`;
+
+    const project = await prisma.project.create({
+      data: {
+        name: `Dedup Preview Test ${suffix}`,
+        type: "JIRA",
+        jiraProjectKey: "PREV",
+        jiraSiteUrl: "https://example.atlassian.net/",
+        jiraEmail: "preview@example.com",
+        jiraApiToken: "preview-token",
+      },
+    });
+
+    const activeStory = await prisma.story.create({
+      data: {
+        jiraKey: activeKey,
+        jiraId: `id-${activeKey}`,
+        projectKey: "PREV",
+        summary: "Has active card",
+        jiraStatus: "To Do",
+        url: `https://example.atlassian.net/browse/${activeKey}`,
+        lastSyncedAt: new Date(),
+      },
+    });
+    await prisma.workUnit.create({
+      data: { storyId: activeStory.id, title: "Card", column: "todo", order: 0 },
+    });
+
+    const archivedStory = await prisma.story.create({
+      data: {
+        jiraKey: archivedKey,
+        jiraId: `id-${archivedKey}`,
+        projectKey: "PREV",
+        summary: "Only archived cards",
+        jiraStatus: "To Do",
+        url: `https://example.atlassian.net/browse/${archivedKey}`,
+        lastSyncedAt: new Date(),
+      },
+    });
+    await prisma.workUnit.create({
+      data: {
+        storyId: archivedStory.id,
+        title: "Archived card",
+        column: "done",
+        order: 0,
+        archivedAt: new Date(),
+      },
+    });
+
+    vi.mocked(jiraClient.fetchStoriesForProject).mockResolvedValueOnce([
+      makeStory({ jiraKey: activeKey, jiraId: `id-${activeKey}` }),
+      makeStory({ jiraKey: archivedKey, jiraId: `id-${archivedKey}` }),
+      makeStory({ jiraKey: freshKey, jiraId: `id-${freshKey}` }),
+    ]);
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/preview`,
+        { method: "POST" }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      const byKey = Object.fromEntries(
+        data.stories.map((s: { jiraKey: string; alreadyImported: boolean }) => [
+          s.jiraKey,
+          s.alreadyImported,
+        ])
+      );
+      expect(byKey[activeKey]).toBe(true);
+      expect(byKey[archivedKey]).toBe(false);
+      expect(byKey[freshKey]).toBe(false);
+    } finally {
+      await prisma.workUnit.deleteMany({
+        where: { storyId: { in: [activeStory.id, archivedStory.id] } },
+      });
+      await prisma.story.deleteMany({
+        where: { id: { in: [activeStory.id, archivedStory.id] } },
+      });
       await prisma.project.delete({ where: { id: project.id } });
     }
   });

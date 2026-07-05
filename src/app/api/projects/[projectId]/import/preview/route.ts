@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchStoriesForProject, type JiraConfig } from "@/lib/jira/client";
 import { jiraStatusToColumn } from "@/lib/columns";
+import { findAlreadyImportedKeys } from "@/lib/importDedup";
 import type { Column } from "@/lib/types";
 
 export interface ImportPreviewStory {
@@ -19,6 +20,7 @@ export interface ImportPreviewStory {
   description: string | null;
   jiraStatus: string;
   targetColumn: Column;
+  alreadyImported: boolean;
 }
 
 export interface ImportPreviewResult {
@@ -69,6 +71,11 @@ export async function POST(
       jiraConfig
     );
 
+    const alreadyImportedKeys = await findAlreadyImportedKeys(
+      jiraStories.map((dto) => dto.jiraKey),
+      prisma
+    );
+
     const stories: ImportPreviewStory[] = jiraStories.map((dto) => ({
       jiraKey: dto.jiraKey,
       jiraId: dto.jiraId,
@@ -76,6 +83,7 @@ export async function POST(
       description: dto.description,
       jiraStatus: dto.jiraStatus,
       targetColumn: jiraStatusToColumn(dto.jiraStatus),
+      alreadyImported: alreadyImportedKeys.has(dto.jiraKey),
     }));
 
     const result: ImportPreviewResult = { stories };
