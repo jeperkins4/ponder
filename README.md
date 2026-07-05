@@ -112,4 +112,4 @@ Once connected, ask Claude Code things like *"list my Ponder projects"*, *"show 
 ## Roadmap
 
 - **PR-gated completion** — a story advances to Code Review / Done when a pull request is opened, rather than on a manual board drag.
-- Re-import de-duplication, additional issue types and status mappings.
+- Additional status mappings (statusCategory-based matching).

@@ -8,7 +8,11 @@ import type { Column } from "@/lib/types";
 export interface ImportReviewProps {
   projectId: string;
   onClose: () => void;
-  onImported: () => void;
+  onImported: (result: {
+    storiesProcessed: number;
+    storiesSkipped: number;
+    workUnitsCreated: number;
+  }) => void;
 }
 
 interface ImportPreviewStory {
@@ -18,6 +22,7 @@ interface ImportPreviewStory {
   description: string | null;
   jiraStatus: string;
   targetColumn: Column;
+  alreadyImported: boolean;
 }
 
 const FOCUSABLE_SELECTOR =
@@ -33,6 +38,13 @@ function columnLabel(column: Column): string {
  * "break down into subtasks" per story, then POSTs the chosen selection to
  * /import/process. Mirrors OnboardingTooltip's dialog accessibility
  * mechanics (focus trap, Escape-to-close) but is Ponder theme-aware.
+ *
+ * Rows flagged `alreadyImported` (already have a card on the board) show an
+ * "Already on board" badge and an opt-in "Import anyway" checkbox; they are
+ * excluded from the /import/process payload unless checked. Fresh rows are
+ * always included — no include checkbox for them, since that's unchanged
+ * behavior. The server-side skip guard in /import/process remains the real
+ * safety mechanism; this filter is UX only.
  */
 export function ImportReview({ projectId, onClose, onImported }: ImportReviewProps) {
   const { isDark } = useTheme();
@@ -41,6 +53,7 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
   const [message, setMessage] = useState<string | null>(null);
   const [stories, setStories] = useState<ImportPreviewStory[]>([]);
   const [breakDownByKey, setBreakDownByKey] = useState<Record<string, boolean>>({});
+  const [importAnywayByKey, setImportAnywayByKey] = useState<Record<string, boolean>>({});
   const [processing, setProcessing] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
 
@@ -80,6 +93,11 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
         setMessage(data.message ?? null);
         setBreakDownByKey(
           Object.fromEntries(loadedStories.map((s) => [s.jiraKey, false]))
+        );
+        setImportAnywayByKey(
+          Object.fromEntries(
+            loadedStories.filter((s) => s.alreadyImported).map((s) => [s.jiraKey, false])
+          )
         );
       } catch (err) {
         if (!cancelled) {
@@ -137,6 +155,10 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
     setBreakDownByKey((prev) => ({ ...prev, [jiraKey]: !prev[jiraKey] }));
   };
 
+  const toggleImportAnyway = (jiraKey: string) => {
+    setImportAnywayByKey((prev) => ({ ...prev, [jiraKey]: !prev[jiraKey] }));
+  };
+
   const selectAll = () => {
     setBreakDownByKey(Object.fromEntries(stories.map((s) => [s.jiraKey, true])));
   };
@@ -150,14 +172,16 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
     setProcessError(null);
 
     try {
-      const items = stories.map((s) => ({
-        jiraKey: s.jiraKey,
-        jiraId: s.jiraId,
-        summary: s.summary,
-        description: s.description,
-        jiraStatus: s.jiraStatus,
-        breakDown: Boolean(breakDownByKey[s.jiraKey]),
-      }));
+      const items = stories
+        .filter((s) => !s.alreadyImported || importAnywayByKey[s.jiraKey])
+        .map((s) => ({
+          jiraKey: s.jiraKey,
+          jiraId: s.jiraId,
+          summary: s.summary,
+          description: s.description,
+          jiraStatus: s.jiraStatus,
+          breakDown: Boolean(breakDownByKey[s.jiraKey]),
+        }));
 
       const response = await fetch(`/api/projects/${projectId}/import/process`, {
         method: "POST",
@@ -172,7 +196,11 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
         return;
       }
 
-      onImported();
+      onImported({
+        storiesProcessed: data.storiesProcessed ?? 0,
+        storiesSkipped: data.storiesSkipped ?? 0,
+        workUnitsCreated: data.workUnitsCreated ?? 0,
+      });
       onClose();
     } catch (err) {
       setProcessError(err instanceof Error ? err.message : "An error occurred");
@@ -293,6 +321,31 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
                       >
                         {columnLabel(story.targetColumn)}
                       </span>
+
+                      {story.alreadyImported && (
+                        <>
+                          <span
+                            data-testid={`import-review-already-imported-badge-${story.jiraKey}`}
+                            className={`text-xs font-semibold px-2 py-1 rounded-full border shrink-0 ${mutedTextClass} ${rowBorderClass}`}
+                          >
+                            Already on board
+                          </span>
+                          <input
+                            id={`import-anyway-${story.jiraKey}`}
+                            type="checkbox"
+                            checked={Boolean(importAnywayByKey[story.jiraKey])}
+                            onChange={() => toggleImportAnyway(story.jiraKey)}
+                            data-testid={`import-review-import-anyway-${story.jiraKey}`}
+                            className="h-4 w-4 shrink-0 focus:ring-2 focus:ring-ponder-light-purple focus:outline-none"
+                          />
+                          <label
+                            htmlFor={`import-anyway-${story.jiraKey}`}
+                            className={`text-xs shrink-0 ${mutedTextClass}`}
+                          >
+                            Import anyway
+                          </label>
+                        </>
+                      )}
                     </li>
                   );
                 })}

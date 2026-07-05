@@ -52,6 +52,61 @@ describe("ImportFromJiraButton", () => {
     expect(screen.queryByTestId("import-review-dialog")).not.toBeInTheDocument();
   });
 
+  it("forwards import result counts on the completion event", async () => {
+    global.fetch = vi.fn((url: string) => {
+      if (String(url).endsWith("/import/preview")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              stories: [
+                {
+                  jiraKey: "FWD-1",
+                  jiraId: "20001",
+                  summary: "Forwarded story",
+                  description: null,
+                  jiraStatus: "To Do",
+                  targetColumn: "todo",
+                  alreadyImported: false,
+                },
+              ],
+            }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            storiesProcessed: 2,
+            storiesSkipped: 1,
+            workUnitsCreated: 4,
+          }),
+      } as Response);
+    }) as unknown as typeof fetch;
+
+    const listener = vi.fn();
+    window.addEventListener("ponder-jira-import-complete", listener);
+    try {
+      render(<ImportFromJiraButton projectId="p1" />);
+      fireEvent.click(screen.getByTestId("import-from-jira-button"));
+
+      await waitFor(() =>
+        expect(screen.getByTestId("import-review-process-button")).toBeInTheDocument()
+      );
+      fireEvent.click(screen.getByTestId("import-review-process-button"));
+
+      await waitFor(() => expect(listener).toHaveBeenCalled());
+      const event = listener.mock.calls[0][0] as CustomEvent;
+      expect(event.detail).toEqual({
+        storiesProcessed: 2,
+        storiesSkipped: 1,
+        workUnitsCreated: 4,
+      });
+    } finally {
+      window.removeEventListener("ponder-jira-import-complete", listener);
+    }
+  });
+
   describe("Theme awareness", () => {
     it("applies the light-mode purple background by default", () => {
       render(<ImportFromJiraButton projectId="p1" />);

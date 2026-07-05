@@ -81,7 +81,7 @@ describe("POST /api/projects/[projectId]/import/process", () => {
 
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data).toEqual({ storiesProcessed: 1, workUnitsCreated: 3 });
+      expect(data).toEqual({ storiesProcessed: 1, storiesSkipped: 0, workUnitsCreated: 3 });
 
       expect(breakdown.breakDownStory).toHaveBeenCalledWith({
         summary: "Story needing breakdown",
@@ -220,7 +220,7 @@ describe("POST /api/projects/[projectId]/import/process", () => {
 
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data).toEqual({ storiesProcessed: 1, workUnitsCreated: 1 });
+      expect(data).toEqual({ storiesProcessed: 1, storiesSkipped: 0, workUnitsCreated: 1 });
       expect(breakdown.breakDownStory).not.toHaveBeenCalled();
 
       const story = await prisma.story.findUnique({ where: { jiraKey } });
@@ -345,7 +345,7 @@ describe("POST /api/projects/[projectId]/import/process", () => {
 
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data).toEqual({ storiesProcessed: 2, workUnitsCreated: 2 });
+      expect(data).toEqual({ storiesProcessed: 2, storiesSkipped: 0, workUnitsCreated: 2 });
 
       const reviewStory = await prisma.story.findUnique({ where: { jiraKey: keyReview } });
       const todoStory = await prisma.story.findUnique({ where: { jiraKey: keyTodo } });
@@ -404,7 +404,7 @@ describe("POST /api/projects/[projectId]/import/process", () => {
 
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data).toEqual({ storiesProcessed: 1, workUnitsCreated: 1 });
+      expect(data).toEqual({ storiesProcessed: 1, storiesSkipped: 0, workUnitsCreated: 1 });
 
       const story = await prisma.story.findUnique({ where: { jiraKey } });
       const workUnits = await prisma.workUnit.findMany({ where: { storyId: story!.id } });
@@ -521,20 +521,159 @@ describe("POST /api/projects/[projectId]/import/process", () => {
       });
       expect(res2.status).toBe(200);
       const data2 = await res2.json();
-      expect(data2).toEqual({ storiesProcessed: 1, workUnitsCreated: 1 });
+      expect(data2).toEqual({ storiesProcessed: 0, storiesSkipped: 1, workUnitsCreated: 0 });
 
       const stories = await prisma.story.findMany({ where: { jiraKey } });
       expect(stories).toHaveLength(1);
       expect(stories[0].summary).toBe("Updated summary");
       expect(stories[0].jiraStatus).toBe("Code Revew");
 
-      // Card creation isn't deduplicated on re-import — both passes each add
-      // their own card for the (single) Story row.
+      // Already-imported stories are skipped: story fields are refreshed but
+      // no new cards are created.
       const workUnits = await prisma.workUnit.findMany({ where: { storyId: stories[0].id } });
-      expect(workUnits).toHaveLength(2);
+      expect(workUnits).toHaveLength(1);
     } finally {
       await prisma.workUnit.deleteMany({ where: { story: { jiraKey } } });
       await prisma.story.deleteMany({ where: { jiraKey } });
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("skips card creation but still upserts story fields for an already-imported story", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const jiraKey = `PROC-${suffix}-DUP`;
+
+    const project = await prisma.project.create({
+      data: {
+        name: `Process Dedup Test ${suffix}`,
+        type: "JIRA",
+        jiraProjectKey: "PROC",
+        jiraSiteUrl: "https://example.atlassian.net/",
+        jiraEmail: "process-dedup@example.com",
+        jiraApiToken: "process-dedup-token",
+      },
+    });
+
+    const story = await prisma.story.create({
+      data: {
+        jiraKey,
+        jiraId: `id-${jiraKey}`,
+        projectKey: "PROC",
+        summary: "Stale summary",
+        jiraStatus: "To Do",
+        url: `https://example.atlassian.net/browse/${jiraKey}`,
+        lastSyncedAt: new Date(),
+      },
+    });
+    await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Existing card", column: "in_progress", order: 0 },
+    });
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/process`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: [
+              {
+                jiraKey,
+                jiraId: `id-${jiraKey}`,
+                summary: "Fresh summary",
+                description: "Fresh description",
+                jiraStatus: "In Progress",
+                breakDown: true,
+              },
+            ],
+          }),
+        }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data).toEqual({
+        storiesProcessed: 0,
+        storiesSkipped: 1,
+        workUnitsCreated: 0,
+      });
+
+      // Story fields refreshed…
+      const updated = await prisma.story.findUnique({ where: { jiraKey } });
+      expect(updated?.summary).toBe("Fresh summary");
+      expect(updated?.jiraStatus).toBe("In Progress");
+
+      // …but no new cards, and no breakdown call despite breakDown: true.
+      const cards = await prisma.workUnit.findMany({ where: { storyId: story.id } });
+      expect(cards).toHaveLength(1);
+      expect(cards[0].title).toBe("Existing card");
+      expect(breakdown.breakDownStory).not.toHaveBeenCalled();
+    } finally {
+      await prisma.workUnit.deleteMany({ where: { storyId: story.id } });
+      await prisma.story.delete({ where: { id: story.id } });
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("skips a duplicate jiraKey within the same request batch", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const jiraKey = `PROC-${suffix}-TWICE`;
+
+    const project = await prisma.project.create({
+      data: {
+        name: `Process Batch Dup Test ${suffix}`,
+        type: "JIRA",
+        jiraProjectKey: "PROC",
+        jiraSiteUrl: "https://example.atlassian.net/",
+        jiraEmail: "process-batchdup@example.com",
+        jiraApiToken: "process-batchdup-token",
+      },
+    });
+
+    const item = {
+      jiraKey,
+      jiraId: `id-${jiraKey}`,
+      summary: "Same story twice",
+      description: null,
+      jiraStatus: "To Do",
+      breakDown: false,
+    };
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/process`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: [item, { ...item }] }),
+        }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data).toEqual({
+        storiesProcessed: 1,
+        storiesSkipped: 1,
+        workUnitsCreated: 1,
+      });
+
+      const story = await prisma.story.findUnique({
+        where: { jiraKey },
+        include: { workUnits: true },
+      });
+      expect(story?.workUnits).toHaveLength(1);
+    } finally {
+      const story = await prisma.story.findUnique({ where: { jiraKey } });
+      if (story) {
+        await prisma.workUnit.deleteMany({ where: { storyId: story.id } });
+        await prisma.story.delete({ where: { id: story.id } });
+      }
       await prisma.project.delete({ where: { id: project.id } });
     }
   });

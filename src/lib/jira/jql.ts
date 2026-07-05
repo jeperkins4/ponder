@@ -35,11 +35,13 @@ const PROJECT_SYNC_STATUSES = [
 ];
 
 /**
- * Builds a JQL query for finding a single project's Story/Task/Bug issues that
- * are assigned to the current user and currently in an active status
- * (see PROJECT_SYNC_STATUSES). Used by project-aware sync: `currentUser()`
- * resolves to the account whose credentials the project is configured with, so
- * each project imports only that account's active, assigned issues.
+ * Builds a JQL query for finding a single project's issues assigned to the
+ * current user and currently in an active status (see PROJECT_SYNC_STATUSES).
+ * Any issue type assigned to the current user in an active status is included —
+ * sub-tasks and epics arrive as ordinary board stories. Used by project-aware
+ * sync: `currentUser()` resolves to the account whose credentials the project
+ * is configured with, so each project imports only that account's active,
+ * assigned issues.
  * @param projectKey - JIRA project key (e.g., 'TEAM')
  * @returns JQL query string
  * @throws Error if projectKey is empty
@@ -49,5 +51,5 @@ export function buildProjectStoriesJql(projectKey: string): string {
     throw new Error("buildProjectStoriesJql requires a project key");
   }
   const statuses = PROJECT_SYNC_STATUSES.map((s) => `"${s}"`).join(", ");
-  return `project = "${projectKey}" AND issuetype in (Story, Task, Bug) AND assignee = currentUser() AND status in (${statuses})`;
+  return `project = "${projectKey}" AND assignee = currentUser() AND status in (${statuses})`;
 }

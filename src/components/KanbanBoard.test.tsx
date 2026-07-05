@@ -475,6 +475,58 @@ describe("KanbanBoard", () => {
     });
   });
 
+  it("shows an import-result toast including the already-on-board count", async () => {
+    render(<KanbanBoard />);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { level: 1, name: /Kanban Board/i })
+      ).toBeInTheDocument()
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("ponder-jira-import-complete", {
+        detail: { storiesProcessed: 3, storiesSkipped: 2, workUnitsCreated: 7 },
+      })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("3 imported, 2 already on board")).toBeInTheDocument()
+    );
+  });
+
+  it("omits the already-on-board clause when nothing was skipped", async () => {
+    render(<KanbanBoard />);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { level: 1, name: /Kanban Board/i })
+      ).toBeInTheDocument()
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("ponder-jira-import-complete", {
+        detail: { storiesProcessed: 3, storiesSkipped: 0, workUnitsCreated: 7 },
+      })
+    );
+
+    await waitFor(() => expect(screen.getByText("3 imported")).toBeInTheDocument());
+    expect(screen.queryByText(/already on board/)).not.toBeInTheDocument();
+  });
+
+  it("shows no toast on a bare import-complete event without detail", async () => {
+    render(<KanbanBoard />);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { level: 1, name: /Kanban Board/i })
+      ).toBeInTheDocument()
+    );
+
+    window.dispatchEvent(new Event("ponder-jira-import-complete"));
+
+    // The silent refetch still runs (existing behavior); no toast appears.
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(/imported/)).not.toBeInTheDocument();
+  });
+
   describe("Keyboard column navigation", () => {
     it("sets up column refs so each column's cards are queryable for navigation", async () => {
       render(<KanbanBoard />);

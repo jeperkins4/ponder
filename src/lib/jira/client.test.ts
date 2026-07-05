@@ -456,7 +456,7 @@ describe("JIRA API Client", () => {
       const url = mockFetch.mock.calls[0][0] as string;
       const decodedUrl = decodeURIComponent(url.replace(/\+/g, " "));
       expect(decodedUrl).toContain('project = "TEAM"');
-      expect(decodedUrl).toContain("issuetype in (Story, Task, Bug)");
+      expect(decodedUrl).not.toContain("issuetype");
       expect(decodedUrl).toContain("assignee = currentUser()");
     });
 

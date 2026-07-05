@@ -10,6 +10,7 @@ const previewStories = [
     description: "First description",
     jiraStatus: "To Do",
     targetColumn: "todo",
+    alreadyImported: false,
   },
   {
     jiraKey: "ALPHA-2",
@@ -18,6 +19,7 @@ const previewStories = [
     description: null,
     jiraStatus: "Code Revew",
     targetColumn: "code_review",
+    alreadyImported: false,
   },
 ];
 
@@ -28,7 +30,8 @@ function mockFetchSequence({
   preview: { ok: boolean; body: unknown };
   process?: { ok: boolean; body: unknown };
 }) {
-  return vi.fn((url: string) => {
+  return vi.fn((url: string, init?: RequestInit) => {
+    void init;
     if (url.endsWith("/import/preview")) {
       return Promise.resolve({
         ok: preview.ok,
@@ -233,5 +236,122 @@ describe("ImportReview", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  const dedupStories = [
+    { ...previewStories[0], alreadyImported: false },
+    {
+      jiraKey: "ALPHA-3",
+      jiraId: "10003",
+      summary: "Already imported story",
+      description: null,
+      jiraStatus: "To Do",
+      targetColumn: "todo",
+      alreadyImported: true,
+    },
+  ];
+
+  it("shows an Already on board badge and Import anyway checkbox on flagged rows only", async () => {
+    global.fetch = mockFetchSequence({
+      preview: { ok: true, body: { stories: dedupStories } },
+    }) as unknown as typeof fetch;
+
+    render(<ImportReview projectId="p1" onClose={onClose} onImported={onImported} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("import-review-row-ALPHA-3")).toBeInTheDocument()
+    );
+
+    expect(screen.getByTestId("import-review-already-imported-badge-ALPHA-3")).toHaveTextContent(
+      "Already on board"
+    );
+    expect(screen.getByTestId("import-review-import-anyway-ALPHA-3")).not.toBeChecked();
+    expect(
+      screen.queryByTestId("import-review-already-imported-badge-ALPHA-1")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("import-review-import-anyway-ALPHA-1")
+    ).not.toBeInTheDocument();
+  });
+
+  it("excludes flagged rows from processing unless Import anyway is checked", async () => {
+    const fetchMock = mockFetchSequence({
+      preview: { ok: true, body: { stories: dedupStories } },
+      process: {
+        ok: true,
+        body: { storiesProcessed: 1, storiesSkipped: 0, workUnitsCreated: 1 },
+      },
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<ImportReview projectId="p1" onClose={onClose} onImported={onImported} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("import-review-process-button")).toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByTestId("import-review-process-button"));
+
+    await waitFor(() => expect(onImported).toHaveBeenCalled());
+
+    const processCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith("/import/process")
+    );
+    const sentItems = JSON.parse(String(processCall![1]!.body)).items;
+    expect(sentItems.map((i: { jiraKey: string }) => i.jiraKey)).toEqual(["ALPHA-1"]);
+  });
+
+  it("includes a flagged row after Import anyway is checked", async () => {
+    const fetchMock = mockFetchSequence({
+      preview: { ok: true, body: { stories: dedupStories } },
+      process: {
+        ok: true,
+        body: { storiesProcessed: 1, storiesSkipped: 1, workUnitsCreated: 1 },
+      },
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<ImportReview projectId="p1" onClose={onClose} onImported={onImported} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("import-review-import-anyway-ALPHA-3")).toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByTestId("import-review-import-anyway-ALPHA-3"));
+    fireEvent.click(screen.getByTestId("import-review-process-button"));
+
+    await waitFor(() => expect(onImported).toHaveBeenCalled());
+
+    const processCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith("/import/process")
+    );
+    const sentItems = JSON.parse(String(processCall![1]!.body)).items;
+    expect(sentItems.map((i: { jiraKey: string }) => i.jiraKey)).toEqual([
+      "ALPHA-1",
+      "ALPHA-3",
+    ]);
+  });
+
+  it("passes the process result counts to onImported", async () => {
+    global.fetch = mockFetchSequence({
+      preview: { ok: true, body: { stories: dedupStories } },
+      process: {
+        ok: true,
+        body: { storiesProcessed: 1, storiesSkipped: 0, workUnitsCreated: 3 },
+      },
+    }) as unknown as typeof fetch;
+
+    render(<ImportReview projectId="p1" onClose={onClose} onImported={onImported} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("import-review-process-button")).toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByTestId("import-review-process-button"));
+
+    await waitFor(() =>
+      expect(onImported).toHaveBeenCalledWith({
+        storiesProcessed: 1,
+        storiesSkipped: 0,
+        workUnitsCreated: 3,
+      })
+    );
   });
 });
