@@ -26,6 +26,10 @@ import {
   markDone,
   moveWorkUnit,
   regenerateAcceptance,
+  reportCompletedWork,
+  reportJiraTrail,
+  reportStatusSnapshot,
+  reportThroughput,
   reportVerification,
   updateWorkUnit,
 } from "./tools";
@@ -166,6 +170,70 @@ export function createServer(client: PonderClient): McpServer {
     },
     async ({ workUnitId, outcome, summary, verificationSteps }) =>
       reportVerification(client, { workUnitId, outcome, summary, verificationSteps })
+  );
+
+  server.registerTool(
+    "report_completed_work",
+    {
+      description:
+        "Report completed work (cards with a completedAt, archived included) " +
+        "grouped by story. Optional projectId and from/to ISO dates (inclusive).",
+      inputSchema: {
+        projectId: z.string().optional(),
+        from: z.string().optional(),
+        to: z.string().optional(),
+      },
+    },
+    async ({ projectId, from, to }) =>
+      reportCompletedWork(client, { projectId, from, to })
+  );
+
+  server.registerTool(
+    "report_throughput",
+    {
+      description:
+        "Report weekly throughput and cycle time (completedAt - createdAt, " +
+        "fractional days) for completed cards. Optional projectId and " +
+        "from/to ISO dates (inclusive).",
+      inputSchema: {
+        projectId: z.string().optional(),
+        from: z.string().optional(),
+        to: z.string().optional(),
+      },
+    },
+    async ({ projectId, from, to }) =>
+      reportThroughput(client, { projectId, from, to })
+  );
+
+  server.registerTool(
+    "report_status_snapshot",
+    {
+      description:
+        "Report the current board snapshot: active card counts per column " +
+        "per story, awaiting-verification and failed-verification tallies. " +
+        "Optional projectId; date ranges do not apply (snapshot is 'right now').",
+      inputSchema: {
+        projectId: z.string().optional(),
+      },
+    },
+    async ({ projectId }) => reportStatusSnapshot(client, { projectId })
+  );
+
+  server.registerTool(
+    "report_jira_trail",
+    {
+      description:
+        "Report the chronological JIRA trail (newest first): Move-to-QA " +
+        "reports, verification outcomes, story completion comments. Optional " +
+        "projectId and from/to ISO dates (inclusive).",
+      inputSchema: {
+        projectId: z.string().optional(),
+        from: z.string().optional(),
+        to: z.string().optional(),
+      },
+    },
+    async ({ projectId, from, to }) =>
+      reportJiraTrail(client, { projectId, from, to })
   );
 
   return server;
