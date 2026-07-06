@@ -106,6 +106,9 @@ claude mcp add ponder -- npx tsx /absolute/path/to/ponder/src/mcp/server.ts
 | `move_work_unit` | `workUnitId`, `column`, `order?` | Move a card — **may transition the JIRA issue** (In Progress / Code Revew + comment) |
 | `mark_done` | `workUnitId` | Move a card to Done (drives the story to Code Revew + summary comment once all its cards are done) |
 | `update_work_unit` | `workUnitId`, `title?`, `description?` | Edit a card's title/description |
+| `regenerate_acceptance` | `workUnitId`, `codebaseContext?` | (Re)generate a card's acceptance criteria and verification with Claude |
+| `attach_image` | `workUnitId`, `filePath`, `filename?` | Attach a local image (e.g. a screenshot) to a card as evidence |
+| `report_verification` | `workUnitId`, `outcome`, `summary`, `verificationSteps?` | Report an AI-agent verification result for a Code Review card |
 | `report_completed_work` | `projectId?`, `from?`, `to?` | Completed-work history grouped by story (archived cards included) |
 | `report_throughput` | `projectId?`, `from?`, `to?` | Weekly throughput + cycle-time stats (created→completed) |
 | `report_status_snapshot` | `projectId?` | Active cards per column per story, verification tallies |
