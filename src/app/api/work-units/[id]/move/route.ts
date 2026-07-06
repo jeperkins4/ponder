@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Column, WorkUnitDTO } from "@/lib/types";
 import { applyStoryStatusSync } from "@/lib/statusTrigger";
+import { moveWorkUnitColumn } from "@/lib/completeMove";
 
 // Helper to convert Prisma WorkUnit to DTO
 function workUnitToDTO(wu: {
@@ -77,14 +78,9 @@ export async function POST(
       );
     }
 
-    // Update the work unit with new column and order
-    const updated = await prisma.workUnit.update({
-      where: { id },
-      data: {
-        column,
-        order,
-      },
-    });
+    // Update the work unit with new column and order (stamps/clears
+    // completedAt on entering/leaving done — see src/lib/completeMove.ts).
+    const updated = await moveWorkUnitColumn(id, column, order, prisma);
 
     // Sync JIRA status from the board (non-blocking): applyStoryStatusSync
     // never throws internally, but this try/catch is load-bearing belt-and-
