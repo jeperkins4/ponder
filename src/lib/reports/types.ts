@@ -15,7 +15,7 @@ export interface ReportFilters {
   to?: Date; // omitted = now; inclusive
 }
 
-export interface CompletedCard {
+interface CompletedCard {
   id: string;
   title: string;
   subNumber: number | null;
@@ -66,7 +66,7 @@ export interface StatusSnapshotReport {
   failedVerification: number; // verificationOutcome === "failed" on an active card
 }
 
-export type JiraTrailEventType = "moved_to_qa" | "verification" | "story_completed";
+type JiraTrailEventType = "moved_to_qa" | "verification" | "story_completed";
 
 export interface JiraTrailEvent {
   type: JiraTrailEventType;
