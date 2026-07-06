@@ -106,10 +106,19 @@ claude mcp add ponder -- npx tsx /absolute/path/to/ponder/src/mcp/server.ts
 | `move_work_unit` | `workUnitId`, `column`, `order?` | Move a card — **may transition the JIRA issue** (In Progress / Code Revew + comment) |
 | `mark_done` | `workUnitId` | Move a card to Done (drives the story to Code Revew + summary comment once all its cards are done) |
 | `update_work_unit` | `workUnitId`, `title?`, `description?` | Edit a card's title/description |
+| `report_completed_work` | `projectId?`, `from?`, `to?` | Completed-work history grouped by story (archived cards included) |
+| `report_throughput` | `projectId?`, `from?`, `to?` | Weekly throughput + cycle-time stats (created→completed) |
+| `report_status_snapshot` | `projectId?` | Active cards per column per story, verification tallies |
+| `report_jira_trail` | `projectId?`, `from?`, `to?` | Chronological trail of what was reported to JIRA and when |
 
 Once connected, ask Claude Code things like *"list my Ponder projects"*, *"show the cards for project X"*, or *"mark work unit &lt;id&gt; done"*. See [`README-mcp.md`](./README-mcp.md) for the full reference and troubleshooting.
+
+## Reports
+
+The `/reports` page answers four questions, filterable by project and date range (7/30/90 days or all time): a current **status snapshot** (active cards per column, verification states), **throughput & cycle time** (weekly completions and created→completed cycle times, charted), **completed work** history grouped by story, and the **JIRA trail** (every Move-to-QA report, verification outcome, and completion comment, newest first). The same data is available to MCP clients via the four `report_*` tools.
 
 ## Roadmap
 
 - **PR-gated completion** — a story advances to Code Review / Done when a pull request is opened, rather than on a manual board drag.
 - Additional status mappings (statusCategory-based matching).
+- **Scheduled report digest** — periodic summary built on the report layer (delivery channel TBD).
