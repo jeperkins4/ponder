@@ -569,7 +569,7 @@ describe("syncStoriesForProject — PR gate integration", () => {
     vi.clearAllMocks();
     mockFetchStoriesForProject = vi.fn();
     vi.spyOn(jiraClient, "fetchStoriesForProject").mockImplementation(
-      mockFetchStoriesForProject as any
+      mockFetchStoriesForProject as unknown as typeof jiraClient.fetchStoriesForProject
     );
     mockFetchStoriesForProject.mockResolvedValue([]);
   });
