@@ -1,4 +1,22 @@
 import "@testing-library/jest-dom";
+import "dotenv/config";
+
+// SAFETY GUARD: several test files run destructive setup (blanket deleteMany
+// on Project/Story/WorkUnit), so tests must only ever touch a test database.
+// `npm test` guarantees that via `dotenv -e .env.test`, but a bare
+// `npx vitest run` skips the wrapper: dotenv/config then falls back to .env
+// and the DEV database — which is exactly how the dev data was wiped on
+// 2026-07-05. Refuse to run unless DATABASE_URL points at a *_test database.
+// (dotenv/config never overrides an already-set DATABASE_URL, so the
+// npm-script wrapper still wins when present.)
+if (!process.env.DATABASE_URL?.includes("_test")) {
+  throw new Error(
+    "Refusing to run tests: DATABASE_URL does not look like a test database " +
+      `(expected it to contain "_test", got: ${process.env.DATABASE_URL ?? "unset"}). ` +
+      "Run tests via `npm test` / `npm run test:ci`, which load .env.test — " +
+      "never bare `npx vitest`."
+  );
+}
 
 // Vitest 1.x's jsdom environment only copies a window property onto the test
 // global if that key is either absent from Node's own `global` or explicitly
