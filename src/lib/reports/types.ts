@@ -80,9 +80,24 @@ export interface JiraTrailReport {
   events: JiraTrailEvent[]; // newest first
 }
 
+export interface TrendsReport {
+  granularity: "day" | "week";
+  buckets: string[]; // YYYY-MM-DD bucket starts, contiguous, zero-activity buckets included
+  created: number[]; // cards created per bucket (archived included)
+  completed: number[]; // cards completed per bucket (archived included)
+  cumulativeCompleted: number[]; // running total of `completed` within the window
+  wip: number[]; // in-flight count at each bucket END (see getTrends)
+  activity: {
+    movedToQa: number[];
+    verifications: number[];
+    storyCompletions: number[];
+  };
+}
+
 export interface ReportsPayload {
   completedWork: CompletedWorkReport;
   throughput: ThroughputReport;
   statusSnapshot: StatusSnapshotReport;
   jiraTrail: JiraTrailReport;
+  trends: TrendsReport;
 }

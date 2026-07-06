@@ -9,6 +9,7 @@ import {
   median,
   cycleTimeDays,
   isoWeekStartUtc,
+  isoDayUtc,
   buildWeeklyBuckets,
 } from "./stats";
 
@@ -65,6 +66,17 @@ describe("isoWeekStartUtc", () => {
   it("maps a Sunday to the Monday six days earlier", () => {
     // 2026-07-05 is a Sunday
     expect(isoWeekStartUtc(new Date("2026-07-05T23:59:59.000Z"))).toBe("2026-06-29");
+  });
+});
+
+describe("isoDayUtc", () => {
+  it("returns the UTC calendar day as YYYY-MM-DD", () => {
+    expect(isoDayUtc(new Date("2026-07-06T15:30:00.000Z"))).toBe("2026-07-06");
+  });
+
+  it("uses the UTC day, not the local day", () => {
+    expect(isoDayUtc(new Date("2026-07-06T23:59:59.999Z"))).toBe("2026-07-06");
+    expect(isoDayUtc(new Date("2026-07-07T00:00:00.000Z"))).toBe("2026-07-07");
   });
 });
 
