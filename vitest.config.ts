@@ -9,6 +9,11 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
     exclude: ["**/node_modules/**", "**/.worktrees/**"],
+    // DB-backed test files share one test database, and several suites
+    // (e.g. projects route.test.ts beforeEach deleteMany) assume exclusive
+    // table access. Parallel file execution races those assumptions and
+    // fails ~40 tests with P2025 cleanup errors, so run files sequentially.
+    fileParallelism: false,
   },
   resolve: {
     alias: {
