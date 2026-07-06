@@ -120,8 +120,11 @@ Once connected, ask Claude Code things like *"list my Ponder projects"*, *"show 
 
 The `/reports` page answers four questions, filterable by project and date range (7/30/90 days or all time): a current **status snapshot** (active cards per column, verification states), **throughput & cycle time** (weekly completions and created→completed cycle times, charted), **completed work** history grouped by story, and the **JIRA trail** (every Move-to-QA report, verification outcome, and completion comment, newest first). The same data is available to MCP clients via the four `report_*` tools.
 
+## PR-gated completion
+
+Link a project to GitHub (Settings → "GitHub repositories", comma-separated `owner/repo`; one `GITHUB_TOKEN` in `.env` serves all repos) and Sync will also check GitHub: any **open or merged PR** whose branch name or title contains a story's JIRA key (word-boundary match — `COM-54` never matches `COM-540`) moves all of that story's active cards to Done, records a "Completed by PR #N" work note on each card, and fires the same JIRA write-back a manual drag does (story → Code Review + summary comment). Cards entering Done now also stamp `completedAt` (manual drags included), which feeds the throughput and completed-work reports.
+
 ## Roadmap
 
-- **PR-gated completion** — a story advances to Code Review / Done when a pull request is opened, rather than on a manual board drag.
 - Additional status mappings (statusCategory-based matching).
 - **Scheduled report digest** — periodic summary built on the report layer (delivery channel TBD).

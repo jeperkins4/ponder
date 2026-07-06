@@ -29,6 +29,7 @@ export default function ProjectSettingsPage() {
   const [jiraSiteUrl, setJiraSiteUrl] = useState("");
   const [jiraEmail, setJiraEmail] = useState("");
   const [jiraApiToken, setJiraApiToken] = useState("");
+  const [githubRepos, setGithubRepos] = useState("");
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export default function ProjectSettingsPage() {
           setJiraProjectKey(data.jiraProjectKey ?? "");
           setJiraSiteUrl(data.jiraSiteUrl ?? "");
           setJiraEmail(data.jiraEmail ?? "");
+          setGithubRepos(data.githubRepos ?? "");
           // The API token is write-only and never returned by the API, so
           // it is intentionally never pre-filled here.
         }
@@ -88,6 +90,7 @@ export default function ProjectSettingsPage() {
         jiraProjectKey,
         jiraSiteUrl,
         jiraEmail,
+        githubRepos,
       };
       // The API token is write-only: only send it when the user actually
       // typed something, so leaving it blank preserves the stored token.
@@ -302,6 +305,24 @@ export default function ProjectSettingsPage() {
                   </a>{" "}
                   → Security → API tokens.
                 </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="github-repos"
+                  className="block text-sm font-instrument font-semibold text-ponder-light-text mb-1"
+                >
+                  GitHub repositories
+                </label>
+                <input
+                  id="github-repos"
+                  type="text"
+                  value={githubRepos}
+                  onChange={(e) => setGithubRepos(e.target.value)}
+                  placeholder="owner/repo, owner/repo"
+                  className={`w-full px-3 py-2 bg-ponder-light-surface border border-ponder-light-card-border rounded-lg font-instrument text-ponder-light-text ${focusRing}`}
+                  data-testid="github-repos-input"
+                />
               </div>
 
               <div>

@@ -10,6 +10,7 @@ import {
   fetchStoriesForProject,
   type JiraConfig,
 } from "@/lib/jira/client";
+import { applyPrGatedCompletion } from "@/lib/github/prGatedCompletion";
 
 /**
  * Result of a sync operation
@@ -199,5 +200,24 @@ export async function syncStoriesForProject(
     }
   }
 
-  return { created, updated };
+  // PR-gated completion runs after the JIRA sync. GitHub problems must
+  // never fail the sync — they surface as message parts instead.
+  const messageParts: string[] = [];
+  try {
+    const gate = await applyPrGatedCompletion(projectId, prismaClient);
+    if (gate.cardsCompleted > 0) {
+      messageParts.push(`${gate.cardsCompleted} card(s) completed by PRs`);
+    }
+    messageParts.push(...gate.warnings.map((warning) => `GitHub: ${warning}`));
+  } catch (error) {
+    messageParts.push(
+      `GitHub: PR check failed (${error instanceof Error ? error.message : String(error)})`
+    );
+  }
+
+  return {
+    created,
+    updated,
+    ...(messageParts.length > 0 ? { message: messageParts.join(" · ") } : {}),
+  };
 }

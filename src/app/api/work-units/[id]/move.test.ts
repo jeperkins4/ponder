@@ -200,6 +200,53 @@ describe("Work Unit Move Endpoint", () => {
     expect(body.column).toBe("in_progress");
   });
 
+  it("stamps completedAt in the response when moving into done", async () => {
+    const req = new Request("http://localhost/api/work-units/test-id/move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        column: "done",
+        order: 0,
+      }),
+    });
+
+    const before = Date.now();
+    const res = await POST(req as never, {
+      params: Promise.resolve({ id: workUnitId }),
+    });
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.column).toBe("done");
+    expect(body.completedAt).not.toBeNull();
+    expect(new Date(body.completedAt).getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  it("clears completedAt in the response when moving out of done", async () => {
+    await prisma.workUnit.update({
+      where: { id: workUnitId },
+      data: { column: "done", completedAt: new Date() },
+    });
+
+    const req = new Request("http://localhost/api/work-units/test-id/move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        column: "in_progress",
+        order: 0,
+      }),
+    });
+
+    const res = await POST(req as never, {
+      params: Promise.resolve({ id: workUnitId }),
+    });
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.column).toBe("in_progress");
+    expect(body.completedAt).toBeNull();
+  });
+
   afterAll(async () => {
     // Properly close database connections
     await prisma.$disconnect();
