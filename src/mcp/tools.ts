@@ -252,6 +252,114 @@ export async function attachImage(
   }
 }
 
+export interface ReportToolArgs {
+  projectId?: string;
+  from?: string;
+  to?: string;
+}
+
+/** Completed-work history grouped by story. */
+export async function reportCompletedWork(
+  client: PonderClient,
+  args: ReportToolArgs
+): Promise<McpTextResult> {
+  const { completedWork } = await client.getReports(args);
+
+  if (completedWork.totalCards === 0) {
+    return textResult("No completed work in the selected range.");
+  }
+
+  const lines = completedWork.stories.map((story) => {
+    const cards = story.cards.map((card) => {
+      const outcome = card.verificationOutcome
+        ? ` [${card.verificationOutcome}]`
+        : "";
+      return `  - ${card.title}${outcome} (completed ${card.completedAt.slice(0, 10)})`;
+    });
+    return [
+      `- ${story.jiraKey}: ${story.summary} [${story.jiraStatus}]`,
+      ...cards,
+    ].join("\n");
+  });
+
+  return textResult(
+    `${completedWork.totalCards} card(s) completed across ${completedWork.totalStories} story(ies):\n${lines.join("\n")}`
+  );
+}
+
+/** Weekly throughput and cycle-time stats. */
+export async function reportThroughput(
+  client: PonderClient,
+  args: ReportToolArgs
+): Promise<McpTextResult> {
+  const { throughput } = await client.getReports(args);
+
+  if (throughput.totalCompleted === 0) {
+    return textResult("No completed work in the selected range.");
+  }
+
+  const weekLines = throughput.weeks.map((week) => {
+    const stats =
+      week.completedCount > 0
+        ? ` (avg ${week.avgCycleTimeDays}d, median ${week.medianCycleTimeDays}d)`
+        : "";
+    return `- ${week.weekStart}: ${week.completedCount} completed${stats}`;
+  });
+
+  return textResult(
+    `Throughput: ${throughput.totalCompleted} completed; ` +
+      `avg cycle ${throughput.avgCycleTimeDays}d, median ${throughput.medianCycleTimeDays}d; ` +
+      `${throughput.avgCardsPerWeek} card(s)/week avg.\nWeekly:\n${weekLines.join("\n")}`
+  );
+}
+
+/** Current board snapshot: active cards per column, verification tallies. */
+export async function reportStatusSnapshot(
+  client: PonderClient,
+  args: { projectId?: string }
+): Promise<McpTextResult> {
+  const { statusSnapshot } = await client.getReports(args);
+
+  const totals = statusSnapshot.columnTotals;
+  const header =
+    `Active cards: todo ${totals.todo}, in_progress ${totals.in_progress}, ` +
+    `code_review ${totals.code_review}, done ${totals.done}. ` +
+    `Awaiting verification: ${statusSnapshot.awaitingVerification}. ` +
+    `Failed verification: ${statusSnapshot.failedVerification}.`;
+
+  if (statusSnapshot.stories.length === 0) {
+    return textResult(`${header}\nNo active cards.`);
+  }
+
+  const storyLines = statusSnapshot.stories.map((story) => {
+    const counts = COLUMNS.filter((c) => story.columnCounts[c.key] > 0)
+      .map((c) => `${c.key}: ${story.columnCounts[c.key]}`)
+      .join(", ");
+    return `- ${story.jiraKey}: ${story.summary} [${story.jiraStatus}] — ${counts}`;
+  });
+
+  return textResult(`${header}\nPer story:\n${storyLines.join("\n")}`);
+}
+
+/** Chronological JIRA reporting trail, newest first. */
+export async function reportJiraTrail(
+  client: PonderClient,
+  args: ReportToolArgs
+): Promise<McpTextResult> {
+  const { jiraTrail } = await client.getReports(args);
+
+  if (jiraTrail.events.length === 0) {
+    return textResult("No JIRA events in the selected range.");
+  }
+
+  const lines = jiraTrail.events.map((event) => {
+    const outcome = event.outcome ? ` (${event.outcome})` : "";
+    return `- ${event.timestamp} ${event.type}${outcome} ${event.jiraKey} — ${event.detail}`;
+  });
+
+  return textResult(`${jiraTrail.events.length} JIRA event(s):\n${lines.join("\n")}`);
+}
+
 /** Report the outcome of an AI-agent verification run (see the Verify button). */
 export async function reportVerification(
   client: PonderClient,

@@ -16,6 +16,7 @@ export default function TopNav() {
   const links = [
     { href: "/projects", label: "Projects" },
     { href: "/board", label: "Board" },
+    { href: "/reports", label: "Reports" },
   ];
 
   // Until mounted, render the light palette to avoid a hydration flash.

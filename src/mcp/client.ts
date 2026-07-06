@@ -7,6 +7,7 @@
  */
 
 import type { AttachmentDTO, Column, ProjectWithStats, StoryDTO, WorkUnitDTO } from "@/lib/types";
+import type { ReportsPayload } from "@/lib/reports/types";
 
 export class PonderClient {
   private readonly baseUrl: string;
@@ -25,6 +26,20 @@ export class PonderClient {
     return this.request<StoryDTO[]>(
       "GET",
       `/api/stories?projectId=${encodeURIComponent(projectId)}`
+    );
+  }
+
+  async getReports(
+    args: { projectId?: string; from?: string; to?: string } = {}
+  ): Promise<ReportsPayload> {
+    const params = new URLSearchParams();
+    if (args.projectId) params.set("projectId", args.projectId);
+    if (args.from) params.set("from", args.from);
+    if (args.to) params.set("to", args.to);
+    const query = params.toString();
+    return this.request<ReportsPayload>(
+      "GET",
+      `/api/reports${query ? `?${query}` : ""}`
     );
   }
 

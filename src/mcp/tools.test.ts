@@ -10,11 +10,16 @@ import {
   markDone,
   moveWorkUnit,
   regenerateAcceptance,
+  reportCompletedWork,
+  reportJiraTrail,
+  reportStatusSnapshot,
+  reportThroughput,
   reportVerification,
   updateWorkUnit,
 } from "./tools";
 import type { PonderClient } from "./client";
 import type { ProjectWithStats, StoryDTO, WorkUnitDTO } from "@/lib/types";
+import type { ReportsPayload } from "@/lib/reports/types";
 
 function fakeClient(overrides: Partial<PonderClient>): PonderClient {
   return overrides as PonderClient;
@@ -574,5 +579,202 @@ describe("attachImage", () => {
 
     expect(result.content[0].text).toMatch(/error/i);
     expect(result.content[0].text).toContain("413");
+  });
+});
+
+const reportsPayload: ReportsPayload = {
+  completedWork: {
+    stories: [
+      {
+        jiraKey: "PONE-1",
+        summary: "Do the thing",
+        jiraStatus: "Code Revew",
+        cards: [
+          {
+            id: "w1",
+            title: "Task A",
+            subNumber: 1,
+            completedAt: "2026-07-01T10:00:00.000Z",
+            archivedAt: null,
+            verificationOutcome: "passed",
+          },
+        ],
+      },
+    ],
+    totalCards: 1,
+    totalStories: 1,
+  },
+  throughput: {
+    weeks: [
+      {
+        weekStart: "2026-06-29",
+        completedCount: 1,
+        avgCycleTimeDays: 2.5,
+        medianCycleTimeDays: 2.5,
+      },
+    ],
+    totalCompleted: 1,
+    avgCycleTimeDays: 2.5,
+    medianCycleTimeDays: 2.5,
+    avgCardsPerWeek: 1,
+  },
+  statusSnapshot: {
+    stories: [
+      {
+        jiraKey: "PONE-2",
+        summary: "Active story",
+        jiraStatus: "In Progress",
+        columnCounts: { todo: 2, in_progress: 1, code_review: 0, done: 0 },
+      },
+    ],
+    columnTotals: { todo: 2, in_progress: 1, code_review: 0, done: 0 },
+    awaitingVerification: 1,
+    failedVerification: 0,
+  },
+  jiraTrail: {
+    events: [
+      {
+        type: "verification",
+        jiraKey: "PONE-1",
+        detail: "Task A",
+        timestamp: "2026-07-02T09:00:00.000Z",
+        outcome: "passed",
+      },
+      {
+        type: "moved_to_qa",
+        jiraKey: "PONE-3",
+        detail: "QA card",
+        timestamp: "2026-07-01T09:00:00.000Z",
+      },
+    ],
+  },
+};
+
+function emptyReportsPayload(): ReportsPayload {
+  return {
+    completedWork: { stories: [], totalCards: 0, totalStories: 0 },
+    throughput: {
+      weeks: [],
+      totalCompleted: 0,
+      avgCycleTimeDays: null,
+      medianCycleTimeDays: null,
+      avgCardsPerWeek: null,
+    },
+    statusSnapshot: {
+      stories: [],
+      columnTotals: { todo: 0, in_progress: 0, code_review: 0, done: 0 },
+      awaitingVerification: 0,
+      failedVerification: 0,
+    },
+    jiraTrail: { events: [] },
+  };
+}
+
+describe("reportCompletedWork", () => {
+  it("formats completed cards grouped by story", async () => {
+    const getReports = vi.fn().mockResolvedValue(reportsPayload);
+    const client = fakeClient({ getReports });
+
+    const result = await reportCompletedWork(client, {});
+
+    expect(getReports).toHaveBeenCalledWith({});
+    const text = result.content[0].text;
+    expect(text).toContain("1 card(s) completed across 1 story(ies)");
+    expect(text).toContain("PONE-1: Do the thing");
+    expect(text).toContain("Task A [passed] (completed 2026-07-01)");
+  });
+
+  it("passes filters through and handles an empty report", async () => {
+    const getReports = vi.fn().mockResolvedValue(emptyReportsPayload());
+    const client = fakeClient({ getReports });
+
+    const result = await reportCompletedWork(client, {
+      projectId: "p1",
+      from: "2026-06-01",
+      to: "2026-07-01",
+    });
+
+    expect(getReports).toHaveBeenCalledWith({
+      projectId: "p1",
+      from: "2026-06-01",
+      to: "2026-07-01",
+    });
+    expect(result.content[0].text).toBe("No completed work in the selected range.");
+  });
+});
+
+describe("reportThroughput", () => {
+  it("formats totals and weekly buckets", async () => {
+    const getReports = vi.fn().mockResolvedValue(reportsPayload);
+    const client = fakeClient({ getReports });
+
+    const result = await reportThroughput(client, {});
+
+    const text = result.content[0].text;
+    expect(text).toContain("1 completed");
+    expect(text).toContain("avg cycle 2.5d");
+    expect(text).toContain("median 2.5d");
+    expect(text).toContain("- 2026-06-29: 1 completed (avg 2.5d, median 2.5d)");
+  });
+
+  it("handles an empty report", async () => {
+    const getReports = vi.fn().mockResolvedValue(emptyReportsPayload());
+    const client = fakeClient({ getReports });
+
+    const result = await reportThroughput(client, {});
+
+    expect(result.content[0].text).toBe("No completed work in the selected range.");
+  });
+});
+
+describe("reportStatusSnapshot", () => {
+  it("formats column totals, verification tallies, and per-story rows", async () => {
+    const getReports = vi.fn().mockResolvedValue(reportsPayload);
+    const client = fakeClient({ getReports });
+
+    const result = await reportStatusSnapshot(client, { projectId: "p1" });
+
+    expect(getReports).toHaveBeenCalledWith({ projectId: "p1" });
+    const text = result.content[0].text;
+    expect(text).toContain("todo 2, in_progress 1, code_review 0, done 0");
+    expect(text).toContain("Awaiting verification: 1");
+    expect(text).toContain("Failed verification: 0");
+    expect(text).toContain("PONE-2: Active story [In Progress]");
+  });
+
+  it("handles an empty board", async () => {
+    const getReports = vi.fn().mockResolvedValue(emptyReportsPayload());
+    const client = fakeClient({ getReports });
+
+    const result = await reportStatusSnapshot(client, {});
+
+    expect(result.content[0].text).toContain("No active cards.");
+  });
+});
+
+describe("reportJiraTrail", () => {
+  it("formats events newest first with outcomes", async () => {
+    const getReports = vi.fn().mockResolvedValue(reportsPayload);
+    const client = fakeClient({ getReports });
+
+    const result = await reportJiraTrail(client, {});
+
+    const text = result.content[0].text;
+    expect(text).toContain("2 JIRA event(s)");
+    expect(text).toContain(
+      "- 2026-07-02T09:00:00.000Z verification (passed) PONE-1 — Task A"
+    );
+    expect(text).toContain(
+      "- 2026-07-01T09:00:00.000Z moved_to_qa PONE-3 — QA card"
+    );
+  });
+
+  it("handles an empty trail", async () => {
+    const getReports = vi.fn().mockResolvedValue(emptyReportsPayload());
+    const client = fakeClient({ getReports });
+
+    const result = await reportJiraTrail(client, {});
+
+    expect(result.content[0].text).toBe("No JIRA events in the selected range.");
   });
 });
