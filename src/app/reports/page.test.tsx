@@ -68,6 +68,19 @@ const payload: ReportsPayload = {
       },
     ],
   },
+  trends: {
+    granularity: "day" as const,
+    buckets: ["2026-07-04", "2026-07-05", "2026-07-06"],
+    created: [2, 1, 0],
+    completed: [0, 1, 1],
+    cumulativeCompleted: [0, 1, 2],
+    wip: [2, 2, 1],
+    activity: {
+      movedToQa: [0, 1, 0],
+      verifications: [0, 0, 1],
+      storyCompletions: [0, 0, 1],
+    },
+  },
 };
 
 const projects = [
@@ -210,6 +223,15 @@ describe("ReportsPage", () => {
           failedVerification: 0,
         },
         jiraTrail: { events: [] },
+        trends: {
+          granularity: "day" as const,
+          buckets: [],
+          created: [],
+          completed: [],
+          cumulativeCompleted: [],
+          wip: [],
+          activity: { movedToQa: [], verifications: [], storyCompletions: [] },
+        },
       } satisfies ReportsPayload);
     });
 
@@ -219,5 +241,27 @@ describe("ReportsPage", () => {
       await screen.findByText(/no completed work in this range/i)
     ).toBeInTheDocument();
     expect(screen.getByText(/no jira events in this range/i)).toBeInTheDocument();
+    expect(screen.getByText(/no activity in this range/i)).toBeInTheDocument();
+  });
+
+  it("renders the Trends section with all four charts and the granularity caption", async () => {
+    render(<ReportsPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: /trends/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText("Daily buckets")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /created vs completed/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /cumulative completed/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /wip over time/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /jira activity/i })
+    ).toBeInTheDocument();
   });
 });
