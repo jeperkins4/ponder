@@ -4,12 +4,22 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { syncStoriesFromJira, syncStoriesForProject } from "./sync";
 import * as jiraClient from "@/lib/jira/client";
+import { applyPrGatedCompletion } from "@/lib/github/prGatedCompletion";
 import type { StoryDTO } from "@/lib/types";
 
 // Mock the JIRA client
 vi.mock("@/lib/jira/client");
+
+vi.mock("@/lib/github/prGatedCompletion", () => ({
+  applyPrGatedCompletion: vi.fn(async () => ({
+    cardsCompleted: 0,
+    storiesCompleted: 0,
+    warnings: [],
+  })),
+}));
 
 describe("syncStoriesFromJira", () => {
   let mockFetchAssignedStories: ReturnType<typeof vi.fn>;
@@ -549,5 +559,86 @@ describe("syncStoriesForProject", () => {
       },
     });
     expect(result).toEqual({ created: 0, updated: 1 });
+  });
+});
+
+describe("syncStoriesForProject — PR gate integration", () => {
+  let mockFetchStoriesForProject: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetchStoriesForProject = vi.fn();
+    vi.spyOn(jiraClient, "fetchStoriesForProject").mockImplementation(
+      mockFetchStoriesForProject as any
+    );
+    mockFetchStoriesForProject.mockResolvedValue([]);
+  });
+
+  async function createJiraLinkedProject() {
+    return prisma.project.create({
+      data: {
+        name: `PR Gate Sync ${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        type: "JIRA",
+        jiraProjectKey: "TEAM",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "team@example.com",
+        jiraApiToken: "secret-token",
+      },
+    });
+  }
+
+  it("appends the completed-by-PRs count to the result message", async () => {
+    vi.mocked(applyPrGatedCompletion).mockResolvedValueOnce({
+      cardsCompleted: 3,
+      storiesCompleted: 2,
+      warnings: [],
+    });
+
+    const project = await createJiraLinkedProject();
+    try {
+      const result = await syncStoriesForProject(project.id, prisma);
+      expect(result.message).toContain("3 card(s) completed by PRs");
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("appends GitHub warnings to the result message", async () => {
+    vi.mocked(applyPrGatedCompletion).mockResolvedValueOnce({
+      cardsCompleted: 0,
+      storiesCompleted: 0,
+      warnings: ["bad/repo: 404 Not Found"],
+    });
+
+    const project = await createJiraLinkedProject();
+    try {
+      const result = await syncStoriesForProject(project.id, prisma);
+      expect(result.message).toContain("GitHub: bad/repo: 404 Not Found");
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("returns no message when the gate is silent", async () => {
+    const project = await createJiraLinkedProject();
+    try {
+      const result = await syncStoriesForProject(project.id, prisma);
+      expect(result.message).toBeUndefined();
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("reports a warning instead of failing when the gate throws", async () => {
+    vi.mocked(applyPrGatedCompletion).mockRejectedValueOnce(new Error("boom"));
+
+    const project = await createJiraLinkedProject();
+    try {
+      const result = await syncStoriesForProject(project.id, prisma);
+      expect(result.created).toBeGreaterThanOrEqual(0); // sync itself succeeded
+      expect(result.message).toContain("GitHub: PR check failed (boom)");
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
   });
 });
