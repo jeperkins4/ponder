@@ -13,6 +13,7 @@ export function projectToDTO(project: {
   jiraSiteUrl?: string | null;
   jiraEmail?: string | null;
   jiraApiToken?: string | null;
+  githubRepos?: string | null;
   createdAt: Date;
   updatedAt: Date;
   _count: { stories: number; workUnits: number };
@@ -24,6 +25,7 @@ export function projectToDTO(project: {
     jiraProjectKey: project.jiraProjectKey ?? undefined,
     jiraSiteUrl: project.jiraSiteUrl ?? undefined,
     jiraEmail: project.jiraEmail ?? undefined,
+    githubRepos: project.githubRepos ?? undefined,
     hasApiToken: Boolean(project.jiraApiToken),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,

@@ -135,6 +135,7 @@ describe("ProjectSettingsPage", () => {
       jiraProjectKey: "RENAMED",
       jiraSiteUrl: "",
       jiraEmail: "",
+      githubRepos: "",
     });
 
     await waitFor(() => {
@@ -534,5 +535,55 @@ describe("ProjectSettingsPage", () => {
     });
 
     resolveTest!();
+  });
+
+  it("loads, edits, and submits the GitHub repositories field", async () => {
+    const mockFetch = vi.fn();
+    mockFetch.mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({
+          id: "p1",
+          name: "Team Project",
+          type: "JIRA",
+          jiraProjectKey: "TEAM",
+          githubRepos: "sphero/team-alliance",
+        }),
+      })
+    );
+    mockFetch.mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({
+          id: "p1",
+          name: "Team Project",
+          type: "JIRA",
+          jiraProjectKey: "TEAM",
+          githubRepos: "sphero/team-alliance, sphero/shared-ui",
+        }),
+      })
+    );
+    global.fetch = mockFetch;
+
+    render(<ProjectSettingsPage />);
+
+    const input = await screen.findByLabelText(/github repositories/i);
+    expect(input).toHaveValue("sphero/team-alliance");
+
+    fireEvent.change(input, {
+      target: { value: "sphero/team-alliance, sphero/shared-ui" },
+    });
+
+    fireEvent.click(screen.getByTestId("save-project-submit"));
+
+    await waitFor(() => {
+      const putCall = mockFetch.mock.calls.find(
+        (call) => call[0] === "/api/projects/p1" && call[1]?.method === "PUT"
+      );
+      expect(putCall).toBeDefined();
+      expect(putCall![1].body as string).toContain(
+        '"githubRepos":"sphero/team-alliance, sphero/shared-ui"'
+      );
+    });
   });
 });

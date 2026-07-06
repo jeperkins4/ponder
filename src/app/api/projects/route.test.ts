@@ -433,6 +433,51 @@ describe("PUT /api/projects/[projectId]", () => {
     const stored = await prisma.project.findUnique({ where: { id: project.id } });
     expect(stored?.jiraApiToken).toBe("new-token");
   });
+
+  it("should store githubRepos when provided", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Team A", type: "JIRA", jiraProjectKey: "TEAM" },
+    });
+
+    const req = new Request(`http://localhost:3000/api/projects/${project.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ githubRepos: "sphero/team-alliance, sphero/shared-ui" }),
+    });
+    const res = await PUT(req as never, {
+      params: Promise.resolve({ projectId: project.id }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.githubRepos).toBe("sphero/team-alliance, sphero/shared-ui");
+
+    const stored = await prisma.project.findUnique({ where: { id: project.id } });
+    expect(stored?.githubRepos).toBe("sphero/team-alliance, sphero/shared-ui");
+  });
+
+  it("should leave githubRepos untouched when omitted from the body", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Team A",
+        type: "JIRA",
+        jiraProjectKey: "TEAM",
+        githubRepos: "sphero/team-alliance",
+      },
+    });
+
+    const req = new Request(`http://localhost:3000/api/projects/${project.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Renamed" }),
+    });
+    const res = await PUT(req as never, {
+      params: Promise.resolve({ projectId: project.id }),
+    });
+    expect(res.status).toBe(200);
+
+    const stored = await prisma.project.findUnique({ where: { id: project.id } });
+    expect(stored?.githubRepos).toBe("sphero/team-alliance");
+  });
 });
 
 describe("DELETE /api/projects/[projectId]", () => {

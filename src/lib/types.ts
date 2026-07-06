@@ -68,6 +68,7 @@ export interface Project {
   jiraProjectKey?: string;
   jiraSiteUrl?: string;
   jiraEmail?: string;
+  githubRepos?: string;
   createdAt: Date;
   updatedAt: Date;
 }
