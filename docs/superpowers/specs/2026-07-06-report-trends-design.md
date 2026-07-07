@@ -55,7 +55,7 @@ export interface TrendsReport {
 
 - `created` / `completed`: counts of `createdAt` / `completedAt` falling in the bucket. **Archived cards included** in both (consistent with the throughput report — archiving does not erase history).
 - `cumulativeCompleted[i]` = sum of `completed[0..i]` (starts from 0 within the window; not an all-time total).
-- `wip[i]` — in-flight at the bucket's END (exclusive upper edge = start of the next bucket): cards with `createdAt ≤ bucketEnd` AND (`completedAt` null or `> bucketEnd`) AND (`archivedAt` null or `> bucketEnd`).
+- `wip[i]` — in-flight at the bucket's END (exclusive upper edge = start of the next bucket): cards with `createdAt < bucketEnd` AND (`completedAt` null or `>= bucketEnd`) AND (`archivedAt` null or `>= bucketEnd`).
 - `activity`: same three event timestamps the JIRA trail uses, counted per bucket.
 - Project filtering: work units via `{ story: { projectId } }`, stories via `projectId` — same as every other report query.
 - Implementation shape: fetch the relevant timestamp columns once (one query per source: work units with `createdAt/completedAt/archivedAt/movedToQaReportedAt/verifiedAt`, stories with `completionCommentPostedAt`), then bucket in memory with the stats helpers. Dataset scale makes this trivially cheap and keeps the math pure and testable.
