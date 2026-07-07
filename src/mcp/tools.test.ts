@@ -648,6 +648,15 @@ const reportsPayload: ReportsPayload = {
       },
     ],
   },
+  trends: {
+    granularity: "day",
+    buckets: [],
+    created: [],
+    completed: [],
+    cumulativeCompleted: [],
+    wip: [],
+    activity: { movedToQa: [], verifications: [], storyCompletions: [] },
+  },
 };
 
 function emptyReportsPayload(): ReportsPayload {
@@ -667,6 +676,15 @@ function emptyReportsPayload(): ReportsPayload {
       failedVerification: 0,
     },
     jiraTrail: { events: [] },
+    trends: {
+      granularity: "day",
+      buckets: [],
+      created: [],
+      completed: [],
+      cumulativeCompleted: [],
+      wip: [],
+      activity: { movedToQa: [], verifications: [], storyCompletions: [] },
+    },
   };
 }
 

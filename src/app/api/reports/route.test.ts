@@ -102,4 +102,21 @@ describe("GET /api/reports", () => {
       await prisma.project.delete({ where: { id: project.id } });
     }
   });
+
+  it("includes a trends section with parallel arrays", async () => {
+    const req = new Request("http://localhost:3000/api/reports?projectId=no-such-project");
+    const res = await GET(req as never);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.trends).toBeDefined();
+    expect(["day", "week"]).toContain(data.trends.granularity);
+    const n = data.trends.buckets.length;
+    expect(data.trends.created).toHaveLength(n);
+    expect(data.trends.completed).toHaveLength(n);
+    expect(data.trends.cumulativeCompleted).toHaveLength(n);
+    expect(data.trends.wip).toHaveLength(n);
+    expect(data.trends.activity.movedToQa).toHaveLength(n);
+    expect(data.trends.activity.verifications).toHaveLength(n);
+    expect(data.trends.activity.storyCompletions).toHaveLength(n);
+  });
 });

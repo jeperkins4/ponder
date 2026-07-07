@@ -40,6 +40,11 @@ export function isoWeekStartUtc(date: Date): string {
   return day.toISOString().slice(0, 10);
 }
 
+/** UTC calendar day containing `date`, as YYYY-MM-DD. */
+export function isoDayUtc(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 /**
  * Buckets completed cards into Monday-start UTC weeks. Weeks with zero
  * completions between the first and last bucket are included so charts

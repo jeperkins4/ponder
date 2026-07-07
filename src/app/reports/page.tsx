@@ -9,6 +9,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { COLUMNS } from "@/lib/columns";
+import { TimeSeriesChart } from "@/components/reports/TimeSeriesChart";
 import { TrendLineChart } from "@/components/reports/TrendLineChart";
 import { WeeklyBarChart } from "@/components/reports/WeeklyBarChart";
 import type { ReportsPayload } from "@/lib/reports/types";
@@ -29,6 +30,10 @@ function formatDate(iso: string): string {
 
 function formatDateTime(iso: string): string {
   return iso.replace("T", " ").slice(0, 16);
+}
+
+function toSeriesPoints(buckets: string[], values: number[]) {
+  return buckets.map((label, i) => ({ label, value: values[i] }));
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -204,6 +209,105 @@ export default function ReportsPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </section>
+
+          {/* Trends */}
+          <section aria-labelledby="trends-heading">
+            <h2 id="trends-heading" className="font-space-grotesk text-lg font-bold">
+              Trends
+            </h2>
+            {report.trends.buckets.length === 0 ? (
+              <p className={`mt-3 text-sm ${mutedClass}`}>
+                No activity in this range.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-8">
+                <p className={`text-xs ${mutedClass}`}>
+                  {report.trends.granularity === "day"
+                    ? "Daily buckets"
+                    : "Weekly buckets"}
+                </p>
+                <div>
+                  <h3 className="text-sm font-semibold">Created vs Completed</h3>
+                  <TimeSeriesChart
+                    ariaLabel="Cards created vs completed over time"
+                    series={[
+                      {
+                        name: "Created",
+                        colorClass: "text-blue-500",
+                        points: toSeriesPoints(report.trends.buckets, report.trends.created),
+                      },
+                      {
+                        name: "Completed",
+                        colorClass: "text-emerald-500",
+                        points: toSeriesPoints(report.trends.buckets, report.trends.completed),
+                      },
+                    ]}
+                  />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">Cumulative completed</h3>
+                  <TimeSeriesChart
+                    ariaLabel="Cumulative completed cards over time"
+                    series={[
+                      {
+                        name: "Completed (cumulative)",
+                        colorClass: "text-purple-500",
+                        points: toSeriesPoints(
+                          report.trends.buckets,
+                          report.trends.cumulativeCompleted
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">WIP over time</h3>
+                  <TimeSeriesChart
+                    ariaLabel="Work in progress over time"
+                    series={[
+                      {
+                        name: "WIP",
+                        colorClass: "text-amber-500",
+                        points: toSeriesPoints(report.trends.buckets, report.trends.wip),
+                      },
+                    ]}
+                  />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">JIRA activity</h3>
+                  <TimeSeriesChart
+                    ariaLabel="JIRA-facing events over time"
+                    series={[
+                      {
+                        name: "Move to QA",
+                        colorClass: "text-blue-500",
+                        points: toSeriesPoints(
+                          report.trends.buckets,
+                          report.trends.activity.movedToQa
+                        ),
+                      },
+                      {
+                        name: "Verifications",
+                        colorClass: "text-emerald-500",
+                        points: toSeriesPoints(
+                          report.trends.buckets,
+                          report.trends.activity.verifications
+                        ),
+                      },
+                      {
+                        name: "Story completions",
+                        colorClass: "text-purple-500",
+                        points: toSeriesPoints(
+                          report.trends.buckets,
+                          report.trends.activity.storyCompletions
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
               </div>
             )}
           </section>

@@ -11,6 +11,7 @@ import { getCompletedWork } from "@/lib/reports/completedWork";
 import { getJiraTrail } from "@/lib/reports/jiraTrail";
 import { getStatusSnapshot } from "@/lib/reports/snapshot";
 import { getThroughput } from "@/lib/reports/throughput";
+import { getTrends } from "@/lib/reports/trends";
 import type { ReportFilters } from "@/lib/reports/types";
 
 function parseDateParam(
@@ -50,12 +51,13 @@ export async function GET(request: NextRequest) {
       to: toResult.date,
     };
 
-    const [completedWork, throughput, statusSnapshot, jiraTrail] =
+    const [completedWork, throughput, statusSnapshot, jiraTrail, trends] =
       await Promise.all([
         getCompletedWork(filters),
         getThroughput(filters),
         getStatusSnapshot(filters),
         getJiraTrail(filters),
+        getTrends(filters),
       ]);
 
     return NextResponse.json({
@@ -63,6 +65,7 @@ export async function GET(request: NextRequest) {
       throughput,
       statusSnapshot,
       jiraTrail,
+      trends,
     });
   } catch (error) {
     console.error("Error building reports:", error);
