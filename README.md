@@ -118,7 +118,7 @@ Once connected, ask Claude Code things like *"list my Ponder projects"*, *"show 
 
 ## Reports
 
-The `/reports` page answers four questions, filterable by project and date range (7/30/90 days or all time): a current **status snapshot** (active cards per column, verification states), **throughput & cycle time** (weekly completions and created→completed cycle times, charted), **completed work** history grouped by story, and the **JIRA trail** (every Move-to-QA report, verification outcome, and completion comment, newest first). The same data is available to MCP clients via the four `report_*` tools.
+The `/reports` page answers four questions, filterable by project and date range (7/30/90 days or all time): a current **status snapshot** (active cards per column, verification states), **throughput & cycle time** (weekly completions and created→completed cycle times, charted), **completed work** history grouped by story, and the **JIRA trail** (every Move-to-QA report, verification outcome, and completion comment, newest first). The same data is available to MCP clients via the four `report_*` tools. A **Trends** section adds time-series graphs — created vs completed, cumulative completed, WIP over time, and JIRA activity — bucketed daily for short ranges and weekly past ~5 weeks.
 
 ## PR-gated completion
 
