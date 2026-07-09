@@ -136,6 +136,7 @@ describe("ProjectSettingsPage", () => {
       jiraSiteUrl: "",
       jiraEmail: "",
       githubRepos: "",
+      jiraSyncStatuses: "",
     });
 
     await waitFor(() => {
@@ -583,6 +584,56 @@ describe("ProjectSettingsPage", () => {
       expect(putCall).toBeDefined();
       expect(putCall![1].body as string).toContain(
         '"githubRepos":"sphero/team-alliance, sphero/shared-ui"'
+      );
+    });
+  });
+
+  it("loads, edits, and submits the statuses-to-sync field", async () => {
+    const mockFetch = vi.fn();
+    mockFetch.mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({
+          id: "p1",
+          name: "Team Project",
+          type: "JIRA",
+          jiraProjectKey: "TEAM",
+          jiraSyncStatuses: "To Do",
+        }),
+      })
+    );
+    mockFetch.mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({
+          id: "p1",
+          name: "Team Project",
+          type: "JIRA",
+          jiraProjectKey: "TEAM",
+          jiraSyncStatuses: "To Do, Blocked",
+        }),
+      })
+    );
+    global.fetch = mockFetch;
+
+    render(<ProjectSettingsPage />);
+
+    const input = await screen.findByLabelText(/statuses to sync/i);
+    expect(input).toHaveValue("To Do");
+
+    fireEvent.change(input, {
+      target: { value: "To Do, Blocked" },
+    });
+
+    fireEvent.click(screen.getByTestId("save-project-submit"));
+
+    await waitFor(() => {
+      const putCall = mockFetch.mock.calls.find(
+        (call) => call[0] === "/api/projects/p1" && call[1]?.method === "PUT"
+      );
+      expect(putCall).toBeDefined();
+      expect(putCall![1].body as string).toContain(
+        '"jiraSyncStatuses":"To Do, Blocked"'
       );
     });
   });

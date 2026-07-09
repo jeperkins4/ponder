@@ -362,6 +362,73 @@ describe("POST /api/projects/[projectId]/import/process", () => {
     }
   });
 
+  it("maps jiraStatusCategory to the correct column, and falls back to todo when absent with an unknown status", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Process Route Category Mapping",
+        type: "JIRA",
+        jiraProjectKey: "PROCCAT",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "process-route-category@example.com",
+        jiraApiToken: "process-route-category-token",
+      },
+    });
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const keyBlocked = `PROCCAT-${suffix}-1`;
+    const keyUnknown = `PROCCAT-${suffix}-2`;
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/process`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            items: [
+              {
+                jiraKey: keyBlocked,
+                jiraId: keyBlocked,
+                summary: "Blocked story",
+                description: null,
+                jiraStatus: "Blocked",
+                jiraStatusCategory: "indeterminate",
+                breakDown: false,
+              },
+              {
+                jiraKey: keyUnknown,
+                jiraId: keyUnknown,
+                summary: "Story with unknown status and no category",
+                description: null,
+                jiraStatus: "Some Unknown Status",
+                breakDown: false,
+              },
+            ],
+          }),
+        }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data).toEqual({ storiesProcessed: 2, storiesSkipped: 0, workUnitsCreated: 2 });
+
+      const blockedStory = await prisma.story.findUnique({ where: { jiraKey: keyBlocked } });
+      const unknownStory = await prisma.story.findUnique({ where: { jiraKey: keyUnknown } });
+
+      const blockedUnits = await prisma.workUnit.findMany({ where: { storyId: blockedStory!.id } });
+      const unknownUnits = await prisma.workUnit.findMany({ where: { storyId: unknownStory!.id } });
+
+      expect(blockedUnits[0].column).toBe("in_progress");
+      expect(unknownUnits[0].column).toBe("todo");
+    } finally {
+      await prisma.workUnit.deleteMany({ where: { story: { jiraKey: { in: [keyBlocked, keyUnknown] } } } });
+      await prisma.story.deleteMany({ where: { jiraKey: { in: [keyBlocked, keyUnknown] } } });
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
   it("falls back to a single card if breakdown throws, and still counts the story as processed", async () => {
     const project = await prisma.project.create({
       data: {

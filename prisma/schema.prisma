@@ -10,16 +10,17 @@ datasource db {
 }
 
 model Project {
-  id             String   @id @default(cuid())
-  name           String
-  type           String   @default("STANDALONE")
-  jiraProjectKey String?
-  jiraSiteUrl    String?
-  jiraEmail      String?
-  jiraApiToken   String?
-  githubRepos    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  name                 String
+  type                 String   @default("STANDALONE")
+  jiraProjectKey       String?
+  jiraSiteUrl          String?
+  jiraEmail            String?
+  jiraApiToken         String?
+  githubRepos          String?
+  jiraSyncStatuses     String?  @default("To Do, In Progress, Code Revew, Code Review")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   stories   Story[]
   workUnits WorkUnit[] @relation("ProjectWorkUnits")

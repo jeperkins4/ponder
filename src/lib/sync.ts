@@ -11,6 +11,7 @@ import {
   type JiraConfig,
 } from "@/lib/jira/client";
 import { applyPrGatedCompletion } from "@/lib/github/prGatedCompletion";
+import { parseSyncStatuses } from "@/lib/jira/jql";
 
 /**
  * Result of a sync operation
@@ -151,7 +152,11 @@ export async function syncStoriesForProject(
     apiToken: project.jiraApiToken,
   };
 
-  const stories = await fetchStoriesForProject(project.jiraProjectKey, jiraConfig);
+  const stories = await fetchStoriesForProject(
+    project.jiraProjectKey,
+    jiraConfig,
+    parseSyncStatuses(project.jiraSyncStatuses)
+  );
 
   let created = 0;
   let updated = 0;

@@ -21,6 +21,7 @@ interface ImportPreviewStory {
   summary: string;
   description: string | null;
   jiraStatus: string;
+  jiraStatusCategory?: "new" | "indeterminate" | "done";
   targetColumn: Column;
   alreadyImported: boolean;
 }
@@ -180,6 +181,7 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
           summary: s.summary,
           description: s.description,
           jiraStatus: s.jiraStatus,
+          jiraStatusCategory: s.jiraStatusCategory,
           breakDown: Boolean(breakDownByKey[s.jiraKey]),
         }));
 

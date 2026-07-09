@@ -156,7 +156,8 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
 
       expect(jiraClient.fetchStoriesForProject).toHaveBeenCalledWith(
         "PREVRT",
-        expect.any(Object)
+        expect.any(Object),
+        ["To Do", "In Progress", "Code Revew", "Code Review"]
       );
 
       expect(data.stories).toEqual([
@@ -194,6 +195,130 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
         where: { jiraKey: { in: mockStories.map((s) => s.jiraKey) } },
       });
       expect(persisted).toHaveLength(0);
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("passes jiraStatusCategory through and uses it to compute the target column", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Preview Category Team",
+        type: "JIRA",
+        jiraProjectKey: "PREVCAT",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "preview-category@example.com",
+        jiraApiToken: "preview-category-token",
+      },
+    });
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const mockStories: StoryDTO[] = [
+      makeStory({
+        jiraKey: `PREVCAT-${suffix}-1`,
+        jiraId: `PREVCAT-${suffix}-1`,
+        summary: "Blocked story",
+        jiraStatus: "Blocked",
+        jiraStatusCategory: "indeterminate",
+      }),
+    ];
+
+    vi.mocked(jiraClient.fetchStoriesForProject).mockResolvedValueOnce(mockStories);
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/preview`,
+        { method: "POST" }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+
+      expect(data.stories).toEqual([
+        {
+          jiraKey: `PREVCAT-${suffix}-1`,
+          jiraId: `PREVCAT-${suffix}-1`,
+          summary: "Blocked story",
+          description: null,
+          jiraStatus: "Blocked",
+          jiraStatusCategory: "indeterminate",
+          targetColumn: "in_progress",
+          alreadyImported: false,
+        },
+      ]);
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("passes the project's parsed jiraSyncStatuses through to fetchStoriesForProject", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Preview Sync Statuses Team",
+        type: "JIRA",
+        jiraProjectKey: "PREVEXC",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "preview-excluded@example.com",
+        jiraApiToken: "preview-excluded-token",
+        jiraSyncStatuses: "QA, Blocked",
+      },
+    });
+
+    vi.mocked(jiraClient.fetchStoriesForProject).mockResolvedValueOnce([]);
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/preview`,
+        { method: "POST" }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(jiraClient.fetchStoriesForProject).toHaveBeenCalledWith(
+        "PREVEXC",
+        expect.any(Object),
+        ["QA", "Blocked"]
+      );
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("passes the default four statuses when jiraSyncStatuses is an empty string", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Preview No Sync Statuses Team",
+        type: "JIRA",
+        jiraProjectKey: "PREVNOEXC",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "preview-noexcluded@example.com",
+        jiraApiToken: "preview-noexcluded-token",
+        jiraSyncStatuses: "",
+      },
+    });
+
+    vi.mocked(jiraClient.fetchStoriesForProject).mockResolvedValueOnce([]);
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/preview`,
+        { method: "POST" }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(jiraClient.fetchStoriesForProject).toHaveBeenCalledWith(
+        "PREVNOEXC",
+        expect.any(Object),
+        ["To Do", "In Progress", "Code Revew", "Code Review"]
+      );
     } finally {
       await prisma.project.delete({ where: { id: project.id } });
     }

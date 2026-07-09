@@ -196,6 +196,77 @@ describe("ImportReview", () => {
     ]);
   });
 
+  it("forwards each story's jiraStatusCategory in the posted items", async () => {
+    const categoryStories = [
+      {
+        jiraKey: "CAT-1",
+        jiraId: "20001",
+        summary: "Blocked story",
+        description: null,
+        jiraStatus: "Blocked",
+        jiraStatusCategory: "indeterminate",
+        targetColumn: "in_progress",
+        alreadyImported: false,
+      },
+      {
+        jiraKey: "CAT-2",
+        jiraId: "20002",
+        summary: "No category story",
+        description: null,
+        jiraStatus: "To Do",
+        targetColumn: "todo",
+        alreadyImported: false,
+      },
+    ];
+
+    const fetchMock = mockFetchSequence({
+      preview: { ok: true, body: { stories: categoryStories } },
+      process: { ok: true, body: { storiesProcessed: 2, workUnitsCreated: 2 } },
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(
+      <ImportReview projectId="p1" onClose={onClose} onImported={onImported} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("import-review-checkbox-CAT-1")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("import-review-process-button"));
+
+    await waitFor(() => {
+      expect(onImported).toHaveBeenCalled();
+    });
+
+    const processCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith("/import/process")
+    );
+    expect(processCall).toBeDefined();
+    const [, requestInit] = processCall as unknown as [string, RequestInit];
+    const body = JSON.parse(requestInit.body as string);
+
+    expect(body.items).toEqual([
+      {
+        jiraKey: "CAT-1",
+        jiraId: "20001",
+        summary: "Blocked story",
+        description: null,
+        jiraStatus: "Blocked",
+        jiraStatusCategory: "indeterminate",
+        breakDown: false,
+      },
+      {
+        jiraKey: "CAT-2",
+        jiraId: "20002",
+        summary: "No category story",
+        description: null,
+        jiraStatus: "To Do",
+        breakDown: false,
+      },
+    ]);
+  });
+
   it("shows an inline error and keeps the dialog open when processing fails", async () => {
     global.fetch = mockFetchSequence({
       preview: { ok: true, body: { stories: previewStories } },

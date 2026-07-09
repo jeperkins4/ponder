@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchStoriesForProject, type JiraConfig } from "@/lib/jira/client";
+import { parseSyncStatuses } from "@/lib/jira/jql";
 import { jiraStatusToColumn } from "@/lib/columns";
 import { findAlreadyImportedKeys } from "@/lib/importDedup";
 import type { Column } from "@/lib/types";
@@ -19,6 +20,7 @@ export interface ImportPreviewStory {
   summary: string;
   description: string | null;
   jiraStatus: string;
+  jiraStatusCategory?: "new" | "indeterminate" | "done";
   targetColumn: Column;
   alreadyImported: boolean;
 }
@@ -68,7 +70,8 @@ export async function POST(
 
     const jiraStories = await fetchStoriesForProject(
       project.jiraProjectKey,
-      jiraConfig
+      jiraConfig,
+      parseSyncStatuses(project.jiraSyncStatuses)
     );
 
     const alreadyImportedKeys = await findAlreadyImportedKeys(
@@ -82,7 +85,8 @@ export async function POST(
       summary: dto.summary,
       description: dto.description,
       jiraStatus: dto.jiraStatus,
-      targetColumn: jiraStatusToColumn(dto.jiraStatus),
+      jiraStatusCategory: dto.jiraStatusCategory,
+      targetColumn: jiraStatusToColumn(dto.jiraStatus, dto.jiraStatusCategory),
       alreadyImported: alreadyImportedKeys.has(dto.jiraKey),
     }));
 
