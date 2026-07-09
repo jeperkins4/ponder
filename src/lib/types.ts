@@ -72,7 +72,7 @@ export interface Project {
   jiraSiteUrl?: string;
   jiraEmail?: string;
   githubRepos?: string;
-  jiraExcludedStatuses?: string;
+  jiraSyncStatuses?: string;
   createdAt: Date;
   updatedAt: Date;
 }

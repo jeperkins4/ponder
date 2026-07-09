@@ -136,7 +136,7 @@ describe("ProjectSettingsPage", () => {
       jiraSiteUrl: "",
       jiraEmail: "",
       githubRepos: "",
-      jiraExcludedStatuses: "",
+      jiraSyncStatuses: "",
     });
 
     await waitFor(() => {
@@ -588,7 +588,7 @@ describe("ProjectSettingsPage", () => {
     });
   });
 
-  it("loads, edits, and submits the statuses-to-exclude field", async () => {
+  it("loads, edits, and submits the statuses-to-sync field", async () => {
     const mockFetch = vi.fn();
     mockFetch.mockImplementationOnce(() =>
       Promise.resolve({
@@ -598,7 +598,7 @@ describe("ProjectSettingsPage", () => {
           name: "Team Project",
           type: "JIRA",
           jiraProjectKey: "TEAM",
-          jiraExcludedStatuses: "QA",
+          jiraSyncStatuses: "To Do",
         }),
       })
     );
@@ -610,7 +610,7 @@ describe("ProjectSettingsPage", () => {
           name: "Team Project",
           type: "JIRA",
           jiraProjectKey: "TEAM",
-          jiraExcludedStatuses: "QA, Blocked",
+          jiraSyncStatuses: "To Do, Blocked",
         }),
       })
     );
@@ -618,11 +618,11 @@ describe("ProjectSettingsPage", () => {
 
     render(<ProjectSettingsPage />);
 
-    const input = await screen.findByLabelText(/statuses to exclude from sync/i);
-    expect(input).toHaveValue("QA");
+    const input = await screen.findByLabelText(/statuses to sync/i);
+    expect(input).toHaveValue("To Do");
 
     fireEvent.change(input, {
-      target: { value: "QA, Blocked" },
+      target: { value: "To Do, Blocked" },
     });
 
     fireEvent.click(screen.getByTestId("save-project-submit"));
@@ -633,7 +633,7 @@ describe("ProjectSettingsPage", () => {
       );
       expect(putCall).toBeDefined();
       expect(putCall![1].body as string).toContain(
-        '"jiraExcludedStatuses":"QA, Blocked"'
+        '"jiraSyncStatuses":"To Do, Blocked"'
       );
     });
   });

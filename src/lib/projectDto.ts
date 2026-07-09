@@ -14,7 +14,7 @@ export function projectToDTO(project: {
   jiraEmail?: string | null;
   jiraApiToken?: string | null;
   githubRepos?: string | null;
-  jiraExcludedStatuses?: string | null;
+  jiraSyncStatuses?: string | null;
   createdAt: Date;
   updatedAt: Date;
   _count: { stories: number; workUnits: number };
@@ -27,7 +27,7 @@ export function projectToDTO(project: {
     jiraSiteUrl: project.jiraSiteUrl ?? undefined,
     jiraEmail: project.jiraEmail ?? undefined,
     githubRepos: project.githubRepos ?? undefined,
-    jiraExcludedStatuses: project.jiraExcludedStatuses ?? undefined,
+    jiraSyncStatuses: project.jiraSyncStatuses ?? undefined,
     hasApiToken: Boolean(project.jiraApiToken),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,

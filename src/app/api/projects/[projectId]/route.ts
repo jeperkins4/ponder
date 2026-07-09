@@ -55,7 +55,7 @@ export async function PUT(
       jiraEmail,
       jiraApiToken,
       githubRepos,
-      jiraExcludedStatuses,
+      jiraSyncStatuses,
     } = body;
 
     const existing = await prisma.project.findUnique({
@@ -80,7 +80,7 @@ export async function PUT(
         // token. This is the write-only security boundary for the token.
         ...(jiraApiToken && { jiraApiToken }),
         ...(githubRepos !== undefined && { githubRepos }),
-        ...(jiraExcludedStatuses !== undefined && { jiraExcludedStatuses }),
+        ...(jiraSyncStatuses !== undefined && { jiraSyncStatuses }),
       },
       include: {
         _count: {

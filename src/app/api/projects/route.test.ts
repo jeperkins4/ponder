@@ -479,7 +479,7 @@ describe("PUT /api/projects/[projectId]", () => {
     expect(stored?.githubRepos).toBe("sphero/team-alliance");
   });
 
-  it("should store jiraExcludedStatuses when provided (including empty string)", async () => {
+  it("should store jiraSyncStatuses when provided (including empty string)", async () => {
     const project = await prisma.project.create({
       data: { name: "Team A", type: "JIRA", jiraProjectKey: "TEAM" },
     });
@@ -487,7 +487,7 @@ describe("PUT /api/projects/[projectId]", () => {
     const req = new Request(`http://localhost:3000/api/projects/${project.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jiraExcludedStatuses: "" }),
+      body: JSON.stringify({ jiraSyncStatuses: "" }),
     });
     const res = await PUT(req as never, {
       params: Promise.resolve({ projectId: project.id }),
@@ -495,14 +495,16 @@ describe("PUT /api/projects/[projectId]", () => {
     expect(res.status).toBe(200);
 
     const stored = await prisma.project.findUnique({ where: { id: project.id } });
-    expect(stored?.jiraExcludedStatuses).toBe("");
+    expect(stored?.jiraSyncStatuses).toBe("");
   });
 
-  it("should default jiraExcludedStatuses to QA on creation and preserve it when omitted from PUT", async () => {
+  it("should default jiraSyncStatuses on creation and preserve it when omitted from PUT", async () => {
     const project = await prisma.project.create({
       data: { name: "Team A", type: "JIRA", jiraProjectKey: "TEAM" },
     });
-    expect(project.jiraExcludedStatuses).toBe("QA");
+    expect(project.jiraSyncStatuses).toBe(
+      "To Do, In Progress, Code Revew, Code Review"
+    );
 
     const req = new Request(`http://localhost:3000/api/projects/${project.id}`, {
       method: "PUT",
@@ -512,7 +514,9 @@ describe("PUT /api/projects/[projectId]", () => {
     await PUT(req as never, { params: Promise.resolve({ projectId: project.id }) });
 
     const stored = await prisma.project.findUnique({ where: { id: project.id } });
-    expect(stored?.jiraExcludedStatuses).toBe("QA");
+    expect(stored?.jiraSyncStatuses).toBe(
+      "To Do, In Progress, Code Revew, Code Review"
+    );
   });
 });
 

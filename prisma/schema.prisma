@@ -18,7 +18,7 @@ model Project {
   jiraEmail            String?
   jiraApiToken         String?
   githubRepos          String?
-  jiraExcludedStatuses String?  @default("QA")
+  jiraSyncStatuses     String?  @default("To Do, In Progress, Code Revew, Code Review")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
