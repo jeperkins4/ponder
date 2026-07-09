@@ -57,3 +57,24 @@ describe("jiraStatusToColumn", () => {
     expect(jiraStatusToColumn("")).toBe("todo");
   });
 });
+
+describe("jiraStatusToColumn category fallback", () => {
+  it("maps unknown statuses by category", () => {
+    expect(jiraStatusToColumn("Blocked", "indeterminate")).toBe("in_progress");
+    expect(jiraStatusToColumn("Backlog Triage", "new")).toBe("todo");
+    expect(jiraStatusToColumn("Shipped", "done")).toBe("done");
+  });
+
+  it("lets name overrides beat a contradicting category", () => {
+    expect(jiraStatusToColumn("Code Revew", "indeterminate")).toBe("code_review");
+    expect(jiraStatusToColumn("To Do", "indeterminate")).toBe("todo");
+    expect(jiraStatusToColumn("Review", "done")).toBe("in_progress");
+  });
+
+  it("falls back to todo when category is absent or unknown", () => {
+    expect(jiraStatusToColumn("Blocked")).toBe("todo");
+    expect(
+      jiraStatusToColumn("Blocked", "mystery" as unknown as "new")
+    ).toBe("todo");
+  });
+});
