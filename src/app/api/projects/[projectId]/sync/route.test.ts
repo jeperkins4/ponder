@@ -98,7 +98,8 @@ describe("POST /api/projects/[projectId]/sync", () => {
       expect(data).toEqual({ created: 1, updated: 0 });
       expect(jiraClient.fetchStoriesForProject).toHaveBeenCalledWith(
         "SYNCRT",
-        expect.any(Object)
+        expect.any(Object),
+        ["QA"]
       );
 
       const stored = await prisma.story.findUnique({ where: { jiraKey } });
