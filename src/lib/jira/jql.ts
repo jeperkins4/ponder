@@ -20,36 +20,47 @@ export function buildAssignedStoriesJql(projectKeys: string[]): string {
 }
 
 /**
- * JIRA statuses considered "active work" for the local board. Stories outside
- * these statuses (e.g. Closed, QA Approved) are not imported.
- *
- * NOTE: both "Code Revew" (the current, misspelled status name in the JIRA
- * instance) and "Code Review" (the corrected spelling) are listed so the sync
- * keeps working if/when the typo is fixed in JIRA. JQL status matching is exact.
+ * Parses a project's comma-separated "statuses to exclude from sync" setting.
+ * null/undefined (pre-setting rows) fall back to the default ["QA"]; an
+ * empty string is an explicit "exclude nothing".
  */
-const PROJECT_SYNC_STATUSES = [
-  "To Do",
-  "In Progress",
-  "Code Revew",
-  "Code Review",
-];
+export function parseExcludedStatuses(
+  value: string | null | undefined
+): string[] {
+  if (value === null || value === undefined) return ["QA"];
+  return value
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+/** Double-quotes a JQL string value, escaping backslashes and quotes. */
+function quoteJqlString(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
 
 /**
- * Builds a JQL query for finding a single project's issues assigned to the
- * current user and currently in an active status (see PROJECT_SYNC_STATUSES).
- * Any issue type assigned to the current user in an active status is included —
- * sub-tasks and epics arrive as ordinary board stories. Used by project-aware
- * sync: `currentUser()` resolves to the account whose credentials the project
- * is configured with, so each project imports only that account's active,
- * assigned issues.
+ * Builds a JQL query for a single project's issues assigned to the current
+ * user in any not-Done statusCategory, minus explicitly excluded status
+ * names (e.g. QA). Category-based matching means custom or renamed active
+ * statuses import without code changes; the exclusion list keeps parked
+ * work (QA by default) off the board.
  * @param projectKey - JIRA project key (e.g., 'TEAM')
- * @returns JQL query string
+ * @param excludedStatuses - status names to exclude (already parsed; see
+ *   parseExcludedStatuses)
  * @throws Error if projectKey is empty
  */
-export function buildProjectStoriesJql(projectKey: string): string {
+export function buildProjectStoriesJql(
+  projectKey: string,
+  excludedStatuses: string[]
+): string {
   if (!projectKey) {
     throw new Error("buildProjectStoriesJql requires a project key");
   }
-  const statuses = PROJECT_SYNC_STATUSES.map((s) => `"${s}"`).join(", ");
-  return `project = "${projectKey}" AND assignee = currentUser() AND status in (${statuses})`;
+  const names = excludedStatuses.map((name) => name.trim()).filter(Boolean);
+  const exclusion =
+    names.length > 0
+      ? ` AND status NOT IN (${names.map(quoteJqlString).join(", ")})`
+      : "";
+  return `project = "${projectKey}" AND assignee = currentUser() AND statusCategory != Done${exclusion}`;
 }
