@@ -157,7 +157,7 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
       expect(jiraClient.fetchStoriesForProject).toHaveBeenCalledWith(
         "PREVRT",
         expect.any(Object),
-        ["QA"]
+        ["To Do", "In Progress", "Code Revew", "Code Review"]
       );
 
       expect(data.stories).toEqual([
@@ -254,16 +254,16 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
     }
   });
 
-  it("passes the project's parsed jiraExcludedStatuses through to fetchStoriesForProject", async () => {
+  it("passes the project's parsed jiraSyncStatuses through to fetchStoriesForProject", async () => {
     const project = await prisma.project.create({
       data: {
-        name: "Preview Excluded Statuses Team",
+        name: "Preview Sync Statuses Team",
         type: "JIRA",
         jiraProjectKey: "PREVEXC",
         jiraSiteUrl: "https://example.atlassian.net",
         jiraEmail: "preview-excluded@example.com",
         jiraApiToken: "preview-excluded-token",
-        jiraExcludedStatuses: "QA, Blocked",
+        jiraSyncStatuses: "QA, Blocked",
       },
     });
 
@@ -289,16 +289,16 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
     }
   });
 
-  it("passes an empty excluded-statuses array when jiraExcludedStatuses is an empty string", async () => {
+  it("passes the default four statuses when jiraSyncStatuses is an empty string", async () => {
     const project = await prisma.project.create({
       data: {
-        name: "Preview No Excluded Statuses Team",
+        name: "Preview No Sync Statuses Team",
         type: "JIRA",
         jiraProjectKey: "PREVNOEXC",
         jiraSiteUrl: "https://example.atlassian.net",
         jiraEmail: "preview-noexcluded@example.com",
         jiraApiToken: "preview-noexcluded-token",
-        jiraExcludedStatuses: "",
+        jiraSyncStatuses: "",
       },
     });
 
@@ -317,7 +317,7 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
       expect(jiraClient.fetchStoriesForProject).toHaveBeenCalledWith(
         "PREVNOEXC",
         expect.any(Object),
-        []
+        ["To Do", "In Progress", "Code Revew", "Code Review"]
       );
     } finally {
       await prisma.project.delete({ where: { id: project.id } });

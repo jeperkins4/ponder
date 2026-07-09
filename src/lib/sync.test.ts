@@ -493,7 +493,7 @@ describe("syncStoriesForProject", () => {
         email: "team@example.com",
         apiToken: "secret-token",
       },
-      ["QA"]
+      ["To Do", "In Progress", "Code Revew", "Code Review"]
     );
     expect(mockPrisma.story.create).toHaveBeenCalledWith({
       data: {
@@ -566,7 +566,7 @@ describe("syncStoriesForProject", () => {
   });
 });
 
-describe("syncStoriesForProject — status exclusions", () => {
+describe("syncStoriesForProject — status allowlist", () => {
   let mockFetchStoriesForProject: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -578,60 +578,60 @@ describe("syncStoriesForProject — status exclusions", () => {
     mockFetchStoriesForProject.mockResolvedValue([]);
   });
 
-  async function createJiraLinkedProject(jiraExcludedStatuses?: string) {
+  async function createJiraLinkedProject(jiraSyncStatuses?: string) {
     return prisma.project.create({
       data: {
-        name: `Status Exclusions Sync ${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        name: `Status Allowlist Sync ${Date.now()}-${Math.floor(Math.random() * 100000)}`,
         type: "JIRA",
         jiraProjectKey: "TEAM",
         jiraSiteUrl: "https://example.atlassian.net",
         jiraEmail: "team@example.com",
         jiraApiToken: "secret-token",
-        ...(jiraExcludedStatuses !== undefined ? { jiraExcludedStatuses } : {}),
+        ...(jiraSyncStatuses !== undefined ? { jiraSyncStatuses } : {}),
       },
     });
   }
 
-  it("passes the parsed exclusion list from the project setting", async () => {
-    const project = await createJiraLinkedProject("QA, Blocked");
+  it("passes the parsed allowlist from the project setting", async () => {
+    const project = await createJiraLinkedProject("To Do, QA");
     try {
       await syncStoriesForProject(project.id, prisma);
       expect(mockFetchStoriesForProject).toHaveBeenCalledWith(
         project.jiraProjectKey,
         expect.anything(),
-        ["QA", "Blocked"]
+        ["To Do", "QA"]
       );
     } finally {
       await prisma.project.delete({ where: { id: project.id } });
     }
   });
 
-  it("passes [] for an explicit empty setting", async () => {
+  it("passes the default four statuses for an explicit empty setting", async () => {
     const project = await createJiraLinkedProject("");
     try {
       await syncStoriesForProject(project.id, prisma);
       expect(mockFetchStoriesForProject).toHaveBeenCalledWith(
         project.jiraProjectKey,
         expect.anything(),
-        []
+        ["To Do", "In Progress", "Code Revew", "Code Review"]
       );
     } finally {
       await prisma.project.delete({ where: { id: project.id } });
     }
   });
 
-  it("passes the QA default when the field is null", async () => {
+  it("passes the default four statuses when the field is null", async () => {
     const project = await createJiraLinkedProject();
     try {
       await prisma.project.update({
         where: { id: project.id },
-        data: { jiraExcludedStatuses: null },
+        data: { jiraSyncStatuses: null },
       });
       await syncStoriesForProject(project.id, prisma);
       expect(mockFetchStoriesForProject).toHaveBeenCalledWith(
         project.jiraProjectKey,
         expect.anything(),
-        ["QA"]
+        ["To Do", "In Progress", "Code Revew", "Code Review"]
       );
     } finally {
       await prisma.project.delete({ where: { id: project.id } });
