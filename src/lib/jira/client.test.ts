@@ -44,7 +44,7 @@ describe("JIRA API Client", () => {
       fields: {
         summary: `Issue ${n}`,
         description: null,
-        status: { name: "To Do" },
+        status: { name: "To Do", statusCategory: { key: "new" } },
       },
     });
 
@@ -473,6 +473,85 @@ describe("JIRA API Client", () => {
       await expect(fetchStoriesForProject("TEAM", mockConfig)).rejects.toThrow(
         "JIRA API error"
       );
+    });
+
+    it("maps statusCategory onto the story DTO", async () => {
+      const mockResponse = {
+        issues: [
+          {
+            id: "10001",
+            key: "TEAM-123",
+            fields: {
+              summary: "Blocked story",
+              description: null,
+              status: { name: "Blocked", statusCategory: { key: "indeterminate" } },
+            },
+          },
+        ],
+      };
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => mockResponse,
+        })
+      );
+
+      const [story] = await fetchStoriesForProject("TEAM", mockConfig, []);
+
+      expect(story.jiraStatusCategory).toBe("indeterminate");
+    });
+
+    it("narrows an unknown statusCategory key to new", async () => {
+      const mockResponse = {
+        issues: [
+          {
+            id: "10001",
+            key: "TEAM-123",
+            fields: {
+              summary: "Weird status",
+              description: null,
+              status: { name: "Weird", statusCategory: { key: "weird" } },
+            },
+          },
+        ],
+      };
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => mockResponse,
+        })
+      );
+
+      const [story] = await fetchStoriesForProject("TEAM", mockConfig, []);
+
+      expect(story.jiraStatusCategory).toBe("new");
+    });
+
+    it("passes the exclusion list into the JQL", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ issues: [] }),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await fetchStoriesForProject("TEAM", mockConfig, ["QA", "Blocked"]);
+
+      const url = mockFetch.mock.calls[0][0] as string;
+      const decodedUrl = decodeURIComponent(url.replace(/\+/g, " "));
+      expect(decodedUrl).toContain('status NOT IN ("QA", "Blocked")');
+
+      mockFetch.mockClear();
+      await fetchStoriesForProject("TEAM", mockConfig);
+
+      const defaultUrl = mockFetch.mock.calls[0][0] as string;
+      const decodedDefaultUrl = decodeURIComponent(
+        defaultUrl.replace(/\+/g, " ")
+      );
+      expect(decodedDefaultUrl).toContain('status NOT IN ("QA")');
     });
   });
 

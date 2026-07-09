@@ -28,6 +28,7 @@ type JiraIssue = {
     description: AdfNode | null;
     status: {
       name: string;
+      statusCategory?: { key: string };
     };
   };
 };
@@ -60,6 +61,14 @@ export function extractProjectKey(jiraKey: string): string {
  * @param siteUrl - Base URL of JIRA instance
  * @returns Converted StoryDTO
  */
+/** JIRA's three fixed category keys; anything unexpected degrades to "new"
+ * so the column mapping falls back to To Do (pre-category behavior). */
+function narrowStatusCategory(
+  key: string | undefined
+): "new" | "indeterminate" | "done" {
+  return key === "indeterminate" || key === "done" ? key : "new";
+}
+
 function issueToStoryDTO(issue: JiraIssue, siteUrl: string): StoryDTO {
   return {
     id: cuid(),
@@ -69,6 +78,7 @@ function issueToStoryDTO(issue: JiraIssue, siteUrl: string): StoryDTO {
     summary: issue.fields.summary,
     description: adfToPlainText(issue.fields.description),
     jiraStatus: issue.fields.status.name,
+    jiraStatusCategory: narrowStatusCategory(issue.fields.status.statusCategory?.key),
     url: `${siteUrl}/browse/${issue.key}`,
     lastSyncedAt: new Date().toISOString(),
     completionCommentPostedAt: null,
@@ -177,9 +187,10 @@ export async function fetchAssignedStories(
  */
 export async function fetchStoriesForProject(
   projectKey: string,
-  config: JiraConfig
+  config: JiraConfig,
+  excludedStatuses: string[] = ["QA"]
 ): Promise<StoryDTO[]> {
-  const jql = buildProjectStoriesJql(projectKey);
+  const jql = buildProjectStoriesJql(projectKey, excludedStatuses);
   return searchIssuesByJql(jql, config);
 }
 
