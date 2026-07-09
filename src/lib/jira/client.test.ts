@@ -458,6 +458,9 @@ describe("JIRA API Client", () => {
       expect(decodedUrl).toContain('project = "TEAM"');
       expect(decodedUrl).not.toContain("issuetype");
       expect(decodedUrl).toContain("assignee = currentUser()");
+      expect(decodedUrl).toContain(
+        'status IN ("To Do", "In Progress", "Code Revew", "Code Review")'
+      );
     });
 
     it("throws error on API failure", async () => {
@@ -498,7 +501,7 @@ describe("JIRA API Client", () => {
         })
       );
 
-      const [story] = await fetchStoriesForProject("TEAM", mockConfig, []);
+      const [story] = await fetchStoriesForProject("TEAM", mockConfig);
 
       expect(story.jiraStatusCategory).toBe("indeterminate");
     });
@@ -526,12 +529,12 @@ describe("JIRA API Client", () => {
         })
       );
 
-      const [story] = await fetchStoriesForProject("TEAM", mockConfig, []);
+      const [story] = await fetchStoriesForProject("TEAM", mockConfig);
 
       expect(story.jiraStatusCategory).toBe("new");
     });
 
-    it("passes the exclusion list into the JQL", async () => {
+    it("passes the sync-status allowlist into the JQL", async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ issues: [] }),
@@ -542,7 +545,7 @@ describe("JIRA API Client", () => {
 
       const url = mockFetch.mock.calls[0][0] as string;
       const decodedUrl = decodeURIComponent(url.replace(/\+/g, " "));
-      expect(decodedUrl).toContain('status NOT IN ("QA", "Blocked")');
+      expect(decodedUrl).toContain('status IN ("QA", "Blocked")');
 
       mockFetch.mockClear();
       await fetchStoriesForProject("TEAM", mockConfig);
@@ -551,7 +554,9 @@ describe("JIRA API Client", () => {
       const decodedDefaultUrl = decodeURIComponent(
         defaultUrl.replace(/\+/g, " ")
       );
-      expect(decodedDefaultUrl).toContain('status NOT IN ("QA")');
+      expect(decodedDefaultUrl).toContain(
+        'status IN ("To Do", "In Progress", "Code Revew", "Code Review")'
+      );
     });
   });
 

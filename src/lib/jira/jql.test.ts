@@ -6,7 +6,8 @@ import { describe, it, expect } from "vitest";
 import {
   buildAssignedStoriesJql,
   buildProjectStoriesJql,
-  parseExcludedStatuses,
+  parseSyncStatuses,
+  DEFAULT_SYNC_STATUSES,
 } from "./jql";
 
 describe("buildAssignedStoriesJql", () => {
@@ -39,54 +40,65 @@ describe("buildAssignedStoriesJql", () => {
 });
 
 describe("buildProjectStoriesJql", () => {
-  it("filters by statusCategory != Done", () => {
-    expect(buildProjectStoriesJql("TEAM", [])).toBe(
-      'project = "TEAM" AND assignee = currentUser() AND statusCategory != Done'
+  it("builds a status IN (...) allowlist clause with the default list", () => {
+    expect(buildProjectStoriesJql("TEAM", DEFAULT_SYNC_STATUSES)).toBe(
+      'project = "TEAM" AND assignee = currentUser() AND status IN ("To Do", "In Progress", "Code Revew", "Code Review")'
     );
   });
 
-  it("appends a NOT IN clause for excluded statuses", () => {
+  it("builds a status IN (...) allowlist clause with a custom list", () => {
     expect(buildProjectStoriesJql("TEAM", ["QA"])).toBe(
-      'project = "TEAM" AND assignee = currentUser() AND statusCategory != Done AND status NOT IN ("QA")'
+      'project = "TEAM" AND assignee = currentUser() AND status IN ("QA")'
     );
     expect(buildProjectStoriesJql("TEAM", ["QA", "Blocked"])).toContain(
-      'status NOT IN ("QA", "Blocked")'
+      'status IN ("QA", "Blocked")'
     );
   });
 
-  it("trims names and drops blanks in the exclusion list", () => {
-    expect(buildProjectStoriesJql("TEAM", [" QA ", "", "  "])).toContain(
-      'status NOT IN ("QA")'
+  it("trims names and drops blanks in the allowlist", () => {
+    expect(buildProjectStoriesJql("TEAM", [" QA ", "", "  "])).toBe(
+      'project = "TEAM" AND assignee = currentUser() AND status IN ("QA")'
     );
   });
 
   it("escapes embedded quotes and backslashes in status names", () => {
     expect(buildProjectStoriesJql("TEAM", ['Wei"rd'])).toContain(
-      'status NOT IN ("Wei\\"rd")'
+      'status IN ("Wei\\"rd")'
     );
     expect(buildProjectStoriesJql("TEAM", ["Back\\slash"])).toContain(
-      'status NOT IN ("Back\\\\slash")'
+      'status IN ("Back\\\\slash")'
     );
   });
 
   it("throws for an empty project key", () => {
-    expect(() => buildProjectStoriesJql("", [])).toThrow(
+    expect(() => buildProjectStoriesJql("", ["QA"])).toThrow(
       "buildProjectStoriesJql requires a project key"
+    );
+  });
+
+  it("throws when the cleaned sync-status list is empty", () => {
+    expect(() => buildProjectStoriesJql("TEAM", [])).toThrow(
+      "buildProjectStoriesJql requires at least one sync status"
+    );
+    expect(() => buildProjectStoriesJql("TEAM", ["", "  "])).toThrow(
+      "buildProjectStoriesJql requires at least one sync status"
     );
   });
 });
 
-describe("parseExcludedStatuses", () => {
-  it("defaults null/undefined to QA", () => {
-    expect(parseExcludedStatuses(null)).toEqual(["QA"]);
-    expect(parseExcludedStatuses(undefined)).toEqual(["QA"]);
-  });
-
-  it("treats an empty string as exclude-nothing", () => {
-    expect(parseExcludedStatuses("")).toEqual([]);
+describe("parseSyncStatuses", () => {
+  it("defaults null/undefined/empty/all-blank to the default four", () => {
+    expect(parseSyncStatuses(null)).toEqual(DEFAULT_SYNC_STATUSES);
+    expect(parseSyncStatuses(undefined)).toEqual(DEFAULT_SYNC_STATUSES);
+    expect(parseSyncStatuses("")).toEqual(DEFAULT_SYNC_STATUSES);
+    expect(parseSyncStatuses("  ,  ,")).toEqual(DEFAULT_SYNC_STATUSES);
   });
 
   it("splits on commas, trims, and drops blanks", () => {
-    expect(parseExcludedStatuses(" QA , Blocked ,, ")).toEqual(["QA", "Blocked"]);
+    expect(parseSyncStatuses(" To Do , QA ,, ")).toEqual(["To Do", "QA"]);
+  });
+
+  it("parses a single custom status", () => {
+    expect(parseSyncStatuses("Blocked")).toEqual(["Blocked"]);
   });
 });

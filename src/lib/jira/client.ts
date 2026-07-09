@@ -5,7 +5,11 @@
 
 import cuid from "cuid";
 import { StoryDTO } from "@/lib/types";
-import { buildAssignedStoriesJql, buildProjectStoriesJql } from "@/lib/jira/jql";
+import {
+  buildAssignedStoriesJql,
+  buildProjectStoriesJql,
+  DEFAULT_SYNC_STATUSES,
+} from "@/lib/jira/jql";
 import { adfToPlainText, type AdfNode } from "@/lib/jira/adf";
 
 /**
@@ -188,9 +192,9 @@ export async function fetchAssignedStories(
 export async function fetchStoriesForProject(
   projectKey: string,
   config: JiraConfig,
-  excludedStatuses: string[] = ["QA"]
+  syncStatuses: string[] = DEFAULT_SYNC_STATUSES
 ): Promise<StoryDTO[]> {
-  const jql = buildProjectStoriesJql(projectKey, excludedStatuses);
+  const jql = buildProjectStoriesJql(projectKey, syncStatuses);
   return searchIssuesByJql(jql, config);
 }
 
