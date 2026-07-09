@@ -1,65 +1,66 @@
 # statusCategory-Based JIRA Status Matching — Design
 
-**Date:** 2026-07-09
-**Status:** Approved
+**Date:** 2026-07-09 (revised 2026-07-09 after PR #30 review hold)
+**Status:** Approved (revision 2 — allowlist fetch)
 
 ## Goal
 
-Custom or renamed JIRA statuses "just work" without code changes: the sync fetch filter moves from a hardcoded status-name list to JIRA's `statusCategory`, and the board column mapping falls back to category when a status name isn't explicitly recognized. Stories parked in QA-style statuses stay off the board via a per-project exclusion list.
+Custom or renamed JIRA statuses work without code changes: the sync fetch filter becomes a **per-project allowlist** ("Statuses to sync") editable in Settings instead of a hardcoded constant, and the board column mapping falls back to `statusCategory` when a status name isn't explicitly recognized.
 
-## Decisions made during brainstorming
+## Revision 2 (2026-07-09)
 
-- **Fetch scope:** `statusCategory != Done`, minus a per-project exclusion list — preserving the July 4 decision that QA-parked stories don't import (default exclusion: `QA`).
-- **Exclusions live on the project:** a "Statuses to exclude from sync" settings field (comma-separated), stored on the Project row exactly like `githubRepos`.
-- **Approach:** category filter in JQL (not post-fetch filtering); column mapping keeps explicit name overrides and gains a category fallback replacing the blanket-`todo` fallback.
+The original design fetched `statusCategory != Done` minus a deny-list. Checking the real COM status universe showed "QA Approved" (In Progress category) would leak onto the board, and any future status defaults to *in* — the wrong bias for a curated workflow. John held PR #30; the fetch side is now an **allowlist**: `status IN (<per-project list>)`, unknown statuses default *out*. The category-based **column mapping** fallback and the client/import category threading are unchanged from revision 1.
+
+## Decisions
+
+- **Fetch scope:** `status IN (<per-project allowlist>)`. Default list: `To Do, In Progress, Code Revew, Code Review` (today's exact behavior). Unknown/future statuses default **out**.
+- **Allowlist lives on the project:** a "Statuses to sync" settings field (comma-separated), stored on the Project row exactly like `githubRepos`.
+- **Blank-input safety:** a null, empty, or all-blank setting falls back to the default list — misconfiguration can never mean "sync nothing" or "sync everything".
+- **Column mapping** keeps explicit name overrides and gains a category fallback replacing the blanket-`todo` fallback (unchanged from revision 1).
 
 ## Behavior change summary
 
-| Scenario | Before | After |
+| Scenario | Before (hardcoded) | After (rev 2) |
 |---|---|---|
-| Custom active status (e.g. "Blocked") | Not imported | Imports; lands in In Progress (indeterminate category) |
-| "Code Revew" renamed to anything | Stops importing | Keeps importing (category-based fetch) |
-| Status "QA" | Not imported | Still not imported (default exclusion, editable per project) |
-| Unknown status's column | To Do (blanket fallback) | By category: new → To Do, indeterminate → In Progress, done → Done |
+| Custom active status (e.g. "Blocked") | Not imported | Imported once added to the project's "Statuses to sync" — no deploy needed |
+| "QA Approved" (In Progress category) | Not imported | Still not imported (not on the default allowlist) |
+| Status "QA" | Not imported | Still not imported |
+| Allowlisted custom status's column | To Do (blanket fallback) | By category: new → To Do, indeterminate → In Progress, done → Done |
 | Known names (To Do / In Progress / Review / Code Revew / Code Review) | Mapped by name | Unchanged — name overrides still win |
 
 ## 1. Schema & settings
 
-- `Project.jiraExcludedStatuses String? @default("QA")` — Postgres backfills existing rows with `'QA'` on migration; code defensively treats `null` as `"QA"` anyway. Comma-separated status names; **empty string means exclude nothing**.
-- Settings page: a "Statuses to exclude from sync" text input beside the other JIRA fields (placeholder `QA, Blocked`), plumbed identically to `githubRepos`: `Project` TS type, `projectToDTO`, PUT route update-when-provided (`!== undefined`), always-sent from the settings form.
+- Replace revision 1's `jiraExcludedStatuses` with `Project.jiraSyncStatuses String? @default("To Do, In Progress, Code Revew, Code Review")`. On this unmerged branch that means a follow-up migration dropping `jiraExcludedStatuses` and adding `jiraSyncStatuses` (the old column carried deny-list semantics; no production data exists).
+- Settings page: a "Statuses to sync" text input beside the other JIRA fields (placeholder `To Do, In Progress, Code Revew, Code Review`), plumbed identically to `githubRepos`: `Project` TS type, `projectToDTO`, PUT route update-when-provided (`!== undefined`), always-sent from the settings form.
 
-## 2. JQL — `buildProjectStoriesJql(projectKey, excludedStatuses: string[])`
+## 2. JQL — `buildProjectStoriesJql(projectKey, syncStatuses: string[])`
 
-- The `PROJECT_SYNC_STATUSES` constant is **deleted**.
-- Query: `project = "<key>" AND assignee = currentUser() AND statusCategory != Done`, plus ` AND status NOT IN ("QA", ...)` only when `excludedStatuses` (after trimming and dropping blanks) is non-empty.
-- Status names are wrapped in double quotes with embedded `"` and `\` escaped (`\"`, `\\`).
-- `sync.ts` parses `project.jiraExcludedStatuses ?? "QA"` (split on commas, trim, drop blanks) and passes the array to `fetchStoriesForProject`, which passes it to the builder — the pure function receives data, never a Project row.
-- `buildAssignedStoriesJql` (legacy multi-project path) already uses `statusCategory != Done`; it is untouched.
+- Query: `project = "<key>" AND assignee = currentUser() AND status IN ("To Do", ...)` — names quoted with embedded `"` and `\` escaped (`\"`, `\\`), trimmed, blanks dropped.
+- The builder throws if the (cleaned) list is empty — callers must resolve defaults first; a pure function silently substituting policy hides bugs.
+- `parseSyncStatuses(value: string | null | undefined): string[]` — null/undefined/empty/all-blank → the default four; else split on commas, trim, drop blanks. Exported alongside the builder; used by sync and the import preview route.
+- `buildAssignedStoriesJql` (legacy multi-project path, `statusCategory != Done`) is untouched.
 
-## 3. Client & DTO
+## 3. Client & DTO (unchanged from revision 1)
 
-- The enhanced-search request already includes `status` in `SEARCH_FIELDS`; the response's status object carries `statusCategory`. The client's `JiraIssue` type gains `fields.status.statusCategory: { key: string }`, and `issueToStoryDTO` maps it.
-- `StoryDTO` gains `jiraStatusCategory: "new" | "indeterminate" | "done"` — JIRA's three fixed category keys. The client narrows: a key outside the three (never expected from JIRA) maps to `"new"`, so the union stays honest and unknown categories degrade to today's To Do behavior.
-- **Not persisted**: `Story` has no new column. The category is consumed at import time (column mapping) and discarded — nothing downstream needs it.
+- `JiraIssue.fields.status.statusCategory?: { key: string }`; `issueToStoryDTO` maps it via `narrowStatusCategory` (unknown keys → `"new"`).
+- `StoryDTO.jiraStatusCategory?: "new" | "indeterminate" | "done"` — optional, set only by the JIRA fetch path; not persisted on `Story`.
+- `fetchStoriesForProject(projectKey, config, syncStatuses: string[] = DEFAULT_SYNC_STATUSES)` — the default constant lives in `jql.ts` and is exported for the client's parameter default.
 
-## 4. Column mapping — `jiraStatusToColumn(status, category?)`
+## 4. Column mapping — `jiraStatusToColumn(status, category?)` (unchanged from revision 1)
 
-- Existing name-override map stays first and wins: `to do → todo`, `in progress → in_progress`, `review → in_progress`, `code revew → code_review`, `code review → code_review` (case-insensitive, trimmed).
-- New optional second parameter `category?: "new" | "indeterminate" | "done"`. When the name isn't in the override map:
-  - `new` → `todo`
-  - `indeterminate` → `in_progress`
-  - `done` → `done`
-  - absent/undefined → `todo` (today's behavior; keeps every existing caller compiling and behaving identically)
-- The import process route (and preview where it maps a display column, if it does) passes `story.jiraStatusCategory`.
+- Name overrides win: `to do → todo`, `in progress → in_progress`, `review → in_progress`, `code revew → code_review`, `code review → code_review` (case-insensitive, trimmed).
+- Category fallback: `new → todo`, `indeterminate → in_progress`, `done → done`; absent/undefined → `todo`.
+- Import preview computes `targetColumn` with the category; ImportReview forwards it; the process route maps with it.
 
 ## 5. Testing
 
-- **jql.test.ts:** category clause present; exclusion clause with one and several names; quoting and escaping of embedded quotes/backslashes; trimming and blank-dropping; empty list omits the `NOT IN` clause entirely; `PROJECT_SYNC_STATUSES` assertions removed.
-- **columns.test.ts:** every name override still wins even with a contradicting category; all three category fallbacks; absent category → todo; unknown name + unknown category → todo.
-- **client.test.ts:** `issueToStoryDTO` maps `statusCategory.key`; unknown key handling.
-- **sync.test.ts:** project's `jiraExcludedStatuses` setting reaches the fetch (mocked client asserts the passed array); null field → `["QA"]`; empty string → `[]`.
-- **Settings/PUT tests:** store-when-provided, preserve-when-omitted, field renders/loads/submits (mirroring the `githubRepos` cases).
-- **Import process route test:** a story with an unrecognized status name and `indeterminate` category creates its card in `in_progress`.
+- **jql.test.ts:** allowlist clause with the default and custom lists; quoting/escaping of embedded quotes/backslashes; trimming and blank-dropping; empty cleaned list throws; `parseSyncStatuses` (null/undefined/empty/all-blank → default four; custom lists parse).
+- **columns.test.ts:** unchanged from revision 1 (overrides beat category; three fallbacks; absent → todo).
+- **client.test.ts:** category mapping and unknown-key narrowing (unchanged); default third argument produces the default allowlist JQL; explicit list passes through.
+- **sync.test.ts:** project's `jiraSyncStatuses` reaches the fetch; null → default four; `""` → default four; custom list parses.
+- **Preview route test:** same pass-through assertions as sync.
+- **Settings/PUT tests:** store-when-provided, creation default, preserve-when-omitted, field renders/loads/submits.
+- **Import process route test:** unchanged — an allowlisted story with an unrecognized name and `indeterminate` category lands in `in_progress`.
 
 All tests via `npm test` / `npm run test:ci` only (vitest.setup guard).
 
@@ -69,4 +70,5 @@ All tests via `npm test` / `npm run test:ci` only (vitest.setup guard).
 - Per-project *column-mapping* configuration.
 - Write-back changes — `transitions.ts` already navigates by `statusCategory`.
 - Re-mapping existing cards' columns; only newly imported cards use the new mapping.
-- The legacy `buildAssignedStoriesJql` path (already category-based).
+- The legacy `buildAssignedStoriesJql` path.
+- A status *picker* UI (fetching available statuses from JIRA to populate a dropdown) — the free-text field ships first; a picker is a natural follow-up.
