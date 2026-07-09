@@ -136,6 +136,7 @@ describe("ProjectSettingsPage", () => {
       jiraSiteUrl: "",
       jiraEmail: "",
       githubRepos: "",
+      jiraExcludedStatuses: "",
     });
 
     await waitFor(() => {
@@ -583,6 +584,56 @@ describe("ProjectSettingsPage", () => {
       expect(putCall).toBeDefined();
       expect(putCall![1].body as string).toContain(
         '"githubRepos":"sphero/team-alliance, sphero/shared-ui"'
+      );
+    });
+  });
+
+  it("loads, edits, and submits the statuses-to-exclude field", async () => {
+    const mockFetch = vi.fn();
+    mockFetch.mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({
+          id: "p1",
+          name: "Team Project",
+          type: "JIRA",
+          jiraProjectKey: "TEAM",
+          jiraExcludedStatuses: "QA",
+        }),
+      })
+    );
+    mockFetch.mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({
+          id: "p1",
+          name: "Team Project",
+          type: "JIRA",
+          jiraProjectKey: "TEAM",
+          jiraExcludedStatuses: "QA, Blocked",
+        }),
+      })
+    );
+    global.fetch = mockFetch;
+
+    render(<ProjectSettingsPage />);
+
+    const input = await screen.findByLabelText(/statuses to exclude from sync/i);
+    expect(input).toHaveValue("QA");
+
+    fireEvent.change(input, {
+      target: { value: "QA, Blocked" },
+    });
+
+    fireEvent.click(screen.getByTestId("save-project-submit"));
+
+    await waitFor(() => {
+      const putCall = mockFetch.mock.calls.find(
+        (call) => call[0] === "/api/projects/p1" && call[1]?.method === "PUT"
+      );
+      expect(putCall).toBeDefined();
+      expect(putCall![1].body as string).toContain(
+        '"jiraExcludedStatuses":"QA, Blocked"'
       );
     });
   });

@@ -478,6 +478,42 @@ describe("PUT /api/projects/[projectId]", () => {
     const stored = await prisma.project.findUnique({ where: { id: project.id } });
     expect(stored?.githubRepos).toBe("sphero/team-alliance");
   });
+
+  it("should store jiraExcludedStatuses when provided (including empty string)", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Team A", type: "JIRA", jiraProjectKey: "TEAM" },
+    });
+
+    const req = new Request(`http://localhost:3000/api/projects/${project.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jiraExcludedStatuses: "" }),
+    });
+    const res = await PUT(req as never, {
+      params: Promise.resolve({ projectId: project.id }),
+    });
+    expect(res.status).toBe(200);
+
+    const stored = await prisma.project.findUnique({ where: { id: project.id } });
+    expect(stored?.jiraExcludedStatuses).toBe("");
+  });
+
+  it("should default jiraExcludedStatuses to QA on creation and preserve it when omitted from PUT", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Team A", type: "JIRA", jiraProjectKey: "TEAM" },
+    });
+    expect(project.jiraExcludedStatuses).toBe("QA");
+
+    const req = new Request(`http://localhost:3000/api/projects/${project.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Renamed" }),
+    });
+    await PUT(req as never, { params: Promise.resolve({ projectId: project.id }) });
+
+    const stored = await prisma.project.findUnique({ where: { id: project.id } });
+    expect(stored?.jiraExcludedStatuses).toBe("QA");
+  });
 });
 
 describe("DELETE /api/projects/[projectId]", () => {

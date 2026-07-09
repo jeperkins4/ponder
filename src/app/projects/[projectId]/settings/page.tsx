@@ -30,6 +30,7 @@ export default function ProjectSettingsPage() {
   const [jiraEmail, setJiraEmail] = useState("");
   const [jiraApiToken, setJiraApiToken] = useState("");
   const [githubRepos, setGithubRepos] = useState("");
+  const [jiraExcludedStatuses, setJiraExcludedStatuses] = useState("");
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +59,7 @@ export default function ProjectSettingsPage() {
           setJiraSiteUrl(data.jiraSiteUrl ?? "");
           setJiraEmail(data.jiraEmail ?? "");
           setGithubRepos(data.githubRepos ?? "");
+          setJiraExcludedStatuses(data.jiraExcludedStatuses ?? "");
           // The API token is write-only and never returned by the API, so
           // it is intentionally never pre-filled here.
         }
@@ -91,6 +93,7 @@ export default function ProjectSettingsPage() {
         jiraSiteUrl,
         jiraEmail,
         githubRepos,
+        jiraExcludedStatuses,
       };
       // The API token is write-only: only send it when the user actually
       // typed something, so leaving it blank preserves the stored token.
@@ -322,6 +325,24 @@ export default function ProjectSettingsPage() {
                   placeholder="owner/repo, owner/repo"
                   className={`w-full px-3 py-2 bg-ponder-light-surface border border-ponder-light-card-border rounded-lg font-instrument text-ponder-light-text ${focusRing}`}
                   data-testid="github-repos-input"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="jira-excluded-statuses"
+                  className="block text-sm font-instrument font-semibold text-ponder-light-text mb-1"
+                >
+                  Statuses to exclude from sync
+                </label>
+                <input
+                  id="jira-excluded-statuses"
+                  type="text"
+                  value={jiraExcludedStatuses}
+                  onChange={(e) => setJiraExcludedStatuses(e.target.value)}
+                  placeholder="QA, Blocked"
+                  className={`w-full px-3 py-2 bg-ponder-light-surface border border-ponder-light-card-border rounded-lg font-instrument text-ponder-light-text ${focusRing}`}
+                  data-testid="jira-excluded-statuses-input"
                 />
               </div>
 
