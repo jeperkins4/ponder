@@ -40,12 +40,12 @@ export function buildAssignedStoriesJql(projectKeys: string[]): string {
 export function parseSyncStatuses(
   value: string | null | undefined
 ): string[] {
-  if (value === null || value === undefined) return DEFAULT_SYNC_STATUSES;
+  if (value === null || value === undefined) return [...DEFAULT_SYNC_STATUSES];
   const names = value
     .split(",")
     .map((name) => name.trim())
     .filter(Boolean);
-  return names.length > 0 ? names : DEFAULT_SYNC_STATUSES;
+  return names.length > 0 ? names : [...DEFAULT_SYNC_STATUSES];
 }
 
 /** Double-quotes a JQL string value, escaping backslashes and quotes. */
