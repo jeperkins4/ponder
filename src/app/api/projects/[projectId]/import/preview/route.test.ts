@@ -199,6 +199,60 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
     }
   });
 
+  it("passes jiraStatusCategory through and uses it to compute the target column", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Preview Category Team",
+        type: "JIRA",
+        jiraProjectKey: "PREVCAT",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "preview-category@example.com",
+        jiraApiToken: "preview-category-token",
+      },
+    });
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const mockStories: StoryDTO[] = [
+      makeStory({
+        jiraKey: `PREVCAT-${suffix}-1`,
+        jiraId: `PREVCAT-${suffix}-1`,
+        summary: "Blocked story",
+        jiraStatus: "Blocked",
+        jiraStatusCategory: "indeterminate",
+      }),
+    ];
+
+    vi.mocked(jiraClient.fetchStoriesForProject).mockResolvedValueOnce(mockStories);
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/preview`,
+        { method: "POST" }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+
+      expect(data.stories).toEqual([
+        {
+          jiraKey: `PREVCAT-${suffix}-1`,
+          jiraId: `PREVCAT-${suffix}-1`,
+          summary: "Blocked story",
+          description: null,
+          jiraStatus: "Blocked",
+          jiraStatusCategory: "indeterminate",
+          targetColumn: "in_progress",
+          alreadyImported: false,
+        },
+      ]);
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
   it("surfaces an unexpected JIRA fetch failure as a 500", async () => {
     const project = await prisma.project.create({
       data: {

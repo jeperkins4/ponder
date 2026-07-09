@@ -28,6 +28,7 @@ export interface ImportProcessItem {
   summary: string;
   description: string | null;
   jiraStatus: string;
+  jiraStatusCategory?: "new" | "indeterminate" | "done";
   breakDown: boolean;
   codebaseContext?: string;
 }
@@ -114,7 +115,7 @@ export async function POST(
 
       seenKeys.add(item.jiraKey);
 
-      const column = jiraStatusToColumn(item.jiraStatus);
+      const column = jiraStatusToColumn(item.jiraStatus, item.jiraStatusCategory);
 
       if (item.breakDown) {
         let drafts;

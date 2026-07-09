@@ -19,6 +19,7 @@ export interface ImportPreviewStory {
   summary: string;
   description: string | null;
   jiraStatus: string;
+  jiraStatusCategory?: "new" | "indeterminate" | "done";
   targetColumn: Column;
   alreadyImported: boolean;
 }
@@ -82,7 +83,8 @@ export async function POST(
       summary: dto.summary,
       description: dto.description,
       jiraStatus: dto.jiraStatus,
-      targetColumn: jiraStatusToColumn(dto.jiraStatus),
+      jiraStatusCategory: dto.jiraStatusCategory,
+      targetColumn: jiraStatusToColumn(dto.jiraStatus, dto.jiraStatusCategory),
       alreadyImported: alreadyImportedKeys.has(dto.jiraKey),
     }));
 
