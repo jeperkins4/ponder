@@ -33,7 +33,7 @@ So: Trello gives you *a board*. Ponder gives you a **JIRA-native decomposition l
 
 1. **Connect a project.** Create a project and link it to a JIRA project (site URL, email, API token) in **Settings** → **Test connection** to verify.
 2. **Import.** Click **Import from JIRA** → review the incoming stories (each shows its target column) → toggle which ones to **break down into sub-tasks** → **Process**. Flagged stories are decomposed by Claude into cards with acceptance criteria and verification; the rest come in as a single card.
-3. **Work the board.** Cards land in the column matching their JIRA status: **To Do · In Progress · Code Review · Done**.
+3. **Work the board.** Sync imports everything assigned to you whose JIRA `statusCategory` isn't Done, minus the per-project **Statuses to exclude from sync** list (default `QA`). Cards land in the column matching their status — named overrides (e.g. Code Review) first, falling back to their JIRA `statusCategory` (new → To Do, indeterminate → In Progress, done → Done) — so custom or renamed statuses still land somewhere sensible.
 4. **JIRA follows automatically.** As you move a story's cards, Ponder writes the meaningful transitions back — the issue goes to **In Progress** when work starts, and to **Code Review** (with a Claude-written summary comment listing what was done) once all of its cards reach **Done**. Non-blocking: a JIRA hiccup never breaks a local move, and the completion comment posts only once.
 
 ---
@@ -126,5 +126,4 @@ Link a project to GitHub (Settings → "GitHub repositories", comma-separated `o
 
 ## Roadmap
 
-- Additional status mappings (statusCategory-based matching).
 - **Scheduled report digest** — periodic summary built on the report layer (delivery channel TBD).
