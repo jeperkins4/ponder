@@ -156,7 +156,8 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
 
       expect(jiraClient.fetchStoriesForProject).toHaveBeenCalledWith(
         "PREVRT",
-        expect.any(Object)
+        expect.any(Object),
+        ["QA"]
       );
 
       expect(data.stories).toEqual([
@@ -248,6 +249,76 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
           alreadyImported: false,
         },
       ]);
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("passes the project's parsed jiraExcludedStatuses through to fetchStoriesForProject", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Preview Excluded Statuses Team",
+        type: "JIRA",
+        jiraProjectKey: "PREVEXC",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "preview-excluded@example.com",
+        jiraApiToken: "preview-excluded-token",
+        jiraExcludedStatuses: "QA, Blocked",
+      },
+    });
+
+    vi.mocked(jiraClient.fetchStoriesForProject).mockResolvedValueOnce([]);
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/preview`,
+        { method: "POST" }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(jiraClient.fetchStoriesForProject).toHaveBeenCalledWith(
+        "PREVEXC",
+        expect.any(Object),
+        ["QA", "Blocked"]
+      );
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("passes an empty excluded-statuses array when jiraExcludedStatuses is an empty string", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Preview No Excluded Statuses Team",
+        type: "JIRA",
+        jiraProjectKey: "PREVNOEXC",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "preview-noexcluded@example.com",
+        jiraApiToken: "preview-noexcluded-token",
+        jiraExcludedStatuses: "",
+      },
+    });
+
+    vi.mocked(jiraClient.fetchStoriesForProject).mockResolvedValueOnce([]);
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/preview`,
+        { method: "POST" }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(jiraClient.fetchStoriesForProject).toHaveBeenCalledWith(
+        "PREVNOEXC",
+        expect.any(Object),
+        []
+      );
     } finally {
       await prisma.project.delete({ where: { id: project.id } });
     }

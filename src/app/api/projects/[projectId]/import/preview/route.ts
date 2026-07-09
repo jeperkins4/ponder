@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchStoriesForProject, type JiraConfig } from "@/lib/jira/client";
+import { parseExcludedStatuses } from "@/lib/jira/jql";
 import { jiraStatusToColumn } from "@/lib/columns";
 import { findAlreadyImportedKeys } from "@/lib/importDedup";
 import type { Column } from "@/lib/types";
@@ -69,7 +70,8 @@ export async function POST(
 
     const jiraStories = await fetchStoriesForProject(
       project.jiraProjectKey,
-      jiraConfig
+      jiraConfig,
+      parseExcludedStatuses(project.jiraExcludedStatuses)
     );
 
     const alreadyImportedKeys = await findAlreadyImportedKeys(
