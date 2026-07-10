@@ -15,7 +15,6 @@ export default function TopNav() {
 
   const links = [
     { href: "/projects", label: "Projects" },
-    { href: "/board", label: "Board" },
     { href: "/reports", label: "Reports" },
   ];
 

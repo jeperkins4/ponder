@@ -28,9 +28,9 @@ describe("TopNav", () => {
       "href",
       "/projects"
     );
-    expect(screen.getByRole("link", { name: "Board" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute(
       "href",
-      "/board"
+      "/reports"
     );
   });
 
@@ -42,9 +42,13 @@ describe("TopNav", () => {
       "aria-current",
       "page"
     );
-    expect(screen.getByRole("link", { name: "Board" })).not.toHaveAttribute(
-      "aria-current"
-    );
+  });
+
+  it("does not render a global Board link", () => {
+    render(<TopNav />);
+    expect(
+      screen.queryByRole("link", { name: "Board" })
+    ).not.toBeInTheDocument();
   });
 
   it("exposes an accessible primary navigation landmark", () => {
