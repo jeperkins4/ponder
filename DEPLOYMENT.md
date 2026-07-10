@@ -60,12 +60,10 @@ The application will be available at `http://localhost:3000`.
 
 ## Environment Variables
 
+JIRA credentials are stored per project (Settings panel), not in the environment.
+
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `JIRA_SITE_URL` | Base URL of your JIRA Cloud instance | `https://your-company.atlassian.net` |
-| `JIRA_EMAIL` | Email address for JIRA API authentication | `developer@company.com` |
-| `JIRA_API_TOKEN` | API token for JIRA Cloud authentication | Generated in JIRA Settings → API tokens |
-| `JIRA_PROJECT_KEYS` | Comma-separated list of JIRA project keys to sync | `TEAM,OPS,PLANNING` |
 | `ANTHROPIC_API_KEY` | API key for Claude (used for story breakdown) | From [console.anthropic.com](https://console.anthropic.com) |
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgres@localhost:5432/kanban` |
 | `NODE_ENV` | Environment mode | `development` or `production` |
@@ -75,7 +73,7 @@ The application will be available at `http://localhost:3000`.
 1. Log in to your JIRA Cloud account
 2. Go to **Settings** → **Security** → **API tokens**
 3. Click **Create API token**
-4. Copy the token and add it to `.env.local` as `JIRA_API_TOKEN`
+4. Copy the token and add it to the project's Settings panel in the app
 
 ## Running Tests
 
@@ -125,7 +123,7 @@ For production, ensure:
 - All required environment variables are set securely (use environment secrets, not committed files)
 - `NODE_ENV=production`
 - `DATABASE_URL` points to your production PostgreSQL instance
-- JIRA and Anthropic API keys are set to production credentials
+- Anthropic API key is set to production credentials, and each project's JIRA credentials are configured in its Settings panel
 - Database backups are configured
 - PostgreSQL is running on a secure, non-exposed port
 
@@ -159,9 +157,9 @@ docker-compose logs postgres
 
 ### JIRA API Errors
 
-- Verify `JIRA_SITE_URL` format (should include `https://`)
+- Verify the project's JIRA site URL in Settings includes `https://`
 - Confirm API token is valid (tokens expire after 90 days by default)
-- Check JIRA project keys in `JIRA_PROJECT_KEYS` exist and are accessible
+- Confirm the JIRA project key configured in the project's Settings exists and is accessible
 - Ensure email address has sufficient JIRA permissions
 
 ### Claude API Errors

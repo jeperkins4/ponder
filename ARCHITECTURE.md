@@ -273,12 +273,10 @@ Next.js 15 with React 18:
 
 ## Environment Variables
 
+JIRA credentials are stored per project (Settings panel), not in the environment.
+
 | Variable | Purpose |
 |----------|---------|
-| `JIRA_SITE_URL` | JIRA Cloud instance URL |
-| `JIRA_EMAIL` | Email for JIRA API Basic Auth |
-| `JIRA_API_TOKEN` | API token for JIRA Basic Auth |
-| `JIRA_PROJECT_KEYS` | Comma-separated project keys to sync |
 | `ANTHROPIC_API_KEY` | Claude API authentication |
 | `DATABASE_URL` | PostgreSQL connection string |
 | `NODE_ENV` | `development` or `production` |
