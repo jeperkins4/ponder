@@ -68,34 +68,18 @@ describe("GET /api/stories", () => {
     }
   });
 
-  it("returns all stories (including unfiltered ones) when no ?projectId= is given", async () => {
-    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-    const story = await prisma.story.create({
-      data: {
-        jiraKey: `NOFILT-${suffix}`,
-        jiraId: `NOFILT-${suffix}`,
-        projectKey: "NOFILT",
-        summary: "No filter story",
-        jiraStatus: "To Do",
-        url: `https://example.atlassian.net/browse/NOFILT-${suffix}`,
-        lastSyncedAt: new Date(),
-      },
-    });
-
-    try {
-      const req = new NextRequest("http://localhost:3000/api/stories");
-      const res = await GET(req);
-      expect(res.status).toBe(200);
-      const data = await res.json();
-
-      expect(Array.isArray(data)).toBe(true);
-      expect(data.some((s: { id: string }) => s.id === story.id)).toBe(true);
-    } finally {
-      await prisma.story.delete({ where: { id: story.id } });
-    }
+  it("returns 400 when projectId is missing", async () => {
+    const req = new NextRequest("http://localhost:3000/api/stories");
+    const res = await GET(req);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Missing required query param: projectId");
   });
 
   it("serializes archivedAt as null for a non-archived work unit", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Archive Field Test Project", type: "STANDALONE" },
+    });
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
     const story = await prisma.story.create({
       data: {
@@ -106,6 +90,7 @@ describe("GET /api/stories", () => {
         jiraStatus: "To Do",
         url: `https://example.atlassian.net/browse/ARCH-${suffix}`,
         lastSyncedAt: new Date(),
+        projectId: project.id,
       },
     });
     const workUnit = await prisma.workUnit.create({
@@ -118,7 +103,9 @@ describe("GET /api/stories", () => {
     });
 
     try {
-      const req = new NextRequest("http://localhost:3000/api/stories");
+      const req = new NextRequest(
+        `http://localhost:3000/api/stories?projectId=${project.id}`
+      );
       const res = await GET(req);
       expect(res.status).toBe(200);
       const data = await res.json();
@@ -137,10 +124,14 @@ describe("GET /api/stories", () => {
     } finally {
       await prisma.workUnit.delete({ where: { id: workUnit.id } });
       await prisma.story.delete({ where: { id: story.id } });
+      await prisma.project.delete({ where: { id: project.id } });
     }
   });
 
   it("excludes archived work units from a story's workUnits array", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Archived Work Unit Test Project", type: "STANDALONE" },
+    });
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
     const story = await prisma.story.create({
       data: {
@@ -151,6 +142,7 @@ describe("GET /api/stories", () => {
         jiraStatus: "To Do",
         url: `https://example.atlassian.net/browse/ARCHWU-${suffix}`,
         lastSyncedAt: new Date(),
+        projectId: project.id,
       },
     });
     const activeWU = await prisma.workUnit.create({
@@ -161,7 +153,11 @@ describe("GET /api/stories", () => {
     });
 
     try {
-      const res = await GET(new NextRequest("http://localhost:3000/api/stories"));
+      const res = await GET(
+        new NextRequest(
+          `http://localhost:3000/api/stories?projectId=${project.id}`
+        )
+      );
       const data = await res.json();
       const returnedStory = data.find((s: { id: string }) => s.id === story.id);
 
@@ -172,10 +168,14 @@ describe("GET /api/stories", () => {
       await prisma.workUnit.delete({ where: { id: activeWU.id } });
       await prisma.workUnit.delete({ where: { id: archivedWU.id } });
       await prisma.story.delete({ where: { id: story.id } });
+      await prisma.project.delete({ where: { id: project.id } });
     }
   });
 
   it("excludes a story entirely once every one of its work units is archived", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Fully Archived Test Project", type: "STANDALONE" },
+    });
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
     const story = await prisma.story.create({
       data: {
@@ -186,6 +186,7 @@ describe("GET /api/stories", () => {
         jiraStatus: "To Do",
         url: `https://example.atlassian.net/browse/FULLARCH-${suffix}`,
         lastSyncedAt: new Date(),
+        projectId: project.id,
       },
     });
     const archivedWU = await prisma.workUnit.create({
@@ -193,13 +194,18 @@ describe("GET /api/stories", () => {
     });
 
     try {
-      const res = await GET(new NextRequest("http://localhost:3000/api/stories"));
+      const res = await GET(
+        new NextRequest(
+          `http://localhost:3000/api/stories?projectId=${project.id}`
+        )
+      );
       const data = await res.json();
 
       expect(data.find((s: { id: string }) => s.id === story.id)).toBeUndefined();
     } finally {
       await prisma.workUnit.delete({ where: { id: archivedWU.id } });
       await prisma.story.delete({ where: { id: story.id } });
+      await prisma.project.delete({ where: { id: project.id } });
     }
   });
 });
