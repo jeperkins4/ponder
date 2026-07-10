@@ -6,7 +6,6 @@
 import cuid from "cuid";
 import { StoryDTO } from "@/lib/types";
 import {
-  buildAssignedStoriesJql,
   buildProjectStoriesJql,
   DEFAULT_SYNC_STATUSES,
 } from "@/lib/jira/jql";
@@ -163,21 +162,6 @@ async function searchIssuesByJql(
   }
 
   return stories;
-}
-
-/**
- * Fetches assigned stories from JIRA for the given project keys
- * @param projectKeys - Array of JIRA project keys (e.g., ['TEAM', 'OPS'])
- * @param config - JIRA configuration (siteUrl, email, apiToken)
- * @returns Array of StoryDTO objects
- * @throws Error if API request fails
- */
-export async function fetchAssignedStories(
-  projectKeys: string[],
-  config: JiraConfig
-): Promise<StoryDTO[]> {
-  const jql = buildAssignedStoriesJql(projectKeys);
-  return searchIssuesByJql(jql, config);
 }
 
 /**
