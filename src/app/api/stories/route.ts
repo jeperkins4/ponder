@@ -1,8 +1,7 @@
 /**
  * GET /api/stories
- * List stories with their work units. Accepts an optional `?projectId=`
- * query param to filter to a single project; omitting it returns all
- * stories (backward compatible with pre-multi-project callers).
+ * List one project's stories with their work units. Requires a
+ * `?projectId=` query param; requests without it are rejected with 400.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,9 +12,16 @@ export async function GET(request: NextRequest) {
   try {
     const projectId = request.nextUrl.searchParams.get("projectId");
 
+    if (!projectId) {
+      return NextResponse.json(
+        { error: "Missing required query param: projectId" },
+        { status: 400 }
+      );
+    }
+
     const stories = await prisma.story.findMany({
       where: {
-        ...(projectId ? { projectId } : {}),
+        projectId,
         // A story is visible unless it has work units AND every one of them
         // is archived. Stories with zero work units remain visible (that's
         // pre-existing, out-of-scope behavior for this filter).

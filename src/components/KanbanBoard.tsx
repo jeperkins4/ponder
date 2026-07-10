@@ -45,9 +45,8 @@ const boardCollisionDetection: CollisionDetection = (args) => {
 };
 
 export interface KanbanBoardProps {
-  /** Scopes the board to a single project's stories. Omit to load all stories
-   * (used by the un-scoped /board route for backward compatibility). */
-  projectId?: string;
+  /** Scopes the board to a single project's stories. */
+  projectId: string;
   /** Heading text for the board's single `<h1>`. Defaults to "Kanban Board".
    * The project board page passes the project's name here instead of
    * rendering its own separate heading, so the page ends up with exactly one
@@ -108,9 +107,7 @@ export function KanbanBoard({
     setShowOnboarding(false);
   }, []);
 
-  const storiesUrl = projectId
-    ? `/api/stories?projectId=${projectId}`
-    : "/api/stories";
+  const storiesUrl = `/api/stories?projectId=${projectId}`;
 
   const fetchStories = useCallback(
     async (opts?: { silent?: boolean }) => {

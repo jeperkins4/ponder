@@ -126,7 +126,7 @@ describe("KanbanBoard", () => {
   });
 
   it("renders the board heading", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
     await waitFor(() => {
       // Query the `<h1>` specifically (level: 1): the onboarding tooltip also
       // renders a heading whose text contains "Kanban Board", so an
@@ -138,7 +138,7 @@ describe("KanbanBoard", () => {
   });
 
   it("renders 4 columns", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
     await waitFor(() => {
       const columnHeadings = screen
         .getAllByRole("heading", { level: 2 })
@@ -155,7 +155,7 @@ describe("KanbanBoard", () => {
   });
 
   it("renders each column's accent dot alongside its heading and item count on one line", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
       expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
@@ -173,7 +173,7 @@ describe("KanbanBoard", () => {
   });
 
   it("displays work units in correct columns", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
       expect(screen.getByText("Work unit 1")).toBeInTheDocument();
@@ -184,7 +184,7 @@ describe("KanbanBoard", () => {
   });
 
   it("shows each card's parent JIRA key linking to the issue", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
     await waitFor(() => {
       // wu-1 belongs to story-1 (PROJ-1, 3 work units → suffixed sub-number);
       // it still links to the parent PROJ-1 issue.
@@ -205,7 +205,7 @@ describe("KanbanBoard", () => {
   });
 
   it("numbers sub-stories of a decomposed story sequentially and stably", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
     await waitFor(() => {
       // story-1's three work units (wu-1, wu-2, wu-4) render PROJ-1-1/-2/-3
       // straight from each work unit's stored, stable `subNumber` field —
@@ -302,7 +302,7 @@ describe("KanbanBoard", () => {
       } as Response)
     );
 
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
       expect(screen.getByTestId("work-unit-card-wu-first")).toBeInTheDocument();
@@ -321,7 +321,7 @@ describe("KanbanBoard", () => {
       })
     );
 
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
     expect(screen.getByText(/Loading kanban board/i)).toBeInTheDocument();
   });
 
@@ -333,7 +333,7 @@ describe("KanbanBoard", () => {
       } as Response)
     );
 
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
       expect(screen.getByText(/Error:/i)).toBeInTheDocument();
@@ -341,7 +341,7 @@ describe("KanbanBoard", () => {
   });
 
   it("displays correct work unit counts per column", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
       const toDoColumn = screen.getAllByText(/To Do/i)[0].closest("div");
@@ -359,7 +359,7 @@ describe("KanbanBoard", () => {
   });
 
   it("shows a Done column badge for finished work units", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
       expect(
@@ -369,7 +369,7 @@ describe("KanbanBoard", () => {
   });
 
   it("displays story count on the page", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
       expect(screen.getByText(/2 stories/i)).toBeInTheDocument();
@@ -420,7 +420,7 @@ describe("KanbanBoard", () => {
       } as Response)
     );
 
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
       const noTasksTexts = screen.getAllByText(/No tasks/i);
@@ -429,19 +429,10 @@ describe("KanbanBoard", () => {
   });
 
   it("displays subtitle explaining the drag affordance", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
       expect(screen.getByText(/Drag tasks between columns to track progress/i)).toBeInTheDocument();
-    });
-  });
-
-  it("fetches stories from the unscoped API when no projectId is given", async () => {
-    render(<KanbanBoard />);
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith("/api/stories");
-      expect(global.fetch).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -457,7 +448,7 @@ describe("KanbanBoard", () => {
   });
 
   it("renders Edit and Delete buttons for each work unit card", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
       expect(screen.getByTestId("edit-button-wu-1")).toBeInTheDocument();
@@ -466,7 +457,7 @@ describe("KanbanBoard", () => {
   });
 
   it("cards are focusable and show a visible focus ring", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
       const card = screen.getByTestId("work-unit-card-wu-1");
@@ -476,7 +467,7 @@ describe("KanbanBoard", () => {
   });
 
   it("shows an import-result toast including the already-on-board count", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
     await waitFor(() =>
       expect(
         screen.getByRole("heading", { level: 1, name: /Kanban Board/i })
@@ -495,7 +486,7 @@ describe("KanbanBoard", () => {
   });
 
   it("omits the already-on-board clause when nothing was skipped", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
     await waitFor(() =>
       expect(
         screen.getByRole("heading", { level: 1, name: /Kanban Board/i })
@@ -513,7 +504,7 @@ describe("KanbanBoard", () => {
   });
 
   it("shows no toast on a bare import-complete event without detail", async () => {
-    render(<KanbanBoard />);
+    render(<KanbanBoard projectId="test-project" />);
     await waitFor(() =>
       expect(
         screen.getByRole("heading", { level: 1, name: /Kanban Board/i })
@@ -529,7 +520,7 @@ describe("KanbanBoard", () => {
 
   describe("Keyboard column navigation", () => {
     it("sets up column refs so each column's cards are queryable for navigation", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
@@ -540,7 +531,7 @@ describe("KanbanBoard", () => {
     });
 
     it("registers keyboard handlers without errors", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-2")).toBeInTheDocument();
@@ -554,7 +545,7 @@ describe("KanbanBoard", () => {
     });
 
     it("moves focus to the left column when ArrowLeft is pressed from the middle column", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-2")).toBeInTheDocument();
@@ -570,7 +561,7 @@ describe("KanbanBoard", () => {
     });
 
     it("moves focus to the right column when ArrowRight is pressed from the middle column", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-2")).toBeInTheDocument();
@@ -586,7 +577,7 @@ describe("KanbanBoard", () => {
     });
 
     it("continues moving focus rightward from code_review to done", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-4")).toBeInTheDocument();
@@ -601,7 +592,7 @@ describe("KanbanBoard", () => {
     });
 
     it("is a no-op when ArrowLeft is pressed from the leftmost column", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
@@ -615,7 +606,7 @@ describe("KanbanBoard", () => {
     });
 
     it("is a no-op when ArrowRight is pressed from the rightmost column", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-3")).toBeInTheDocument();
@@ -631,7 +622,7 @@ describe("KanbanBoard", () => {
 
   describe("Accessibility landmarks", () => {
     it("wraps the board content in a main landmark", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         const main = screen.getByRole("main");
@@ -640,7 +631,7 @@ describe("KanbanBoard", () => {
     });
 
     it("provides a skip link that targets the main landmark", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
@@ -652,7 +643,7 @@ describe("KanbanBoard", () => {
     });
 
     it("renders each column as a labelled region", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         const regions = screen.getAllByRole("region");
@@ -671,7 +662,7 @@ describe("KanbanBoard", () => {
     });
 
     it("renders a polite live region for status announcements", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
@@ -683,7 +674,7 @@ describe("KanbanBoard", () => {
     });
 
     it("shows the live region as a visible toast (not sr-only) once it has a status message", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
@@ -720,7 +711,7 @@ describe("KanbanBoard", () => {
 
     it("auto-dismisses the toast back to sr-only after the timeout", async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
@@ -759,7 +750,7 @@ describe("KanbanBoard", () => {
     });
 
     it("end-to-end: edit-mode focus enters/exits the card, then delete announces via the live region", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-card-wu-1")).toBeInTheDocument();
@@ -806,7 +797,7 @@ describe("KanbanBoard", () => {
 
   describe("Theme awareness", () => {
     it("does not render its own theme toggle button (TopNav owns the single global toggle)", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(
@@ -820,7 +811,7 @@ describe("KanbanBoard", () => {
     it("applies dark-mode styling when ponderTheme is set to dark in localStorage", async () => {
       window.localStorage.setItem("ponderTheme", "dark");
 
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         const main = screen.getByRole("main");
@@ -829,7 +820,7 @@ describe("KanbanBoard", () => {
     });
 
     it("applies light-mode styling by default", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         const main = screen.getByRole("main");
@@ -840,7 +831,7 @@ describe("KanbanBoard", () => {
 
   describe("title and headerActions props", () => {
     it("renders 'Kanban Board' as the sole h1 by default", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         const headings = screen.getAllByRole("heading", { level: 1 });
@@ -850,7 +841,7 @@ describe("KanbanBoard", () => {
     });
 
     it("renders a custom title as the sole h1 when provided", async () => {
-      render(<KanbanBoard title="Alpha" />);
+      render(<KanbanBoard projectId="test-project" title="Alpha" />);
 
       await waitFor(() => {
         const headings = screen.getAllByRole("heading", { level: 1 });
@@ -862,6 +853,7 @@ describe("KanbanBoard", () => {
     it("renders headerActions alongside the heading without adding another heading", async () => {
       render(
         <KanbanBoard
+          projectId="test-project"
           title="Alpha"
           headerActions={<button data-testid="my-action">Do thing</button>}
         />
@@ -877,7 +869,7 @@ describe("KanbanBoard", () => {
 
   describe("Onboarding tooltip", () => {
     it("is shown on first visit, when boardOnboarded is not set in localStorage", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(
@@ -889,7 +881,7 @@ describe("KanbanBoard", () => {
     it("is hidden when boardOnboarded is already set to 'true' in localStorage", async () => {
       window.localStorage.setItem("boardOnboarded", "true");
 
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(screen.getByRole("heading", { name: /Kanban Board/i })).toBeInTheDocument();
@@ -898,7 +890,7 @@ describe("KanbanBoard", () => {
     });
 
     it("clicking 'Got it' sets localStorage and hides the tooltip", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       const dismissButton = await screen.findByTestId(
         "onboarding-dismiss-button"
@@ -910,7 +902,7 @@ describe("KanbanBoard", () => {
     });
 
     it("pressing Escape dismisses the tooltip", async () => {
-      render(<KanbanBoard />);
+      render(<KanbanBoard projectId="test-project" />);
 
       await screen.findByRole("dialog", { name: /Welcome to Kanban Board/i });
 

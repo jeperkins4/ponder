@@ -10,7 +10,7 @@ The API provides endpoints for managing work units within stories. Story reads a
 
 All API requests use HTTP Basic Authentication with JIRA credentials. The frontend handles this automatically by including JIRA email and API token in requests.
 
-**Note:** JIRA authentication is handled server-side. Ensure `JIRA_EMAIL` and `JIRA_API_TOKEN` environment variables are set.
+**Note:** JIRA authentication is handled server-side using the email and API token configured in each project's Settings panel.
 
 ## Base URL
 
