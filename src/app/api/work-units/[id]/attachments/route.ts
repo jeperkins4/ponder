@@ -1,14 +1,17 @@
 /**
  * GET /api/work-units/[id]/attachments - List a work unit's attachments (chronological)
- * POST /api/work-units/[id]/attachments - Upload an image attachment to a work unit
+ * POST /api/work-units/[id]/attachments - Upload an image or video attachment to a work unit
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { writeAttachmentFile } from "@/lib/attachmentStorage";
+import {
+  attachmentSizeLimitLabel,
+  isAllowedAttachmentMimeType,
+  maxBytesForMimeType,
+} from "@/lib/attachmentPolicy";
 import { AttachmentDTO } from "@/lib/types";
-
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB
 
 // Helper to convert Prisma Attachment to DTO
 function attachmentToDTO(attachment: {
@@ -92,17 +95,19 @@ export async function POST(
     }
 
     const mimeType = file.type;
-    if (!mimeType.startsWith("image/")) {
+    if (!isAllowedAttachmentMimeType(mimeType)) {
       return NextResponse.json(
-        { error: "Only image attachments are allowed" },
+        { error: "Only image and video attachments are allowed" },
         { status: 400 }
       );
     }
 
     const size = file.size;
-    if (size > MAX_ATTACHMENT_BYTES) {
+    if (size > maxBytesForMimeType(mimeType)) {
       return NextResponse.json(
-        { error: "File exceeds the 10 MB attachment size limit" },
+        {
+          error: `File exceeds the ${attachmentSizeLimitLabel(mimeType)} attachment size limit`,
+        },
         { status: 413 }
       );
     }

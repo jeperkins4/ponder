@@ -138,10 +138,11 @@ export function createServer(client: PonderClient): McpServer {
     "attach_image",
     {
       description:
-        "Attach a local image file (e.g. a screenshot) to a work unit as " +
-        "evidence. filePath must be readable by the MCP server process. " +
-        "Supported extensions: .png, .jpg, .jpeg, .gif, .webp. Max 10 MB " +
-        "(enforced server-side).",
+        "Attach a local image or video file (e.g. a screenshot or screen " +
+        "recording of a test run) to a work unit as evidence. filePath must " +
+        "be readable by the MCP server process. Supported extensions: .png, " +
+        ".jpg, .jpeg, .gif, .webp, .mp4, .webm, .mov. Max 10 MB for images, " +
+        "250 MB for video (enforced server-side).",
       inputSchema: {
         workUnitId: z.string(),
         filePath: z.string(),

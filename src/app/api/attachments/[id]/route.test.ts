@@ -91,9 +91,85 @@ describe("Attachment Endpoint", () => {
 
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toBe("image/png");
+      expect(res.headers.get("Accept-Ranges")).toBe("bytes");
+      expect(res.headers.get("Content-Length")).toBe("4");
 
       const buf = Buffer.from(await res.arrayBuffer());
       expect(Array.from(buf)).toEqual([137, 80, 78, 71]);
+    });
+
+    it("serves a byte range with 206 and Content-Range (video seeking)", async () => {
+      const attachment = await createAttachment([10, 20, 30, 40, 50, 60]);
+
+      const req = new Request(`http://localhost/api/attachments/${attachment.id}`, {
+        headers: { Range: "bytes=1-3" },
+      });
+      const res = await GET(req as never, {
+        params: Promise.resolve({ id: attachment.id }),
+      });
+
+      expect(res.status).toBe(206);
+      expect(res.headers.get("Content-Range")).toBe("bytes 1-3/6");
+      expect(res.headers.get("Content-Length")).toBe("3");
+      expect(Array.from(Buffer.from(await res.arrayBuffer()))).toEqual([20, 30, 40]);
+    });
+
+    it("serves an open-ended range to the end of the file", async () => {
+      const attachment = await createAttachment([10, 20, 30, 40, 50, 60]);
+
+      const req = new Request(`http://localhost/api/attachments/${attachment.id}`, {
+        headers: { Range: "bytes=4-" },
+      });
+      const res = await GET(req as never, {
+        params: Promise.resolve({ id: attachment.id }),
+      });
+
+      expect(res.status).toBe(206);
+      expect(res.headers.get("Content-Range")).toBe("bytes 4-5/6");
+      expect(Array.from(Buffer.from(await res.arrayBuffer()))).toEqual([50, 60]);
+    });
+
+    it("serves a suffix range (last N bytes)", async () => {
+      const attachment = await createAttachment([10, 20, 30, 40, 50, 60]);
+
+      const req = new Request(`http://localhost/api/attachments/${attachment.id}`, {
+        headers: { Range: "bytes=-2" },
+      });
+      const res = await GET(req as never, {
+        params: Promise.resolve({ id: attachment.id }),
+      });
+
+      expect(res.status).toBe(206);
+      expect(res.headers.get("Content-Range")).toBe("bytes 4-5/6");
+      expect(Array.from(Buffer.from(await res.arrayBuffer()))).toEqual([50, 60]);
+    });
+
+    it("returns 416 for an unsatisfiable range", async () => {
+      const attachment = await createAttachment([10, 20, 30]);
+
+      const req = new Request(`http://localhost/api/attachments/${attachment.id}`, {
+        headers: { Range: "bytes=10-20" },
+      });
+      const res = await GET(req as never, {
+        params: Promise.resolve({ id: attachment.id }),
+      });
+
+      expect(res.status).toBe(416);
+      expect(res.headers.get("Content-Range")).toBe("bytes */3");
+    });
+
+    it("falls back to the full 200 response for an unsupported Range form", async () => {
+      const attachment = await createAttachment([10, 20, 30]);
+
+      const req = new Request(`http://localhost/api/attachments/${attachment.id}`, {
+        headers: { Range: "bytes=0-0,2-2" },
+      });
+      const res = await GET(req as never, {
+        params: Promise.resolve({ id: attachment.id }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(Array.from(Buffer.from(await res.arrayBuffer()))).toEqual([10, 20, 30]);
     });
 
     it("returns 404 when the attachment row does not exist", async () => {

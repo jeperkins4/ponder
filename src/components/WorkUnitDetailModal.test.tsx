@@ -557,14 +557,55 @@ describe("WorkUnitDetailModal", () => {
       expect(img).toHaveAttribute("src", "/api/attachments/a1");
     });
 
-    it("shows an empty state when there are no screenshots", async () => {
+    it("renders a video attachment as a playable <video> element", async () => {
+      const attachments: AttachmentDTO[] = [
+        {
+          id: "v1",
+          workUnitId: "wu-1",
+          filename: "test-run.mp4",
+          mimeType: "video/mp4",
+          size: 5678,
+          createdAt: "2026-01-01T00:00:00Z",
+          url: "/api/attachments/v1",
+        },
+      ];
+      global.fetch = mockFetch({ attachments }) as unknown as typeof fetch;
+
+      render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
+
+      const video = await screen.findByTestId("work-unit-detail-attachment-video-v1");
+      expect(video.tagName).toBe("VIDEO");
+      expect(video).toHaveAttribute("src", "/api/attachments/v1");
+      expect(video).toHaveAttribute("controls");
+      expect(video).toHaveAttribute("aria-label", "Play recording test-run.mp4");
+    });
+
+    it("rejects a non-media file client-side with a clear message", async () => {
+      global.fetch = mockFetch({ attachments: [] }) as unknown as typeof fetch;
+
+      render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
+
+      await screen.findByTestId("work-unit-detail-attachments-empty");
+
+      const input = screen.getByTestId("work-unit-detail-attachment-input");
+      const pdf = new File(["%PDF"], "report.pdf", { type: "application/pdf" });
+      fireEvent.change(input, { target: { files: [pdf] } });
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("work-unit-detail-attachments-upload-error")
+        ).toHaveTextContent("Only image and video files can be attached");
+      });
+    });
+
+    it("shows an empty state when there are no attachments", async () => {
       global.fetch = mockFetch({ attachments: [] }) as unknown as typeof fetch;
 
       render(<WorkUnitDetailModal workUnit={baseWorkUnit} isOpen={true} onClose={vi.fn()} />);
 
       await waitFor(() => {
         expect(screen.getByTestId("work-unit-detail-attachments-empty")).toHaveTextContent(
-          "No screenshots yet"
+          "No attachments yet"
         );
       });
     });

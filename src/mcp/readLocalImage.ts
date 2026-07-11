@@ -14,6 +14,11 @@ const EXTENSION_MIME_TYPES: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".webp": "image/webp",
+  // Recorded test evidence (screen recordings). Server-side caps differ:
+  // 10 MB for images, 250 MB for video — see src/lib/attachmentPolicy.ts.
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".mov": "video/quicktime",
 };
 
 export interface LocalImage {
@@ -38,7 +43,7 @@ export async function readLocalImage(
   if (!mimeType) {
     const supported = Object.keys(EXTENSION_MIME_TYPES).join(", ");
     throw new Error(
-      `Unsupported image extension "${ext || "(none)"}" for "${filePath}" — supported: ${supported}`
+      `Unsupported file extension "${ext || "(none)"}" for "${filePath}" — supported: ${supported}`
     );
   }
 
