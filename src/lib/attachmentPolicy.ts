@@ -12,7 +12,7 @@
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 export const VIDEO_MAX_BYTES = 250 * 1024 * 1024; // 250 MB
 
-export const ALLOWED_VIDEO_MIME_TYPES = [
+const ALLOWED_VIDEO_MIME_TYPES = [
   "video/mp4",
   "video/webm",
   "video/quicktime",
