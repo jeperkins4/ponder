@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ClipboardEvent, DragEvent } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { COLUMNS } from "@/lib/columns";
+import { isAllowedAttachmentMimeType } from "@/lib/attachmentPolicy";
 import type { WorkUnitDTO, WorkNoteDTO, AttachmentDTO } from "@/lib/types";
 
 export interface WorkUnitDetailModalProps {
@@ -126,7 +127,7 @@ export function WorkUnitDetailModal({
         if (cancelled) return;
 
         if (!response.ok) {
-          setAttachmentsError(data.error || "Failed to load screenshots");
+          setAttachmentsError(data.error || "Failed to load attachments");
           return;
         }
         setAttachments(data);
@@ -291,8 +292,8 @@ export function WorkUnitDetailModal({
   };
 
   const uploadAttachment = async (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      setUploadError("Only image files can be added as screenshots");
+    if (!isAllowedAttachmentMimeType(file.type)) {
+      setUploadError("Only image and video files can be attached");
       return;
     }
 
@@ -308,7 +309,7 @@ export function WorkUnitDetailModal({
       const data = await response.json();
 
       if (!response.ok) {
-        setUploadError(data.error || "Failed to upload screenshot");
+        setUploadError(data.error || "Failed to upload attachment");
         return;
       }
 
@@ -348,24 +349,24 @@ export function WorkUnitDetailModal({
     uploadAttachments(e.dataTransfer.files);
   };
 
-  // Only treats clipboard *image* items as screenshot uploads; never calls
-  // preventDefault, so a normal text paste into the notes textarea (or
-  // anywhere else) is left untouched.
+  // Only treats clipboard *media* items (images, screen-recording videos) as
+  // attachment uploads; never calls preventDefault, so a normal text paste
+  // into the notes textarea (or anywhere else) is left untouched.
   const handleModalPaste = (e: ClipboardEvent<HTMLDivElement>) => {
     const items = e.clipboardData?.items;
     if (!items) return;
 
-    const imageFiles: File[] = [];
+    const mediaFiles: File[] = [];
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      if (item.kind === "file" && item.type.startsWith("image/")) {
+      if (item.kind === "file" && isAllowedAttachmentMimeType(item.type)) {
         const file = item.getAsFile();
-        if (file) imageFiles.push(file);
+        if (file) mediaFiles.push(file);
       }
     }
 
-    if (imageFiles.length > 0) {
-      uploadAttachments(imageFiles);
+    if (mediaFiles.length > 0) {
+      uploadAttachments(mediaFiles);
     }
   };
 
@@ -375,7 +376,7 @@ export function WorkUnitDetailModal({
       const response = await fetch(`/api/attachments/${id}`, { method: "DELETE" });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        setUploadError(data.error || "Failed to delete screenshot");
+        setUploadError(data.error || "Failed to delete attachment");
         return;
       }
       setAttachments((prev) => prev.filter((a) => a.id !== id));
@@ -619,7 +620,7 @@ export function WorkUnitDetailModal({
 
           <div className={`border-t pt-4 ${rowBorderClass}`}>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold font-space-grotesk">Screenshots</h3>
+              <h3 className="text-sm font-semibold font-space-grotesk">Attachments</h3>
               <div className="flex items-center gap-2">
                 {uploadingCount > 0 && (
                   <span
@@ -633,16 +634,16 @@ export function WorkUnitDetailModal({
                   htmlFor="work-unit-detail-attachment-input"
                   className={`text-xs font-semibold underline cursor-pointer rounded ${mutedTextClass} hover:opacity-80 focus-within:ring-2 focus-within:ring-ponder-light-purple focus-within:outline-none`}
                 >
-                  Add screenshot
+                  Add attachment
                 </label>
                 <input
                   id="work-unit-detail-attachment-input"
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/mp4,video/webm,video/quicktime"
                   multiple
                   onChange={handleAttachmentInputChange}
                   className="sr-only"
-                  aria-label="Add screenshot"
+                  aria-label="Add attachment"
                   data-testid="work-unit-detail-attachment-input"
                 />
               </div>
@@ -664,7 +665,7 @@ export function WorkUnitDetailModal({
                   className={`text-sm ${mutedTextClass}`}
                   data-testid="work-unit-detail-attachments-loading"
                 >
-                  Loading screenshots…
+                  Loading attachments…
                 </p>
               )}
 
@@ -683,7 +684,7 @@ export function WorkUnitDetailModal({
                   className={`text-sm ${mutedTextClass}`}
                   data-testid="work-unit-detail-attachments-empty"
                 >
-                  No screenshots yet
+                  No attachments yet
                 </p>
               )}
 
@@ -695,24 +696,39 @@ export function WorkUnitDetailModal({
                       className="relative group"
                       data-testid={`work-unit-detail-attachment-${attachment.id}`}
                     >
-                      <a
-                        href={attachment.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`View screenshot ${attachment.filename}`}
-                        className={`block rounded-lg overflow-hidden border aspect-square ${rowBorderClass} ${focusRing}`}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={attachment.url}
-                          alt={attachment.filename}
-                          className="w-full h-full object-cover"
-                        />
-                      </a>
+                      {attachment.mimeType.startsWith("video/") ? (
+                        <div
+                          className={`rounded-lg overflow-hidden border aspect-square ${rowBorderClass}`}
+                        >
+                          <video
+                            src={attachment.url}
+                            controls
+                            preload="metadata"
+                            aria-label={`Play recording ${attachment.filename}`}
+                            className="w-full h-full object-cover"
+                            data-testid={`work-unit-detail-attachment-video-${attachment.id}`}
+                          />
+                        </div>
+                      ) : (
+                        <a
+                          href={attachment.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`View attachment ${attachment.filename}`}
+                          className={`block rounded-lg overflow-hidden border aspect-square ${rowBorderClass} ${focusRing}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={attachment.url}
+                            alt={attachment.filename}
+                            className="w-full h-full object-cover"
+                          />
+                        </a>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleDeleteAttachment(attachment.id)}
-                        aria-label={`Delete screenshot ${attachment.filename}`}
+                        aria-label={`Delete attachment ${attachment.filename}`}
                         data-testid={`work-unit-detail-attachment-delete-${attachment.id}`}
                         className={`absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full text-xs font-semibold text-white bg-black bg-opacity-60 hover:bg-opacity-80 ${focusRing}`}
                       >

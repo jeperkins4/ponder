@@ -21,6 +21,9 @@ describe("readLocalImage", () => {
     [".jpeg", "image/jpeg"],
     [".gif", "image/gif"],
     [".webp", "image/webp"],
+    [".mp4", "video/mp4"],
+    [".webm", "video/webm"],
+    [".mov", "video/quicktime"],
   ])("infers %s as %s and reads the file's bytes", async (ext, expectedMime) => {
     const filePath = path.join(dir, `screenshot${ext}`);
     await writeFile(filePath, "fake-bytes");

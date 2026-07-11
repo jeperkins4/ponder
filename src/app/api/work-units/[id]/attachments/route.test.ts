@@ -204,6 +204,86 @@ describe("Work Unit Attachments Endpoint", () => {
       const count = await prisma.attachment.count();
       expect(count).toBe(0);
     });
+
+    it("uploads a video, returns 201, and writes the file to disk", async () => {
+      const formData = new FormData();
+      formData.append(
+        "file",
+        new File([new Uint8Array([0, 0, 0, 24])], "test-run.mp4", {
+          type: "video/mp4",
+        })
+      );
+
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const res = await POST(req as never, {
+        params: Promise.resolve({ id: workUnitId }),
+      });
+      expect(res.status).toBe(201);
+
+      const dto = await res.json();
+      expect(dto.filename).toBe("test-run.mp4");
+      expect(dto.mimeType).toBe("video/mp4");
+
+      const fileBytes = await readFile(path.join(uploadsDir, dto.id));
+      expect(Array.from(fileBytes)).toEqual([0, 0, 0, 24]);
+    });
+
+    it("accepts a video larger than the 10 MB image cap", async () => {
+      const elevenMb = new Uint8Array(11 * 1024 * 1024);
+      const formData = new FormData();
+      formData.append(
+        "file",
+        new File([elevenMb], "recording.webm", { type: "video/webm" })
+      );
+
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const res = await POST(req as never, {
+        params: Promise.resolve({ id: workUnitId }),
+      });
+      expect(res.status).toBe(201);
+
+      const dto = await res.json();
+      expect(dto.mimeType).toBe("video/webm");
+      expect(dto.size).toBe(11 * 1024 * 1024);
+    });
+
+    it("rejects a video MIME type outside the allowlist", async () => {
+      const formData = new FormData();
+      formData.append(
+        "file",
+        new File([new Uint8Array([1])], "clip.avi", { type: "video/x-msvideo" })
+      );
+
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const res = await POST(req as never, {
+        params: Promise.resolve({ id: workUnitId }),
+      });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe(
+        "Only image and video attachments are allowed"
+      );
+    });
   });
 
   describe("GET", () => {
