@@ -71,7 +71,13 @@ session) after adding the server so it picks up the new connection.
 | `move_work_unit` | `workUnitId`, `column`, `order?` | Move a work unit to a column and optional position. |
 | `mark_done` | `workUnitId` | Convenience wrapper over `move_work_unit` that moves a work unit straight to Done. |
 | `update_work_unit` | `workUnitId`, `title?`, `description?` | Update a work unit's title and/or description (at least one required). |
-| `report_verification` | `workUnitId`, `outcome` (`passed`\|`failed`), `summary`, `verificationSteps?` | Report the result of an AI-agent verification run requested via Ponder's Verify button. Attach the screenshot separately with `attach_image`. |
+| `regenerate_acceptance` | `workUnitId`, `codebaseContext?` | (Re)generate a work unit's acceptance criteria and verification steps with Claude, optionally grounded in pasted codebase context. |
+| `attach_image` | `workUnitId`, `filePath`, `filename?` | Attach a local image or video (screenshot or recorded test run) to a work unit as evidence. Supported: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.mp4`, `.webm`, `.mov`. Max 10 MB for images, 250 MB for video (enforced server-side). |
+| `report_verification` | `workUnitId`, `outcome` (`passed`\|`failed`), `summary`, `verificationSteps?` | Report the result of an AI-agent verification run requested via Ponder's Verify button. Attach the supporting screenshot or recording separately with `attach_image`. |
+| `report_completed_work` | `projectId?`, `from?`, `to?` | Completed-work history grouped by story (archived cards included); ISO dates, inclusive. |
+| `report_throughput` | `projectId?`, `from?`, `to?` | Weekly throughput and cycle-time stats (created→completed, fractional days). |
+| `report_status_snapshot` | `projectId?` | Active cards per column per story, plus awaiting/failed verification tallies. |
+| `report_jira_trail` | `projectId?`, `from?`, `to?` | Chronological trail of what was reported to JIRA and when (Move-to-QA, verifications, completion comments). |
 
 `move_work_unit` and `mark_done` may transition the linked JIRA issue as a
 side effect of Ponder's existing server-side write-back: moving to a
@@ -92,7 +98,8 @@ Once connected, you can ask Claude Code things like:
 - "Move work unit ck123abc to code_review."
 - "Mark work unit ck123abc done."
 - "Update work unit ck123abc's title to 'Fix pagination bug'."
-- "List work units pending verification for project acme-web, verify each one, attach a screenshot, and report the result."
+- "List work units pending verification for project acme-web, verify each one, attach a screenshot or a recording of the test run, and report the result."
+- "Show me this week's throughput for project acme-web."
 
 ## Troubleshooting
 

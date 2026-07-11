@@ -43,6 +43,8 @@ So: Trello gives you *a board*. Ponder gives you a **JIRA-native decomposition l
 - **Auto-import** of your assigned, active JIRA issues (filtered by JQL).
 - **AI-assisted breakdown** — optional per story, powered by `@anthropic-ai/sdk`.
 - **Bidirectional JIRA status sync** — non-blocking and idempotent.
+- **Verification with evidence** — request an AI-agent verification per card and attach the proof: screenshots *and screen recordings* (images up to 10 MB, video — MP4/WebM/QuickTime — up to 250 MB, served with seek support).
+- **Verification capacity reporting** — is checking keeping pace with making? Verified/generated ratio, verification lag, queue depth, and verified-completion rate on `/reports`.
 - **Multi-project** support with per-project JIRA credentials (API token stored write-only).
 - **Ponder UI** — light/dark themes, keyboard-accessible, WCAG AA.
 - **Local-first** — your data lives in your own Postgres; JIRA credentials never leave the server.
@@ -102,12 +104,12 @@ claude mcp add ponder -- npx tsx /absolute/path/to/ponder/src/mcp/server.ts
 |---|---|---|
 | `list_projects` | — | List projects with story/work-unit counts |
 | `list_stories` | `projectId` | Stories with a per-column work-unit breakdown |
-| `list_work_units` | `projectId`, `column?` | Flat card list (with ids), optionally filtered by column |
+| `list_work_units` | `projectId`, `column?`, `pendingVerification?` | Flat card list (with ids), optionally filtered by column or to cards awaiting AI-agent verification |
 | `move_work_unit` | `workUnitId`, `column`, `order?` | Move a card — **may transition the JIRA issue** (In Progress / Code Revew + comment) |
 | `mark_done` | `workUnitId` | Move a card to Done (drives the story to Code Revew + summary comment once all its cards are done) |
 | `update_work_unit` | `workUnitId`, `title?`, `description?` | Edit a card's title/description |
 | `regenerate_acceptance` | `workUnitId`, `codebaseContext?` | (Re)generate a card's acceptance criteria and verification with Claude |
-| `attach_image` | `workUnitId`, `filePath`, `filename?` | Attach a local image (e.g. a screenshot) to a card as evidence |
+| `attach_image` | `workUnitId`, `filePath`, `filename?` | Attach a local image **or video** (screenshot or recorded test run — `.png/.jpg/.jpeg/.gif/.webp/.mp4/.webm/.mov`) to a card as evidence |
 | `report_verification` | `workUnitId`, `outcome`, `summary`, `verificationSteps?` | Report an AI-agent verification result for a Code Review card |
 | `report_completed_work` | `projectId?`, `from?`, `to?` | Completed-work history grouped by story (archived cards included) |
 | `report_throughput` | `projectId?`, `from?`, `to?` | Weekly throughput + cycle-time stats (created→completed) |
@@ -118,7 +120,7 @@ Once connected, ask Claude Code things like *"list my Ponder projects"*, *"show 
 
 ## Reports
 
-The `/reports` page answers four questions, filterable by project and date range (7/30/90 days or all time): a current **status snapshot** (active cards per column, verification states), **throughput & cycle time** (weekly completions and created→completed cycle times, charted), **completed work** history grouped by story, and the **JIRA trail** (every Move-to-QA report, verification outcome, and completion comment, newest first). The same data is available to MCP clients via the four `report_*` tools. A **Trends** section adds time-series graphs — created vs completed, cumulative completed, WIP over time, and JIRA activity — bucketed daily for short ranges and weekly past ~5 weeks.
+The `/reports` page answers five questions, filterable by project and date range (7/30/90 days or all time): a current **status snapshot** (active cards per column, verification states), **verification capacity** (is checking keeping pace with making? — verified/generated ratio, verification lag, queue depth over time, and the share of completions carrying a passed verification), **throughput & cycle time** (weekly completions and created→completed cycle times, charted), **completed work** history grouped by story, and the **JIRA trail** (every Move-to-QA report, verification outcome, and completion comment, newest first). The same data is available to MCP clients via the four `report_*` tools. A **Trends** section adds time-series graphs — created vs completed, cumulative completed, WIP over time, and JIRA activity — bucketed daily for short ranges and weekly past ~5 weeks.
 
 ## PR-gated completion
 
