@@ -657,6 +657,21 @@ const reportsPayload: ReportsPayload = {
     wip: [],
     activity: { movedToQa: [], verifications: [], storyCompletions: [] },
   },
+  verificationCapacity: {
+    granularity: "day",
+    buckets: [],
+    generated: [],
+    verified: [],
+    queueDepth: [],
+    totalGenerated: 0,
+    totalVerified: 0,
+    capacityRatio: null,
+    avgVerificationLagDays: null,
+    medianVerificationLagDays: null,
+    completedInWindow: 0,
+    completedVerified: 0,
+    verifiedCompletionRate: null,
+  },
 };
 
 function emptyReportsPayload(): ReportsPayload {
@@ -684,6 +699,21 @@ function emptyReportsPayload(): ReportsPayload {
       cumulativeCompleted: [],
       wip: [],
       activity: { movedToQa: [], verifications: [], storyCompletions: [] },
+    },
+    verificationCapacity: {
+      granularity: "day",
+      buckets: [],
+      generated: [],
+      verified: [],
+      queueDepth: [],
+      totalGenerated: 0,
+      totalVerified: 0,
+      capacityRatio: null,
+      avgVerificationLagDays: null,
+      medianVerificationLagDays: null,
+      completedInWindow: 0,
+      completedVerified: 0,
+      verifiedCompletionRate: null,
     },
   };
 }

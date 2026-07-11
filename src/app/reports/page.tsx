@@ -312,6 +312,127 @@ export default function ReportsPage() {
             )}
           </section>
 
+          {/* Verification capacity vs generation capacity */}
+          <section aria-labelledby="verification-capacity-heading">
+            <h2
+              id="verification-capacity-heading"
+              className="font-space-grotesk text-lg font-bold"
+            >
+              Verification capacity
+            </h2>
+            <p className={`mt-1 text-xs ${mutedClass}`}>
+              Is checking keeping pace with making?
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <div className={`rounded-lg border px-4 py-3 ${cardClass}`}>
+                <div className={`text-xs ${mutedClass}`}>
+                  Verified / generated
+                </div>
+                <div
+                  className="text-xl font-bold"
+                  data-testid="capacity-ratio"
+                >
+                  {report.verificationCapacity.capacityRatio ?? "—"}
+                </div>
+              </div>
+              <div className={`rounded-lg border px-4 py-3 ${cardClass}`}>
+                <div className={`text-xs ${mutedClass}`}>
+                  Completions verified
+                </div>
+                <div
+                  className="text-xl font-bold"
+                  data-testid="verified-completion-rate"
+                >
+                  {report.verificationCapacity.verifiedCompletionRate !== null
+                    ? `${Math.round(
+                        report.verificationCapacity.verifiedCompletionRate * 100
+                      )}%`
+                    : "—"}
+                </div>
+              </div>
+              <div className={`rounded-lg border px-4 py-3 ${cardClass}`}>
+                <div className={`text-xs ${mutedClass}`}>Avg verification lag</div>
+                <div className="text-xl font-bold">
+                  {report.verificationCapacity.avgVerificationLagDays ?? "—"}
+                  {report.verificationCapacity.avgVerificationLagDays !== null &&
+                    "d"}
+                </div>
+              </div>
+              <div className={`rounded-lg border px-4 py-3 ${cardClass}`}>
+                <div className={`text-xs ${mutedClass}`}>
+                  Median verification lag
+                </div>
+                <div className="text-xl font-bold">
+                  {report.verificationCapacity.medianVerificationLagDays ?? "—"}
+                  {report.verificationCapacity.medianVerificationLagDays !==
+                    null && "d"}
+                </div>
+              </div>
+              <div className={`rounded-lg border px-4 py-3 ${cardClass}`}>
+                <div className={`text-xs ${mutedClass}`}>Verification queue</div>
+                <div className="text-xl font-bold" data-testid="queue-now">
+                  {report.verificationCapacity.queueDepth.length > 0
+                    ? report.verificationCapacity.queueDepth[
+                        report.verificationCapacity.queueDepth.length - 1
+                      ]
+                    : "—"}
+                </div>
+              </div>
+            </div>
+            {report.verificationCapacity.buckets.length === 0 ? (
+              <p className={`mt-3 text-sm ${mutedClass}`}>
+                No verification activity in this range.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-8">
+                <div>
+                  <h3 className="text-sm font-semibold">
+                    Generated vs Verified
+                  </h3>
+                  <TimeSeriesChart
+                    ariaLabel="Cards generated vs verifications completed over time"
+                    series={[
+                      {
+                        name: "Generated",
+                        colorClass: "text-blue-500",
+                        points: toSeriesPoints(
+                          report.verificationCapacity.buckets,
+                          report.verificationCapacity.generated
+                        ),
+                      },
+                      {
+                        name: "Verified",
+                        colorClass: "text-emerald-500",
+                        points: toSeriesPoints(
+                          report.verificationCapacity.buckets,
+                          report.verificationCapacity.verified
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">
+                    Verification queue depth
+                  </h3>
+                  <TimeSeriesChart
+                    ariaLabel="Cards awaiting verification over time"
+                    series={[
+                      {
+                        name: "Awaiting verification",
+                        colorClass: "text-amber-500",
+                        points: toSeriesPoints(
+                          report.verificationCapacity.buckets,
+                          report.verificationCapacity.queueDepth
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+              </div>
+            )}
+          </section>
+
           {/* 2. Throughput & cycle time */}
           <section aria-labelledby="throughput-heading">
             <h2 id="throughput-heading" className="font-space-grotesk text-lg font-bold">

@@ -94,10 +94,27 @@ export interface TrendsReport {
   };
 }
 
+export interface VerificationCapacityReport {
+  granularity: "day" | "week";
+  buckets: string[]; // YYYY-MM-DD bucket starts, contiguous (same rules as trends)
+  generated: number[]; // cards created per bucket
+  verified: number[]; // verifications completed (verifiedAt) per bucket
+  queueDepth: number[]; // awaiting verification at each bucket END
+  totalGenerated: number;
+  totalVerified: number;
+  capacityRatio: number | null; // totalVerified / totalGenerated; null when nothing generated
+  avgVerificationLagDays: number | null; // verifiedAt - verificationRequestedAt
+  medianVerificationLagDays: number | null;
+  completedInWindow: number;
+  completedVerified: number; // completed with a passed verification
+  verifiedCompletionRate: number | null; // completedVerified / completedInWindow (0..1)
+}
+
 export interface ReportsPayload {
   completedWork: CompletedWorkReport;
   throughput: ThroughputReport;
   statusSnapshot: StatusSnapshotReport;
   jiraTrail: JiraTrailReport;
   trends: TrendsReport;
+  verificationCapacity: VerificationCapacityReport;
 }
