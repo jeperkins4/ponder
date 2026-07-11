@@ -41,8 +41,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        "instrument": ["Instrument Sans", "-apple-system", "system-ui", "sans-serif"],
-        "space-grotesk": ["Space Grotesk", "sans-serif"],
+        "instrument": ["var(--font-instrument-sans)", "Instrument Sans", "-apple-system", "system-ui", "sans-serif"],
+        "space-grotesk": ["var(--font-space-grotesk)", "Space Grotesk", "sans-serif"],
       },
       boxShadow: {
         "ponder-card": "0 1px 2px rgba(20, 22, 35, 0.05)",
