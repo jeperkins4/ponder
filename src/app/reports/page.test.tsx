@@ -81,6 +81,21 @@ const payload: ReportsPayload = {
       storyCompletions: [0, 0, 1],
     },
   },
+  verificationCapacity: {
+    granularity: "day" as const,
+    buckets: ["2026-07-04", "2026-07-05", "2026-07-06"],
+    generated: [2, 1, 0],
+    verified: [0, 0, 1],
+    queueDepth: [1, 2, 1],
+    totalGenerated: 3,
+    totalVerified: 1,
+    capacityRatio: 0.33,
+    avgVerificationLagDays: 1.5,
+    medianVerificationLagDays: 1.5,
+    completedInWindow: 2,
+    completedVerified: 1,
+    verifiedCompletionRate: 0.5,
+  },
 };
 
 const projects = [
@@ -145,6 +160,28 @@ describe("ReportsPage", () => {
     expect(screen.getByText("Ship the thing")).toBeInTheDocument();
     expect(screen.getByText("Active story")).toBeInTheDocument();
     expect(screen.getByText("QA card")).toBeInTheDocument();
+  });
+
+  it("renders the Verification capacity section with ratio, rate, lag, and queue", async () => {
+    render(<ReportsPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: /^verification capacity$/i })
+    ).toBeInTheDocument();
+
+    expect(screen.getByTestId("capacity-ratio")).toHaveTextContent("0.33");
+    expect(screen.getByTestId("verified-completion-rate")).toHaveTextContent(
+      "50%"
+    );
+    expect(screen.getByTestId("queue-now")).toHaveTextContent("1");
+    expect(
+      screen.getByRole("img", {
+        name: /cards generated vs verifications completed over time/i,
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: /cards awaiting verification over time/i })
+    ).toBeInTheDocument();
   });
 
   it("defaults to the 30-day range (sends a from param)", async () => {
@@ -231,6 +268,21 @@ describe("ReportsPage", () => {
           cumulativeCompleted: [],
           wip: [],
           activity: { movedToQa: [], verifications: [], storyCompletions: [] },
+        },
+        verificationCapacity: {
+          granularity: "day" as const,
+          buckets: [],
+          generated: [],
+          verified: [],
+          queueDepth: [],
+          totalGenerated: 0,
+          totalVerified: 0,
+          capacityRatio: null,
+          avgVerificationLagDays: null,
+          medianVerificationLagDays: null,
+          completedInWindow: 0,
+          completedVerified: 0,
+          verifiedCompletionRate: null,
         },
       } satisfies ReportsPayload);
     });
