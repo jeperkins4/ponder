@@ -36,11 +36,11 @@ describe("WorkUnitCard", () => {
       ).toHaveTextContent("Test Work Unit");
     });
 
-    it("renders the column badge", () => {
+    it("does not render a column badge (the column header already states it)", () => {
       render(<WorkUnitCard workUnit={mockWorkUnit} />);
       expect(
-        screen.getByTestId(`work-unit-column-badge-${mockWorkUnit.id}`)
-      ).toHaveTextContent("To Do");
+        screen.queryByTestId(`work-unit-column-badge-${mockWorkUnit.id}`)
+      ).not.toBeInTheDocument();
     });
 
     it("renders the description", () => {
@@ -101,25 +101,6 @@ describe("WorkUnitCard", () => {
       expect(
         screen.getByTestId(`delete-button-${mockWorkUnit.id}`)
       ).toBeInTheDocument();
-    });
-
-    it("renders different column badge colors for different columns", () => {
-      const inProgressUnit: WorkUnitDTO = {
-        ...mockWorkUnit,
-        column: "in_progress",
-      };
-      const { rerender } = render(
-        <WorkUnitCard workUnit={inProgressUnit} />
-      );
-      expect(
-        screen.getByTestId(`work-unit-column-badge-${mockWorkUnit.id}`)
-      ).toHaveTextContent("In Progress");
-
-      const doneUnit: WorkUnitDTO = { ...mockWorkUnit, column: "done" };
-      rerender(<WorkUnitCard workUnit={doneUnit} />);
-      expect(
-        screen.getByTestId(`work-unit-column-badge-${mockWorkUnit.id}`)
-      ).toHaveTextContent("Done");
     });
 
     it("handles null description gracefully", () => {

@@ -358,14 +358,15 @@ describe("KanbanBoard", () => {
     });
   });
 
-  it("shows a Done column badge for finished work units", async () => {
+  it("renders finished work units without a redundant column badge", async () => {
     render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("work-unit-column-badge-wu-3")
-      ).toHaveTextContent("Done");
+      expect(screen.getByTestId("work-unit-card-wu-3")).toBeInTheDocument();
     });
+    expect(
+      screen.queryByTestId("work-unit-column-badge-wu-3")
+    ).not.toBeInTheDocument();
   });
 
   it("displays story count on the page", async () => {

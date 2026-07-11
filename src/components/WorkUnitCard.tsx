@@ -7,11 +7,8 @@ import { WorkUnitDTO, Column } from "@/lib/types";
 import { WorkUnitDetailModal } from "@/components/WorkUnitDetailModal";
 import { useTheme } from "@/hooks/useTheme";
 
-type PriorityLevel = "HIGH" | "MEDIUM" | "LOW";
-
 interface WorkUnitCardProps {
   workUnit: WorkUnitDTO;
-  priority?: PriorityLevel;
   /** JIRA key of the parent story this card was decomposed from (e.g. "COM-540"). */
   storyKey?: string;
   /** Link to the parent JIRA issue; when present the key renders as a link. */
@@ -29,35 +26,10 @@ const columnLabels: Record<Column, string> = {
   done: "Done",
 };
 
-const columnColorsLight: Record<Column, string> = {
-  todo: "bg-gray-100 text-gray-800",
-  in_progress: "bg-blue-100 text-blue-800",
-  code_review: "bg-purple-100 text-purple-800",
-  done: "bg-green-100 text-green-800",
-};
-const columnColorsDark: Record<Column, string> = {
-  todo: "bg-gray-800 text-gray-200",
-  in_progress: "bg-blue-900/50 text-blue-200",
-  code_review: "bg-purple-900/50 text-purple-200",
-  done: "bg-green-900/50 text-green-200",
-};
-
-const priorityStylesLight: Record<PriorityLevel, { dot: string; text: string }> = {
-  HIGH: { dot: "bg-red-500", text: "text-red-700" },
-  MEDIUM: { dot: "bg-amber-400", text: "text-amber-700" },
-  LOW: { dot: "bg-gray-500", text: "text-gray-600" },
-};
-const priorityStylesDark: Record<PriorityLevel, { dot: string; text: string }> = {
-  HIGH: { dot: "bg-red-500", text: "text-red-400" },
-  MEDIUM: { dot: "bg-amber-400", text: "text-amber-400" },
-  LOW: { dot: "bg-gray-500", text: "text-gray-400" },
-};
-
 const focusRing = "focus:ring-2 focus:ring-ponder-light-purple focus:outline-none";
 
 export function WorkUnitCard({
   workUnit,
-  priority,
   storyKey,
   storyUrl,
   onDelete,
@@ -83,8 +55,6 @@ export function WorkUnitCard({
   const wasEditingRef = useRef(false);
 
   const { isDark } = useTheme();
-  const columnColors = isDark ? columnColorsDark : columnColorsLight;
-  const priorityStyles = isDark ? priorityStylesDark : priorityStylesLight;
   const surfaceClass = isDark
     ? "bg-ponder-dark-surface border-ponder-dark-border"
     : "bg-ponder-light-surface border-ponder-light-card-border";
@@ -371,8 +341,7 @@ export function WorkUnitCard({
       }}
       data-testid={`work-unit-card-${workUnit.id}`}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex-1">
+      <div className="mb-2">
           {storyKey &&
             (storyUrl ? (
               <a
@@ -393,29 +362,12 @@ export function WorkUnitCard({
                 {storyKey}
               </span>
             ))}
-          {priority && (
-            <div className="flex items-center gap-1 mb-2">
-              <span className={`inline-flex items-center gap-1 text-xs font-bold tracking-wide ${priorityStyles[priority].text}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${priorityStyles[priority].dot}`}></span>
-                {priority}
-              </span>
-            </div>
-          )}
           <h3
             className={`font-instrument font-semibold text-sm ${textClass} leading-tight`}
             data-testid={`work-unit-title-${workUnit.id}`}
           >
             {workUnit.title}
           </h3>
-        </div>
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-instrument font-medium ml-2 flex-shrink-0 ${
-            columnColors[workUnit.column]
-          }`}
-          data-testid={`work-unit-column-badge-${workUnit.id}`}
-        >
-          {columnLabels[workUnit.column]}
-        </span>
       </div>
 
       {workUnit.description && (
