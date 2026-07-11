@@ -326,7 +326,7 @@ export function WorkUnitCard({
       {...listeners}
       role="article"
       aria-label={cardAriaLabel}
-      className={`p-3 border ${surfaceClass} rounded-xl shadow-ponder-card hover:shadow-ponder-card-hover hover:-translate-y-0.5 transition-all cursor-pointer ${focusRing}`}
+      className={`group p-3 border ${surfaceClass} rounded-xl shadow-ponder-card hover:shadow-ponder-card-hover hover:-translate-y-0.5 transition-all cursor-pointer ${focusRing}`}
       style={dragStyle}
       tabIndex={0}
       onClick={() => setIsDetailOpen(true)}
@@ -377,6 +377,14 @@ export function WorkUnitCard({
       )}
 
       <div className="flex gap-2">
+        <div
+          className={`flex gap-2 ${
+            isDeleting
+              ? ""
+              : "opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+          }`}
+          data-testid={`card-actions-${workUnit.id}`}
+        >
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -420,6 +428,7 @@ export function WorkUnitCard({
             Cancel
           </button>
         )}
+        </div>
         {workUnit.column === "done" && storyKey && (
           <button
             onClick={(e) => {

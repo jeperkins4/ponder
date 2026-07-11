@@ -739,6 +739,26 @@ describe("WorkUnitCard", () => {
       ).toHaveClass("focus:ring-2", "focus:outline-none");
     });
 
+    it("hides Edit/Delete at rest and reveals them on hover or focus-within", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      const actions = screen.getByTestId(`card-actions-${mockWorkUnit.id}`);
+      expect(actions).toHaveClass(
+        "opacity-0",
+        "group-hover:opacity-100",
+        "group-focus-within:opacity-100"
+      );
+    });
+
+    it("keeps Edit/Delete pinned visible while a delete is awaiting confirmation", () => {
+      render(<WorkUnitCard workUnit={mockWorkUnit} />);
+
+      fireEvent.click(screen.getByTestId(`delete-button-${mockWorkUnit.id}`));
+
+      const actions = screen.getByTestId(`card-actions-${mockWorkUnit.id}`);
+      expect(actions).not.toHaveClass("opacity-0");
+    });
+
     it("keeps the focus ring visible on the card while in edit mode", () => {
       render(<WorkUnitCard workUnit={mockWorkUnit} />);
 
