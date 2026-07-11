@@ -71,7 +71,7 @@ export function TimeSeriesChart({
         role="img"
         aria-label={ariaLabel}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="mt-1 w-full max-w-2xl"
+        className="mt-1 w-full max-w-4xl"
       >
         {nonEmpty.map((s) => {
           const lastIndex = s.points.length - 1;

@@ -80,7 +80,7 @@ export default function TopNav() {
             type="button"
             onClick={toggle}
             aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-            className={`ml-1 rounded-lg p-2 transition-colors focus:outline-none focus:ring-2 focus:ring-ponder-light-purple ${
+            className={`ml-1 rounded-lg p-3 transition-colors focus:outline-none focus:ring-2 focus:ring-ponder-light-purple ${
               dark
                 ? "text-ponder-dark-text hover:bg-ponder-dark-bg"
                 : "text-ponder-light-text hover:bg-ponder-light-bg"
