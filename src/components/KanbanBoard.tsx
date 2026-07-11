@@ -27,12 +27,9 @@ import {
   ColumnOrderMap,
 } from "@/lib/dndReorder";
 import { WorkUnitCard } from "@/components/WorkUnitCard";
-import { OnboardingTooltip } from "@/components/OnboardingTooltip";
 import { useTheme } from "@/hooks/useTheme";
 
 type ColumnRefMap = Record<Column, HTMLDivElement | null>;
-
-const ONBOARDING_STORAGE_KEY = "boardOnboarded";
 
 // Prefer the droppable the pointer is actually over (cursor-based), falling back
 // to closest-corners only when the pointer isn't within any droppable. This
@@ -69,7 +66,6 @@ export function KanbanBoard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
-  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Auto-dismisses the visible toast ~3s after it appears; a new message
   // resets the timer. The underlying `statusMessage` state also still drives
@@ -89,23 +85,6 @@ export function KanbanBoard({
       }
     };
   }, [statusMessage]);
-
-  useEffect(() => {
-    // `?reset-onboarding=true` lets us re-trigger the tooltip for manual
-    // testing without clearing localStorage by hand.
-    const params = new URLSearchParams(window.location.search);
-    const forceReset = params.get("reset-onboarding") === "true";
-
-    const hasOnboarded = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
-    if (forceReset || !hasOnboarded) {
-      setShowOnboarding(true);
-    }
-  }, []);
-
-  const handleOnboardingDismiss = useCallback(() => {
-    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
-    setShowOnboarding(false);
-  }, []);
 
   const storiesUrl = `/api/stories?projectId=${projectId}`;
 
@@ -332,8 +311,7 @@ export function KanbanBoard({
     content = (
       <>
         <div className="mb-8">
-          <p className={`${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} text-sm`}>Drag tasks between columns to track progress.</p>
-          <p className={`${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} mt-2`}>
+          <p className={`${isDark ? "text-ponder-dark-text-muted" : "text-ponder-light-text-muted"} text-sm`}>
             {stories.length} {stories.length === 1 ? "story" : "stories"}
           </p>
         </div>
@@ -401,11 +379,6 @@ export function KanbanBoard({
       >
         {statusMessage}
       </div>
-
-      <OnboardingTooltip
-        isOpen={showOnboarding}
-        onDismiss={handleOnboardingDismiss}
-      />
 
       <main role="main" id="main-content" className={`min-h-screen ${isDark ? "bg-ponder-dark-bg" : "bg-gray-50"} p-8`}>
         <div className={`max-w-7xl mx-auto rounded-3xl border p-8 shadow-ponder-card ${
