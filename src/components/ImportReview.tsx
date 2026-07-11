@@ -37,8 +37,8 @@ function columnLabel(column: Column): string {
  * Modal review step between "Import from JIRA" and actually creating cards.
  * Fetches a read-only preview (POST /import/preview), lets the user toggle
  * "break down into subtasks" per story, then POSTs the chosen selection to
- * /import/process. Mirrors OnboardingTooltip's dialog accessibility
- * mechanics (focus trap, Escape-to-close) but is Ponder theme-aware.
+ * /import/process. Shares the app's standard dialog accessibility
+ * mechanics (focus trap, Escape-to-close) and is Ponder theme-aware.
  *
  * Rows flagged `alreadyImported` (already have a card on the board) show an
  * "Already on board" badge and an opt-in "Import anyway" checkbox; they are

@@ -42,7 +42,6 @@ describe("ProjectBoardPage integration (real KanbanBoard)", () => {
     mockFindMany.mockReset();
     mockFindMany.mockResolvedValue([jiraProject, standaloneProject]);
 
-    // Onboarding tooltip is first-visit-only; start from a clean slate.
     window.localStorage.clear();
 
     // KanbanBoard fetches stories on mount via `fetch`.

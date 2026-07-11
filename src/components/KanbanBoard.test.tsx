@@ -358,14 +358,15 @@ describe("KanbanBoard", () => {
     });
   });
 
-  it("shows a Done column badge for finished work units", async () => {
+  it("renders finished work units without a redundant column badge", async () => {
     render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("work-unit-column-badge-wu-3")
-      ).toHaveTextContent("Done");
+      expect(screen.getByTestId("work-unit-card-wu-3")).toBeInTheDocument();
     });
+    expect(
+      screen.queryByTestId("work-unit-column-badge-wu-3")
+    ).not.toBeInTheDocument();
   });
 
   it("displays story count on the page", async () => {
@@ -428,12 +429,15 @@ describe("KanbanBoard", () => {
     });
   });
 
-  it("displays subtitle explaining the drag affordance", async () => {
+  it("does not render instructional copy above the board", async () => {
     render(<KanbanBoard projectId="test-project" />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Drag tasks between columns to track progress/i)).toBeInTheDocument();
+      expect(screen.getByText(/2 stories/i)).toBeInTheDocument();
     });
+    expect(
+      screen.queryByText(/Drag tasks between columns/i)
+    ).not.toBeInTheDocument();
   });
 
   it("fetches project-scoped stories when a projectId is provided", async () => {
@@ -867,51 +871,16 @@ describe("KanbanBoard", () => {
     });
   });
 
-  describe("Onboarding tooltip", () => {
-    it("is shown on first visit, when boardOnboarded is not set in localStorage", async () => {
+  describe("Onboarding", () => {
+    it("does not show an onboarding dialog on first visit", async () => {
       render(<KanbanBoard projectId="test-project" />);
 
       await waitFor(() => {
         expect(
-          screen.getByRole("dialog", { name: /Welcome to Kanban Board/i })
+          screen.getByRole("heading", { name: /Kanban Board/i })
         ).toBeInTheDocument();
       });
-    });
-
-    it("is hidden when boardOnboarded is already set to 'true' in localStorage", async () => {
-      window.localStorage.setItem("boardOnboarded", "true");
-
-      render(<KanbanBoard projectId="test-project" />);
-
-      await waitFor(() => {
-        expect(screen.getByRole("heading", { name: /Kanban Board/i })).toBeInTheDocument();
-      });
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    });
-
-    it("clicking 'Got it' sets localStorage and hides the tooltip", async () => {
-      render(<KanbanBoard projectId="test-project" />);
-
-      const dismissButton = await screen.findByTestId(
-        "onboarding-dismiss-button"
-      );
-      fireEvent.click(dismissButton);
-
-      expect(window.localStorage.getItem("boardOnboarded")).toBe("true");
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    });
-
-    it("pressing Escape dismisses the tooltip", async () => {
-      render(<KanbanBoard projectId="test-project" />);
-
-      await screen.findByRole("dialog", { name: /Welcome to Kanban Board/i });
-
-      fireEvent.keyDown(document, { key: "Escape" });
-
-      await waitFor(() => {
-        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      });
-      expect(window.localStorage.getItem("boardOnboarded")).toBe("true");
     });
   });
 });

@@ -36,9 +36,9 @@ function formatDateTime(iso: string): string {
 }
 
 /**
- * Detail modal opened from a WorkUnitCard. Mirrors OnboardingTooltip/ImportReview's
- * dialog accessibility mechanics (focus trap, Escape-to-close, overlay-click-close,
- * focus restore) but is Ponder theme-aware like ImportReview.
+ * Detail modal opened from a WorkUnitCard. Mirrors ImportReview's dialog
+ * accessibility mechanics (focus trap, Escape-to-close, overlay-click-close,
+ * focus restore) and is Ponder theme-aware like ImportReview.
  *
  * Shows the work unit's details (title, description, acceptance criteria,
  * verification, dates), lets the user edit acceptanceCriteria/verification in
