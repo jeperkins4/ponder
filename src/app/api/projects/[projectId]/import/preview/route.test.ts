@@ -6,13 +6,17 @@
  * the database.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { POST } from "./route";
 import * as jiraClient from "@/lib/jira/client";
 import type { StoryDTO } from "@/lib/types";
 
 vi.mock("@/lib/jira/client");
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 function makeStory(overrides: Partial<StoryDTO>): StoryDTO {
   return {
@@ -195,6 +199,95 @@ describe("POST /api/projects/[projectId]/import/preview", () => {
         where: { jiraKey: { in: mockStories.map((s) => s.jiraKey) } },
       });
       expect(persisted).toHaveLength(0);
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("uses fetchStoriesForEpic instead of fetchStoriesForProject when epicKey is provided", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Preview Epic Scoped Team",
+        type: "JIRA",
+        jiraProjectKey: "PREVEPIC",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "preview-epic@example.com",
+        jiraApiToken: "preview-epic-token",
+      },
+    });
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const mockStories: StoryDTO[] = [
+      makeStory({
+        jiraKey: `PREVEPIC-${suffix}-1`,
+        jiraId: `PREVEPIC-${suffix}-1`,
+        summary: "Story under the epic",
+        jiraStatus: "To Do",
+      }),
+    ];
+
+    vi.mocked(jiraClient.fetchStoriesForEpic).mockResolvedValueOnce(mockStories);
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/preview`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ epicKey: "PREVEPIC-100" }),
+        }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.stories).toHaveLength(1);
+      expect(data.stories[0].jiraKey).toBe(`PREVEPIC-${suffix}-1`);
+
+      expect(jiraClient.fetchStoriesForEpic).toHaveBeenCalledWith(
+        "PREVEPIC-100",
+        expect.any(Object),
+        ["To Do", "In Progress", "Code Revew", "Code Review"]
+      );
+      expect(jiraClient.fetchStoriesForProject).not.toHaveBeenCalled();
+    } finally {
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
+  it("uses fetchStoriesForProject when no body or an empty epicKey is provided", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Preview No Epic Team",
+        type: "JIRA",
+        jiraProjectKey: "PREVNOEPIC",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "preview-no-epic@example.com",
+        jiraApiToken: "preview-no-epic-token",
+      },
+    });
+
+    vi.mocked(jiraClient.fetchStoriesForProject).mockResolvedValueOnce([]);
+
+    try {
+      // No body at all — matches the existing button's request shape.
+      const req = new Request(
+        `http://localhost:3000/api/projects/${project.id}/import/preview`,
+        { method: "POST" }
+      );
+      const res = await POST(req as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(jiraClient.fetchStoriesForProject).toHaveBeenCalledWith(
+        "PREVNOEPIC",
+        expect.any(Object),
+        ["To Do", "In Progress", "Code Revew", "Code Review"]
+      );
+      expect(jiraClient.fetchStoriesForEpic).not.toHaveBeenCalled();
     } finally {
       await prisma.project.delete({ where: { id: project.id } });
     }

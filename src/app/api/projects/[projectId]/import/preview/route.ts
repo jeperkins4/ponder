@@ -8,7 +8,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchStoriesForProject, type JiraConfig } from "@/lib/jira/client";
+import {
+  fetchStoriesForProject,
+  fetchStoriesForEpic,
+  type JiraConfig,
+} from "@/lib/jira/client";
 import { parseSyncStatuses } from "@/lib/jira/jql";
 import { jiraStatusToColumn } from "@/lib/columns";
 import { findAlreadyImportedKeys } from "@/lib/importDedup";
@@ -31,11 +35,16 @@ export interface ImportPreviewResult {
 }
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
     const { projectId } = await params;
+    const body = await request.json().catch(() => ({}));
+    const epicKey: string | undefined =
+      typeof body?.epicKey === "string" && body.epicKey.trim() !== ""
+        ? body.epicKey
+        : undefined;
 
     const project = await prisma.project.findUnique({
       where: { id: projectId },
@@ -68,11 +77,17 @@ export async function POST(
       apiToken: project.jiraApiToken,
     };
 
-    const jiraStories = await fetchStoriesForProject(
-      project.jiraProjectKey,
-      jiraConfig,
-      parseSyncStatuses(project.jiraSyncStatuses)
-    );
+    const jiraStories = epicKey
+      ? await fetchStoriesForEpic(
+          epicKey,
+          jiraConfig,
+          parseSyncStatuses(project.jiraSyncStatuses)
+        )
+      : await fetchStoriesForProject(
+          project.jiraProjectKey,
+          jiraConfig,
+          parseSyncStatuses(project.jiraSyncStatuses)
+        );
 
     const alreadyImportedKeys = await findAlreadyImportedKeys(
       jiraStories.map((dto) => dto.jiraKey),
