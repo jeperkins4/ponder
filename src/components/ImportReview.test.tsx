@@ -26,9 +26,11 @@ const previewStories = [
 function mockFetchSequence({
   preview,
   process,
+  epics,
 }: {
   preview: { ok: boolean; body: unknown };
   process?: { ok: boolean; body: unknown };
+  epics?: { ok: boolean; body: unknown };
 }) {
   return vi.fn((url: string, init?: RequestInit) => {
     void init;
@@ -42,6 +44,12 @@ function mockFetchSequence({
       return Promise.resolve({
         ok: process?.ok ?? true,
         json: () => Promise.resolve(process?.body ?? {}),
+      } as Response);
+    }
+    if (url.endsWith("/jira/epics")) {
+      return Promise.resolve({
+        ok: epics?.ok ?? true,
+        json: () => Promise.resolve(epics?.body ?? { epics: [] }),
       } as Response);
     }
     return Promise.reject(new Error(`Unexpected fetch to ${url}`));
@@ -423,6 +431,157 @@ describe("ImportReview", () => {
         storiesSkipped: 0,
         workUnitsCreated: 3,
       })
+    );
+  });
+
+  it("does not render an epic dropdown when no epics are returned", async () => {
+    global.fetch = mockFetchSequence({
+      preview: { ok: true, body: { stories: previewStories } },
+    }) as unknown as typeof fetch;
+
+    render(<ImportReview projectId="p1" onClose={onClose} onImported={onImported} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Import 2 stories")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("import-review-epic-select")).not.toBeInTheDocument();
+  });
+
+  it("renders an epic dropdown with 'All epics' plus the fetched epics", async () => {
+    global.fetch = mockFetchSequence({
+      preview: { ok: true, body: { stories: previewStories } },
+      epics: {
+        ok: true,
+        body: { epics: [{ key: "ALPHA-100", name: "Big epic" }] },
+      },
+    }) as unknown as typeof fetch;
+
+    render(<ImportReview projectId="p1" onClose={onClose} onImported={onImported} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("import-review-epic-select")).toBeInTheDocument();
+    });
+
+    const select = screen.getByTestId("import-review-epic-select") as HTMLSelectElement;
+    const optionLabels = Array.from(select.options).map((o) => o.textContent);
+    expect(optionLabels).toEqual(["All epics", "Big epic (ALPHA-100)"]);
+  });
+
+  it("re-fetches the preview with the selected epicKey and includes it when processing", async () => {
+    const fetchMock = mockFetchSequence({
+      preview: { ok: true, body: { stories: previewStories } },
+      process: { ok: true, body: { storiesProcessed: 2, workUnitsCreated: 2 } },
+      epics: {
+        ok: true,
+        body: { epics: [{ key: "ALPHA-100", name: "Big epic" }] },
+      },
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<ImportReview projectId="p1" onClose={onClose} onImported={onImported} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("import-review-epic-select")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId("import-review-epic-select"), {
+      target: { value: "ALPHA-100" },
+    });
+
+    await waitFor(() => {
+      const previewCalls = fetchMock.mock.calls.filter(([url]) =>
+        String(url).endsWith("/import/preview")
+      );
+      expect(previewCalls).toHaveLength(2);
+    });
+
+    const previewCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).endsWith("/import/preview")
+    );
+    const secondCallBody = JSON.parse(
+      String((previewCalls[1][1] as RequestInit).body)
+    );
+    expect(secondCallBody).toEqual({ epicKey: "ALPHA-100" });
+
+    fireEvent.click(screen.getByTestId("import-review-process-button"));
+
+    await waitFor(() => expect(onImported).toHaveBeenCalled());
+
+    const processCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith("/import/process")
+    );
+    const processBody = JSON.parse(String((processCall![1] as RequestInit).body));
+    expect(processBody.epicKey).toBe("ALPHA-100");
+    expect(processBody.epicName).toBe("Big epic");
+  });
+
+  it("omits epicKey/epicName when 'All epics' is selected", async () => {
+    const fetchMock = mockFetchSequence({
+      preview: { ok: true, body: { stories: previewStories } },
+      process: { ok: true, body: { storiesProcessed: 2, workUnitsCreated: 2 } },
+      epics: {
+        ok: true,
+        body: { epics: [{ key: "ALPHA-100", name: "Big epic" }] },
+      },
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<ImportReview projectId="p1" onClose={onClose} onImported={onImported} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("import-review-process-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("import-review-process-button"));
+
+    await waitFor(() => expect(onImported).toHaveBeenCalled());
+
+    const processCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith("/import/process")
+    );
+    const processBody = JSON.parse(String((processCall![1] as RequestInit).body));
+    expect(processBody.epicKey).toBeUndefined();
+    expect(processBody.epicName).toBeUndefined();
+  });
+
+  it("does not steal focus back to the Close button when changing the epic filter re-fetches the preview", async () => {
+    const fetchMock = mockFetchSequence({
+      preview: { ok: true, body: { stories: previewStories } },
+      epics: {
+        ok: true,
+        body: { epics: [{ key: "ALPHA-100", name: "Big epic" }] },
+      },
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<ImportReview projectId="p1" onClose={onClose} onImported={onImported} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("import-review-epic-select")).toBeInTheDocument();
+    });
+
+    const select = screen.getByTestId("import-review-epic-select");
+
+    fireEvent.change(select, {
+      target: { value: "ALPHA-100" },
+    });
+
+    // The user's interaction naturally focuses the select; assert the
+    // re-fetch triggered by the epic change (loading cycling false -> true
+    // -> false again) doesn't yank focus back to the Close button.
+    select.focus();
+    expect(document.activeElement).toBe(select);
+
+    await waitFor(() => {
+      const previewCalls = fetchMock.mock.calls.filter(([url]) =>
+        String(url).endsWith("/import/preview")
+      );
+      expect(previewCalls).toHaveLength(2);
+    });
+
+    expect(document.activeElement).toBe(select);
+    expect(document.activeElement).not.toBe(
+      screen.getByTestId("import-review-close-button")
     );
   });
 });

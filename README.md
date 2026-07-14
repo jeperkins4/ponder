@@ -32,7 +32,7 @@ So: Trello gives you *a board*. Ponder gives you a **JIRA-native decomposition l
 ## How it works
 
 1. **Connect a project.** Create a project and link it to a JIRA project (site URL, email, API token) in **Settings** → **Test connection** to verify.
-2. **Import.** Click **Import from JIRA** → review the incoming stories (each shows its target column) → toggle which ones to **break down into sub-tasks** → **Process**. Flagged stories are decomposed by Claude into cards with acceptance criteria and verification; the rest come in as a single card.
+2. **Import.** Click **Import from JIRA** → optionally narrow to a single **epic** via the picker → review the incoming stories (each shows its target column) → toggle which ones to **break down into sub-tasks** → **Process**. Flagged stories are decomposed by Claude into cards with acceptance criteria and verification; the rest come in as a single card. Epic-scoped imports pull in every issue under that epic regardless of assignee (project-wide imports stay limited to your own assigned issues).
 3. **Work the board.** Sync imports issues assigned to you whose JIRA status is on the project's **Statuses to sync** allowlist (default `To Do, In Progress, Code Revew, Code Review`); unknown or future statuses stay off the board until added to the list. Cards land in the column matching their status — named overrides (e.g. Code Review) first, falling back to their JIRA `statusCategory` (new → To Do, indeterminate → In Progress, done → Done) — so allowlisted custom or renamed statuses still land somewhere sensible.
 4. **JIRA follows automatically.** As you move a story's cards, Ponder writes the meaningful transitions back — the issue goes to **In Progress** when work starts, and to **Code Review** (with a Claude-written summary comment listing what was done) once all of its cards reach **Done**. Non-blocking: a JIRA hiccup never breaks a local move, and the completion comment posts only once.
 
@@ -40,7 +40,7 @@ So: Trello gives you *a board*. Ponder gives you a **JIRA-native decomposition l
 
 ## Features
 
-- **Auto-import** of your assigned, active JIRA issues (filtered by JQL).
+- **Auto-import** of your assigned, active JIRA issues (filtered by JQL), or scope a single import to one **epic** (all its issues, any assignee).
 - **AI-assisted breakdown** — optional per story, powered by `@anthropic-ai/sdk`.
 - **Bidirectional JIRA status sync** — non-blocking and idempotent.
 - **Verification with evidence** — request an AI-agent verification per card and attach the proof: screenshots *and screen recordings* (images up to 10 MB, video — MP4/WebM/QuickTime — up to 250 MB, served with seek support).

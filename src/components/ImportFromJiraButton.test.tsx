@@ -32,7 +32,7 @@ describe("ImportFromJiraButton", () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/projects/p1/import/preview",
-        { method: "POST" }
+        expect.objectContaining({ method: "POST" })
       );
     });
   });

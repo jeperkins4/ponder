@@ -7,6 +7,8 @@ import cuid from "cuid";
 import { StoryDTO } from "@/lib/types";
 import {
   buildProjectStoriesJql,
+  buildEpicsJql,
+  buildEpicStoriesJql,
   DEFAULT_SYNC_STATUSES,
 } from "@/lib/jira/jql";
 import { adfToPlainText, type AdfNode } from "@/lib/jira/adf";
@@ -179,6 +181,79 @@ export async function fetchStoriesForProject(
   syncStatuses: string[] = DEFAULT_SYNC_STATUSES
 ): Promise<StoryDTO[]> {
   const jql = buildProjectStoriesJql(projectKey, syncStatuses);
+  return searchIssuesByJql(jql, config);
+}
+
+/**
+ * Fetches all Epic-type issues for a single JIRA project, most recently
+ * updated first. Used to populate the epic picker in the import review UI.
+ * @param projectKey - JIRA project key (e.g., 'TEAM')
+ * @param config - JIRA configuration (siteUrl, email, apiToken)
+ * @returns Array of `{ key, name }`, one per epic
+ * @throws Error if the API request fails
+ */
+export async function fetchEpicsForProject(
+  projectKey: string,
+  config: JiraConfig
+): Promise<{ key: string; name: string }[]> {
+  const jql = buildEpicsJql(projectKey);
+  const stories = await searchIssuesByJql(jql, config);
+  return stories.map((story) => ({ key: story.jiraKey, name: story.summary }));
+}
+
+/**
+ * Checks whether this JIRA site has a custom field named "Epic Link" —
+ * present on company-managed projects, absent on team-managed projects
+ * (which link epics via the system `parent` field instead). Used to decide
+ * how `fetchStoriesForEpic` builds its JQL. Never throws: any failure
+ * (network error, non-ok response) returns `false`, the safer default since
+ * `parent` alone still works on both project types for `buildEpicStoriesJql`.
+ * @param config - JIRA configuration (siteUrl, email, apiToken)
+ */
+export async function hasEpicLinkField(config: JiraConfig): Promise<boolean> {
+  const credentials = Buffer.from(`${config.email}:${config.apiToken}`).toString(
+    "base64"
+  );
+
+  try {
+    const url = new URL(config.siteUrl);
+    url.pathname = "/rest/api/3/field";
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) return false;
+
+    const fields: Array<{ id: string; name: string }> = await response.json();
+    return fields.some((field) => field.name?.toLowerCase() === "epic link");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetches all Story/Task/Bug issues under a single epic, regardless of
+ * assignee, whose status is on the given allowlist. Mirrors
+ * fetchStoriesForProject's shape but scopes by epic instead of project and
+ * drops the assignee filter (see buildEpicStoriesJql).
+ * @param epicKey - JIRA epic key (e.g., 'TEAM-100')
+ * @param config - JIRA configuration (siteUrl, email, apiToken)
+ * @param syncStatuses - status names to include (already parsed)
+ * @returns Array of StoryDTO objects
+ * @throws Error if the API request fails
+ */
+export async function fetchStoriesForEpic(
+  epicKey: string,
+  config: JiraConfig,
+  syncStatuses: string[] = DEFAULT_SYNC_STATUSES
+): Promise<StoryDTO[]> {
+  const epicLinkFieldExists = await hasEpicLinkField(config);
+  const jql = buildEpicStoriesJql(epicKey, syncStatuses, epicLinkFieldExists);
   return searchIssuesByJql(jql, config);
 }
 
