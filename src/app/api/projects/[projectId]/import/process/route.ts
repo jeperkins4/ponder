@@ -56,6 +56,14 @@ export async function POST(
 
     const body = await request.json();
     const items: ImportProcessItem[] = Array.isArray(body?.items) ? body.items : [];
+    const epicKey: string | undefined =
+      typeof body?.epicKey === "string" && body.epicKey.trim() !== ""
+        ? body.epicKey
+        : undefined;
+    const epicName: string | undefined =
+      typeof body?.epicName === "string" && body.epicName.trim() !== ""
+        ? body.epicName
+        : undefined;
 
     let storiesProcessed = 0;
     let storiesSkipped = 0;
@@ -93,6 +101,7 @@ export async function POST(
           jiraStatus: item.jiraStatus,
           url,
           lastSyncedAt: new Date(),
+          ...(epicKey ? { epicKey, epicName: epicName ?? null } : {}),
         },
         update: {
           jiraId: item.jiraId,
@@ -103,6 +112,7 @@ export async function POST(
           jiraStatus: item.jiraStatus,
           url,
           lastSyncedAt: new Date(),
+          ...(epicKey ? { epicKey, epicName: epicName ?? null } : {}),
         },
       });
 
