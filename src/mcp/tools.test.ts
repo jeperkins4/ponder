@@ -341,7 +341,32 @@ describe("listStories with epicKey filter", () => {
 describe("listWorkUnits with epicKey filter", () => {
   const storiesWithEpic: StoryDTO[] = [
     { ...stories[0], epicKey: "PONE-100", epicName: "Big epic" },
-    { ...stories[1], epicKey: "PONE-200", epicName: "Other epic" },
+    {
+      ...stories[1],
+      epicKey: "PONE-200",
+      epicName: "Other epic",
+      workUnits: [
+        {
+          id: "w5",
+          storyId: "s2",
+          title: "Task E",
+          description: null,
+          acceptanceCriteria: null,
+          verification: null,
+          column: "code_review",
+          order: 0,
+          subNumber: null,
+          createdAt: new Date().toISOString(),
+          completedAt: null,
+          archivedAt: null,
+          movedToQaReportedAt: null,
+          verificationRequestedAt: null,
+          verifiedAt: null,
+          verificationOutcome: null,
+          verificationSummary: null,
+        },
+      ],
+    },
   ];
 
   it("filters work units to those under the given epic", async () => {
@@ -352,6 +377,7 @@ describe("listWorkUnits with epicKey filter", () => {
 
     expect(text).toContain("Task A");
     expect(text).toContain("Task D");
+    expect(text).not.toContain("Task E");
   });
 
   it("composes with the column filter", async () => {
@@ -366,6 +392,7 @@ describe("listWorkUnits with epicKey filter", () => {
 
     expect(text).toContain("Task D");
     expect(text).not.toContain("Task A");
+    expect(text).not.toContain("Task E");
   });
 });
 
