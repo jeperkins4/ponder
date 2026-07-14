@@ -5,6 +5,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   fetchStoriesForProject,
+  fetchEpicsForProject,
+  hasEpicLinkField,
+  fetchStoriesForEpic,
   extractProjectKey,
   testJiraConnection,
 } from "./client";
@@ -365,6 +368,153 @@ describe("JIRA API Client", () => {
       expect((result as { ok: false; error: string }).error).toContain(
         "fetch failed"
       );
+    });
+  });
+
+  describe("fetchEpicsForProject", () => {
+    it("fetches Epic-type issues and maps them to { key, name }", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          issues: [
+            {
+              id: "5001",
+              key: "TEAM-100",
+              fields: { summary: "Big epic", description: null, status: { name: "To Do" } },
+            },
+            {
+              id: "5002",
+              key: "TEAM-200",
+              fields: { summary: "Other epic", description: null, status: { name: "To Do" } },
+            },
+          ],
+        }),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const epics = await fetchEpicsForProject("TEAM", mockConfig);
+
+      expect(epics).toEqual([
+        { key: "TEAM-100", name: "Big epic" },
+        { key: "TEAM-200", name: "Other epic" },
+      ]);
+      const url = mockFetch.mock.calls[0][0] as string;
+      const decodedUrl = decodeURIComponent(url.replace(/\+/g, " "));
+      expect(decodedUrl).toContain('project = "TEAM"');
+      expect(decodedUrl).toContain("issuetype = Epic");
+    });
+  });
+
+  describe("hasEpicLinkField", () => {
+    it("returns true when a field named Epic Link exists", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => [
+            { id: "customfield_10014", name: "Epic Link" },
+            { id: "summary", name: "Summary" },
+          ],
+        })
+      );
+
+      expect(await hasEpicLinkField(mockConfig)).toBe(true);
+    });
+
+    it("returns false when no field is named Epic Link", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => [{ id: "summary", name: "Summary" }],
+        })
+      );
+
+      expect(await hasEpicLinkField(mockConfig)).toBe(false);
+    });
+
+    it("returns false on a non-ok response rather than throwing", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: false, status: 500, statusText: "Error" })
+      );
+
+      expect(await hasEpicLinkField(mockConfig)).toBe(false);
+    });
+
+    it("returns false on a network error rather than throwing", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+
+      expect(await hasEpicLinkField(mockConfig)).toBe(false);
+    });
+
+    it("requests /rest/api/3/field with Basic auth", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await hasEpicLinkField(mockConfig);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toBe("https://example.atlassian.net/rest/api/3/field");
+      expect((options.headers as Record<string, string>).Authorization).toMatch(/^Basic /);
+    });
+  });
+
+  describe("fetchStoriesForEpic", () => {
+    it("checks for the Epic Link field, then fetches issues under the epic with no assignee clause", async () => {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes("/rest/api/3/field")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [{ id: "customfield_10014", name: "Epic Link" }],
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            issues: [
+              {
+                id: "9001",
+                key: "TEAM-101",
+                fields: { summary: "Story under epic", description: null, status: { name: "To Do" } },
+              },
+            ],
+          }),
+        });
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const stories = await fetchStoriesForEpic("TEAM-100", mockConfig);
+
+      expect(stories).toHaveLength(1);
+      expect(stories[0].jiraKey).toBe("TEAM-101");
+
+      const searchCall = mockFetch.mock.calls.find(([url]) =>
+        String(url).includes("/rest/api/3/search/jql")
+      );
+      const decodedUrl = decodeURIComponent(String(searchCall![0]).replace(/\+/g, " "));
+      expect(decodedUrl).toContain('parent = "TEAM-100"');
+      expect(decodedUrl).toContain('"Epic Link" = "TEAM-100"');
+      expect(decodedUrl).not.toContain("assignee");
+    });
+
+    it("passes a custom sync-status allowlist through to the JQL", async () => {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes("/rest/api/3/field")) {
+          return Promise.resolve({ ok: true, json: async () => [] });
+        }
+        return Promise.resolve({ ok: true, json: async () => ({ issues: [] }) });
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      await fetchStoriesForEpic("TEAM-100", mockConfig, ["QA", "Blocked"]);
+
+      const searchCall = mockFetch.mock.calls.find(([url]) =>
+        String(url).includes("/rest/api/3/search/jql")
+      );
+      const decodedUrl = decodeURIComponent(String(searchCall![0]).replace(/\+/g, " "));
+      expect(decodedUrl).toContain('status IN ("QA", "Blocked")');
+      expect(decodedUrl).not.toContain('"Epic Link"');
     });
   });
 });
