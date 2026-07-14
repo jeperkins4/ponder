@@ -342,6 +342,58 @@ describe("POST /api/projects/[projectId]/import/process", () => {
     }
   });
 
+  it("preserves an existing epicKey/epicName when a later re-import omits epicKey", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Process Epic Preserve Team",
+        type: "JIRA",
+        jiraProjectKey: "PROCEPICPRES",
+        jiraSiteUrl: "https://example.atlassian.net",
+        jiraEmail: "process-epic-preserve@example.com",
+        jiraApiToken: "process-epic-preserve-token",
+      },
+    });
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const jiraKey = `PROCEPICPRES-${suffix}-1`;
+
+    const makeReq = (epicKey?: string, epicName?: string) =>
+      new Request(`http://localhost:3000/api/projects/${project.id}/import/process`, {
+        method: "POST",
+        body: JSON.stringify({
+          items: [
+            {
+              jiraKey,
+              jiraId: jiraKey,
+              summary: "Story",
+              description: null,
+              jiraStatus: "To Do",
+              breakDown: false,
+            },
+          ],
+          ...(epicKey ? { epicKey, epicName } : {}),
+        }),
+      });
+
+    try {
+      await POST(makeReq("PROCEPICPRES-1", "First epic") as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+      const res2 = await POST(makeReq() as never, {
+        params: Promise.resolve({ projectId: project.id }),
+      });
+
+      expect(res2.status).toBe(200);
+      const story = await prisma.story.findUnique({ where: { jiraKey } });
+      expect(story?.epicKey).toBe("PROCEPICPRES-1");
+      expect(story?.epicName).toBe("First epic");
+    } finally {
+      await prisma.workUnit.deleteMany({ where: { story: { jiraKey } } });
+      await prisma.story.deleteMany({ where: { jiraKey } });
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
+
   it("re-processing with a different epicKey updates the stamped epic on the existing Story", async () => {
     const project = await prisma.project.create({
       data: {

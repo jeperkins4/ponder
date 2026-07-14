@@ -63,6 +63,7 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
+  const hasAutoFocusedRef = useRef(false);
 
   useEffect(() => {
     previouslyFocusedElement.current = document.activeElement as HTMLElement | null;
@@ -140,10 +141,13 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
     };
   }, [projectId, selectedEpicKey]);
 
-  // Move focus into the dialog once its content is ready to receive it.
+  // Move focus into the dialog once its content is ready to receive it —
+  // only on the initial load, not on every re-fetch triggered by changing
+  // the epic filter (which would otherwise steal focus off the <select>).
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !hasAutoFocusedRef.current) {
       closeButtonRef.current?.focus();
+      hasAutoFocusedRef.current = true;
     }
   }, [loading]);
 

@@ -543,4 +543,45 @@ describe("ImportReview", () => {
     expect(processBody.epicKey).toBeUndefined();
     expect(processBody.epicName).toBeUndefined();
   });
+
+  it("does not steal focus back to the Close button when changing the epic filter re-fetches the preview", async () => {
+    const fetchMock = mockFetchSequence({
+      preview: { ok: true, body: { stories: previewStories } },
+      epics: {
+        ok: true,
+        body: { epics: [{ key: "ALPHA-100", name: "Big epic" }] },
+      },
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<ImportReview projectId="p1" onClose={onClose} onImported={onImported} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("import-review-epic-select")).toBeInTheDocument();
+    });
+
+    const select = screen.getByTestId("import-review-epic-select");
+
+    fireEvent.change(select, {
+      target: { value: "ALPHA-100" },
+    });
+
+    // The user's interaction naturally focuses the select; assert the
+    // re-fetch triggered by the epic change (loading cycling false -> true
+    // -> false again) doesn't yank focus back to the Close button.
+    select.focus();
+    expect(document.activeElement).toBe(select);
+
+    await waitFor(() => {
+      const previewCalls = fetchMock.mock.calls.filter(([url]) =>
+        String(url).endsWith("/import/preview")
+      );
+      expect(previewCalls).toHaveLength(2);
+    });
+
+    expect(document.activeElement).toBe(select);
+    expect(document.activeElement).not.toBe(
+      screen.getByTestId("import-review-close-button")
+    );
+  });
 });
