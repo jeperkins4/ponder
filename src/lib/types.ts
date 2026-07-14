@@ -55,6 +55,8 @@ export interface StoryDTO {
   summary: string;
   description: string | null;
   jiraStatus: string;
+  epicKey?: string | null;
+  epicName?: string | null;
   /** JIRA statusCategory key; present only on DTOs from the JIRA fetch path
    * (import/sync). Local API serializers never set it. */
   jiraStatusCategory?: "new" | "indeterminate" | "done";
