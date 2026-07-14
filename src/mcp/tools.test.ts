@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   attachImage,
+  listEpics,
   listProjects,
   listStories,
   listWorkUnits,
@@ -177,6 +178,33 @@ describe("listProjects", () => {
     const result = await listProjects(client);
 
     expect(result.content[0].text).toMatch(/no projects/i);
+  });
+});
+
+describe("listEpics", () => {
+  it("includes each epic's name and key", async () => {
+    const client = fakeClient({
+      getEpics: async () => [
+        { key: "PONE-100", name: "Big epic" },
+        { key: "PONE-200", name: "Other epic" },
+      ],
+    });
+
+    const result = await listEpics(client, { projectId: "p1" });
+    const text = result.content[0].text;
+
+    expect(text).toContain("Big epic");
+    expect(text).toContain("PONE-100");
+    expect(text).toContain("Other epic");
+    expect(text).toContain("PONE-200");
+  });
+
+  it("reports zero epics clearly", async () => {
+    const client = fakeClient({ getEpics: async () => [] });
+
+    const result = await listEpics(client, { projectId: "p1" });
+
+    expect(result.content[0].text).toMatch(/no epics/i);
   });
 });
 

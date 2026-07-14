@@ -20,6 +20,7 @@ import { z } from "zod/v3";
 import { PonderClient } from "./client";
 import {
   attachImage,
+  listEpics,
   listProjects,
   listStories,
   listWorkUnits,
@@ -43,6 +44,17 @@ export function createServer(client: PonderClient): McpServer {
       description: "List all Ponder projects with story/work-unit stats.",
     },
     async () => listProjects(client)
+  );
+
+  server.registerTool(
+    "list_epics",
+    {
+      description: "List a project's JIRA epics (key + name).",
+      inputSchema: {
+        projectId: z.string(),
+      },
+    },
+    async ({ projectId }) => listEpics(client, { projectId })
   );
 
   server.registerTool(

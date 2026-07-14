@@ -38,6 +38,22 @@ export async function listProjects(client: PonderClient): Promise<McpTextResult>
   );
 }
 
+/** List a project's JIRA epics (key + name). */
+export async function listEpics(
+  client: PonderClient,
+  args: { projectId: string }
+): Promise<McpTextResult> {
+  const epics = await client.getEpics(args.projectId);
+
+  if (epics.length === 0) {
+    return textResult(`No epics found for project ${args.projectId}.`);
+  }
+
+  const lines = epics.map((epic) => `- ${epic.name} (${epic.key})`);
+
+  return textResult(`${epics.length} epic(s):\n${lines.join("\n")}`);
+}
+
 function columnBreakdown(story: StoryDTO): string {
   const counts = new Map<Column, number>();
   for (const workUnit of story.workUnits) {
