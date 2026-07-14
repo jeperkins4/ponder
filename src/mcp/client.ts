@@ -9,6 +9,27 @@
 import type { AttachmentDTO, Column, ProjectWithStats, StoryDTO, WorkUnitDTO } from "@/lib/types";
 import type { ReportsPayload } from "@/lib/reports/types";
 
+export interface EpicImportPreviewStory {
+  jiraKey: string;
+  jiraId: string;
+  summary: string;
+  description: string | null;
+  jiraStatus: string;
+  jiraStatusCategory?: "new" | "indeterminate" | "done";
+  targetColumn: Column;
+  alreadyImported: boolean;
+}
+
+export interface EpicImportProcessItem {
+  jiraKey: string;
+  jiraId: string;
+  summary: string;
+  description: string | null;
+  jiraStatus: string;
+  jiraStatusCategory?: "new" | "indeterminate" | "done";
+  breakDown: boolean;
+}
+
 export class PonderClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
@@ -26,6 +47,42 @@ export class PonderClient {
     return this.request<StoryDTO[]>(
       "GET",
       `/api/stories?projectId=${encodeURIComponent(projectId)}`
+    );
+  }
+
+  async getEpics(projectId: string): Promise<{ key: string; name: string }[]> {
+    const result = await this.request<{
+      epics: { key: string; name: string }[];
+      message?: string;
+    }>("GET", `/api/projects/${encodeURIComponent(projectId)}/jira/epics`);
+    return result.epics;
+  }
+
+  async previewEpicImport(
+    projectId: string,
+    epicKey: string
+  ): Promise<{ stories: EpicImportPreviewStory[]; message?: string }> {
+    return this.request<{ stories: EpicImportPreviewStory[]; message?: string }>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/import/preview`,
+      { epicKey }
+    );
+  }
+
+  async processEpicImport(
+    projectId: string,
+    items: EpicImportProcessItem[],
+    epicKey: string,
+    epicName?: string
+  ): Promise<{ storiesProcessed: number; storiesSkipped: number; workUnitsCreated: number }> {
+    return this.request<{
+      storiesProcessed: number;
+      storiesSkipped: number;
+      workUnitsCreated: number;
+    }>(
+      "POST",
+      `/api/projects/${encodeURIComponent(projectId)}/import/process`,
+      epicName !== undefined ? { items, epicKey, epicName } : { items, epicKey }
     );
   }
 
