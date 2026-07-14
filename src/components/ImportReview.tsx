@@ -57,6 +57,8 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
   const [importAnywayByKey, setImportAnywayByKey] = useState<Record<string, boolean>>({});
   const [processing, setProcessing] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
+  const [epics, setEpics] = useState<{ key: string; name: string }[]>([]);
+  const [selectedEpicKey, setSelectedEpicKey] = useState("");
 
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -73,12 +75,35 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
   useEffect(() => {
     let cancelled = false;
 
+    async function loadEpics() {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/jira/epics`);
+        const data = await response.json();
+        if (!cancelled && response.ok) {
+          setEpics(data.epics ?? []);
+        }
+      } catch {
+        // Non-blocking: the dropdown just falls back to "All epics" only.
+      }
+    }
+
+    loadEpics();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     async function loadPreview() {
       setLoading(true);
       setLoadError(null);
       try {
         const response = await fetch(`/api/projects/${projectId}/import/preview`, {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(selectedEpicKey ? { epicKey: selectedEpicKey } : {}),
         });
         const data = await response.json();
         if (cancelled) return;
@@ -113,7 +138,7 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, selectedEpicKey]);
 
   // Move focus into the dialog once its content is ready to receive it.
   useEffect(() => {
@@ -185,10 +210,17 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
           breakDown: Boolean(breakDownByKey[s.jiraKey]),
         }));
 
+      const selectedEpic = epics.find((epic) => epic.key === selectedEpicKey);
+
       const response = await fetch(`/api/projects/${projectId}/import/process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({
+          items,
+          ...(selectedEpic
+            ? { epicKey: selectedEpic.key, epicName: selectedEpic.name }
+            : {}),
+        }),
       });
       const data = await response.json();
 
@@ -253,6 +285,28 @@ export function ImportReview({ projectId, onClose, onImported }: ImportReviewPro
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
+          {epics.length > 0 && (
+            <div className="flex items-center gap-2 mb-4 text-sm">
+              <label htmlFor="import-review-epic-select" className={mutedTextClass}>
+                Epic:
+              </label>
+              <select
+                id="import-review-epic-select"
+                data-testid="import-review-epic-select"
+                value={selectedEpicKey}
+                onChange={(e) => setSelectedEpicKey(e.target.value)}
+                className={`rounded-lg border px-2 py-1 text-sm ${rowBorderClass} ${surfaceClass}`}
+              >
+                <option value="">All epics</option>
+                {epics.map((epic) => (
+                  <option key={epic.key} value={epic.key}>
+                    {epic.name} ({epic.key})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {loading && (
             <p className={mutedTextClass} data-testid="import-review-loading">
               Loading stories from JIRA…
