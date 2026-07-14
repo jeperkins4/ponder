@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   attachImage,
+  importByEpic,
   listEpics,
   listProjects,
   listStories,
@@ -18,7 +19,7 @@ import {
   reportVerification,
   updateWorkUnit,
 } from "./tools";
-import type { PonderClient } from "./client";
+import type { EpicImportPreviewStory, PonderClient } from "./client";
 import type { ProjectWithStats, StoryDTO, WorkUnitDTO } from "@/lib/types";
 import type { ReportsPayload } from "@/lib/reports/types";
 
@@ -936,5 +937,105 @@ describe("reportJiraTrail", () => {
     const result = await reportJiraTrail(client, {});
 
     expect(result.content[0].text).toBe("No JIRA events in the selected range.");
+  });
+});
+
+describe("importByEpic", () => {
+  const previewStory = (
+    overrides: Partial<EpicImportPreviewStory>
+  ): EpicImportPreviewStory => ({
+    jiraKey: "PONE-101",
+    jiraId: "10101",
+    summary: "Story under epic",
+    description: null,
+    jiraStatus: "To Do",
+    targetColumn: "todo",
+    alreadyImported: false,
+    ...overrides,
+  });
+
+  it("returns the preview message when the project isn't JIRA-linked / missing credentials", async () => {
+    const client = fakeClient({
+      previewEpicImport: async () => ({
+        stories: [],
+        message: "JIRA credentials not configured. Add them in project settings.",
+      }),
+    });
+
+    const result = await importByEpic(client, { projectId: "p1", epicKey: "PONE-1" });
+
+    expect(result.content[0].text).toBe(
+      "JIRA credentials not configured. Add them in project settings."
+    );
+  });
+
+  it("returns a clear message when the epic has no stories and no preview message", async () => {
+    const client = fakeClient({
+      previewEpicImport: async () => ({ stories: [] }),
+    });
+
+    const result = await importByEpic(client, { projectId: "p1", epicKey: "PONE-1" });
+
+    expect(result.content[0].text).toMatch(/no stories found for epic PONE-1/i);
+  });
+
+  it("returns a clear message when every story is already imported, without calling process", async () => {
+    const processEpicImportMock = vi.fn();
+    const client = fakeClient({
+      previewEpicImport: async () => ({
+        stories: [previewStory({ alreadyImported: true })],
+      }),
+      processEpicImport: processEpicImportMock as unknown as PonderClient["processEpicImport"],
+    });
+
+    const result = await importByEpic(client, { projectId: "p1", epicKey: "PONE-1" });
+
+    expect(result.content[0].text).toMatch(/already on the board/i);
+    expect(processEpicImportMock).not.toHaveBeenCalled();
+  });
+
+  it("imports not-yet-imported stories with breakDown applied uniformly, and reports counts", async () => {
+    const processEpicImportMock = vi.fn(async () => ({
+      storiesProcessed: 1,
+      storiesSkipped: 1,
+      workUnitsCreated: 3,
+    })) as unknown as PonderClient["processEpicImport"];
+    const client = fakeClient({
+      previewEpicImport: async () => ({
+        stories: [
+          previewStory({ jiraKey: "PONE-101", alreadyImported: false }),
+          previewStory({ jiraKey: "PONE-102", alreadyImported: true }),
+        ],
+      }),
+      processEpicImport: processEpicImportMock,
+    });
+
+    const result = await importByEpic(client, {
+      projectId: "p1",
+      epicKey: "PONE-1",
+      epicName: "Big epic",
+      breakDown: true,
+    });
+
+    expect(processEpicImportMock).toHaveBeenCalledWith(
+      "p1",
+      [
+        {
+          jiraKey: "PONE-101",
+          jiraId: "10101",
+          summary: "Story under epic",
+          description: null,
+          jiraStatus: "To Do",
+          jiraStatusCategory: undefined,
+          breakDown: true,
+        },
+      ],
+      "PONE-1",
+      "Big epic"
+    );
+    expect(result.content[0].text).toContain("1 processed");
+    expect(result.content[0].text).toContain("1 skipped");
+    expect(result.content[0].text).toContain("3 work unit(s) created");
+    expect(result.content[0].text).toContain("PONE-101");
   });
 });

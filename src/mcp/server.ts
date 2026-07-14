@@ -20,6 +20,7 @@ import { z } from "zod/v3";
 import { PonderClient } from "./client";
 import {
   attachImage,
+  importByEpic,
   listEpics,
   listProjects,
   listStories,
@@ -87,6 +88,24 @@ export function createServer(client: PonderClient): McpServer {
     },
     async ({ projectId, column, pendingVerification, epicKey }) =>
       listWorkUnits(client, { projectId, column, pendingVerification, epicKey })
+  );
+
+  server.registerTool(
+    "import_by_epic",
+    {
+      description:
+        "Import all not-yet-imported issues under a JIRA epic into this " +
+        "project's board, skipping issues already on the board. Optional " +
+        "breakDown applies to every imported story (default false).",
+      inputSchema: {
+        projectId: z.string(),
+        epicKey: z.string(),
+        epicName: z.string().optional(),
+        breakDown: z.boolean().optional(),
+      },
+    },
+    async ({ projectId, epicKey, epicName, breakDown }) =>
+      importByEpic(client, { projectId, epicKey, epicName, breakDown })
   );
 
   server.registerTool(
