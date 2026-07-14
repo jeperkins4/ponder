@@ -60,12 +60,15 @@ export function createServer(client: PonderClient): McpServer {
   server.registerTool(
     "list_stories",
     {
-      description: "List stories (with their work units) for a project.",
+      description:
+        "List stories (with their work units) for a project, optionally " +
+        "filtered to a single epic.",
       inputSchema: {
         projectId: z.string(),
+        epicKey: z.string().optional(),
       },
     },
-    async ({ projectId }) => listStories(client, { projectId })
+    async ({ projectId, epicKey }) => listStories(client, { projectId, epicKey })
   );
 
   server.registerTool(
@@ -73,15 +76,17 @@ export function createServer(client: PonderClient): McpServer {
     {
       description:
         "List work units for a project, optionally filtered to a single column, " +
-        "or to only those pending AI-agent verification (pendingVerification: true).",
+        "to only those pending AI-agent verification (pendingVerification: true), " +
+        "or to a single epic.",
       inputSchema: {
         projectId: z.string(),
         column: z.string().optional(),
         pendingVerification: z.boolean().optional(),
+        epicKey: z.string().optional(),
       },
     },
-    async ({ projectId, column, pendingVerification }) =>
-      listWorkUnits(client, { projectId, column, pendingVerification })
+    async ({ projectId, column, pendingVerification, epicKey }) =>
+      listWorkUnits(client, { projectId, column, pendingVerification, epicKey })
   );
 
   server.registerTool(

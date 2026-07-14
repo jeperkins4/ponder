@@ -68,12 +68,19 @@ function columnBreakdown(story: StoryDTO): string {
 /** List stories (with a per-column work-unit breakdown) for a project. */
 export async function listStories(
   client: PonderClient,
-  args: { projectId: string }
+  args: { projectId: string; epicKey?: string }
 ): Promise<McpTextResult> {
-  const stories = await client.getStories(args.projectId);
+  let stories = await client.getStories(args.projectId);
+  if (args.epicKey) {
+    stories = stories.filter((story) => story.epicKey === args.epicKey);
+  }
 
   if (stories.length === 0) {
-    return textResult(`No stories found for project ${args.projectId}.`);
+    return textResult(
+      args.epicKey
+        ? `No stories found for project ${args.projectId} under epic ${args.epicKey}.`
+        : `No stories found for project ${args.projectId}.`
+    );
   }
 
   const lines = stories.map(
@@ -90,7 +97,12 @@ export async function listStories(
  */
 export async function listWorkUnits(
   client: PonderClient,
-  args: { projectId: string; column?: string; pendingVerification?: boolean }
+  args: {
+    projectId: string;
+    column?: string;
+    pendingVerification?: boolean;
+    epicKey?: string;
+  }
 ): Promise<McpTextResult> {
   const validColumns = COLUMNS.map((c) => c.key);
 
@@ -100,7 +112,10 @@ export async function listWorkUnits(
     );
   }
 
-  const stories = await client.getStories(args.projectId);
+  let stories = await client.getStories(args.projectId);
+  if (args.epicKey) {
+    stories = stories.filter((story) => story.epicKey === args.epicKey);
+  }
   const column = args.column as Column | undefined;
 
   const rows: {

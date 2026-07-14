@@ -312,6 +312,63 @@ describe("listWorkUnits with pendingVerification", () => {
   });
 });
 
+describe("listStories with epicKey filter", () => {
+  const storiesWithEpic: StoryDTO[] = [
+    { ...stories[0], epicKey: "PONE-100", epicName: "Big epic" },
+    { ...stories[1], epicKey: "PONE-200", epicName: "Other epic" },
+  ];
+
+  it("filters to stories under the given epic", async () => {
+    const client = fakeClient({ getStories: async () => storiesWithEpic });
+
+    const result = await listStories(client, { projectId: "p1", epicKey: "PONE-100" });
+    const text = result.content[0].text;
+
+    expect(text).toContain("PONE-1");
+    expect(text).not.toContain("PONE-2");
+  });
+
+  it("returns a clear message when nothing matches the epic", async () => {
+    const client = fakeClient({ getStories: async () => storiesWithEpic });
+
+    const result = await listStories(client, { projectId: "p1", epicKey: "NOPE-1" });
+
+    expect(result.content[0].text).toMatch(/no stories/i);
+    expect(result.content[0].text).toContain("NOPE-1");
+  });
+});
+
+describe("listWorkUnits with epicKey filter", () => {
+  const storiesWithEpic: StoryDTO[] = [
+    { ...stories[0], epicKey: "PONE-100", epicName: "Big epic" },
+    { ...stories[1], epicKey: "PONE-200", epicName: "Other epic" },
+  ];
+
+  it("filters work units to those under the given epic", async () => {
+    const client = fakeClient({ getStories: async () => storiesWithEpic });
+
+    const result = await listWorkUnits(client, { projectId: "p1", epicKey: "PONE-100" });
+    const text = result.content[0].text;
+
+    expect(text).toContain("Task A");
+    expect(text).toContain("Task D");
+  });
+
+  it("composes with the column filter", async () => {
+    const client = fakeClient({ getStories: async () => storiesWithEpic });
+
+    const result = await listWorkUnits(client, {
+      projectId: "p1",
+      epicKey: "PONE-100",
+      column: "code_review",
+    });
+    const text = result.content[0].text;
+
+    expect(text).toContain("Task D");
+    expect(text).not.toContain("Task A");
+  });
+});
+
 describe("reportVerification", () => {
   it("calls client.reportVerification with the right args and confirms", async () => {
     const reportVerificationMock = vi.fn(async () => ({
