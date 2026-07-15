@@ -546,6 +546,7 @@ describe("WorkUnitDetailModal", () => {
           mimeType: "image/png",
           size: 1234,
           createdAt: "2026-01-01T00:00:00Z",
+          jiraUploadedAt: null,
           url: "/api/attachments/a1",
         },
       ];
@@ -566,6 +567,7 @@ describe("WorkUnitDetailModal", () => {
           mimeType: "video/mp4",
           size: 5678,
           createdAt: "2026-01-01T00:00:00Z",
+          jiraUploadedAt: null,
           url: "/api/attachments/v1",
         },
       ];
@@ -618,6 +620,7 @@ describe("WorkUnitDetailModal", () => {
         mimeType: "image/png",
         size: 42,
         createdAt: "2026-01-02T00:00:00Z",
+        jiraUploadedAt: null,
         url: "/api/attachments/a2",
       };
       const fetchMock = mockFetch({ attachments: [], uploadResponse: created });
@@ -655,6 +658,7 @@ describe("WorkUnitDetailModal", () => {
         mimeType: "image/png",
         size: 42,
         createdAt: "2026-01-03T00:00:00Z",
+        jiraUploadedAt: null,
         url: "/api/attachments/a3",
       };
       const fetchMock = mockFetch({ attachments: [], uploadResponse: created });
@@ -753,6 +757,7 @@ describe("WorkUnitDetailModal", () => {
         mimeType: "image/png",
         size: 42,
         createdAt: "2026-01-04T00:00:00Z",
+        jiraUploadedAt: null,
         url: "/api/attachments/a4",
       };
       const fetchMock = mockFetch({ attachments: [], uploadResponse: created });
@@ -782,6 +787,7 @@ describe("WorkUnitDetailModal", () => {
           mimeType: "image/png",
           size: 42,
           createdAt: "2026-01-05T00:00:00Z",
+          jiraUploadedAt: null,
           url: "/api/attachments/a5",
         },
       ];
