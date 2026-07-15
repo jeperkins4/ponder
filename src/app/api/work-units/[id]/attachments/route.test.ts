@@ -9,12 +9,26 @@
  */
 
 // @vitest-environment node
-import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
 import { mkdtemp, rm, readFile } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
 import { prisma } from "@/lib/prisma";
 import { GET, POST } from "@/app/api/work-units/[id]/attachments/route";
+
+vi.mock("@/lib/jira/writeback", () => ({
+  uploadAttachment: vi.fn(async () => {}),
+  // syncAttachmentToJira pulls in statusTrigger.ts, which statically imports
+  // these other named exports from the same module. The brief's mock factory
+  // only stubbed uploadAttachment (the only one this route path calls), which
+  // left the other three undefined and made the module fail to load. They're
+  // never invoked on this code path — stubbed only so the import resolves.
+  getTransitions: vi.fn(),
+  transitionIssue: vi.fn(),
+  addComment: vi.fn(),
+}));
+
+import { uploadAttachment } from "@/lib/jira/writeback";
 
 describe("Work Unit Attachments Endpoint", () => {
   let storyId: string;
@@ -259,6 +273,94 @@ describe("Work Unit Attachments Endpoint", () => {
       const dto = await res.json();
       expect(dto.mimeType).toBe("video/webm");
       expect(dto.size).toBe(11 * 1024 * 1024);
+    });
+
+    it("uploads the attachment to JIRA immediately and reflects jiraUploadedAt in the response", async () => {
+      vi.mocked(uploadAttachment).mockClear();
+      const project = await prisma.project.create({
+        data: {
+          name: "JIRA Attachments Test Project",
+          type: "JIRA",
+          jiraProjectKey: "ATT",
+          jiraSiteUrl: "https://example.atlassian.net",
+          jiraEmail: "user@example.com",
+          jiraApiToken: "token-123",
+        },
+      });
+      await prisma.story.update({ where: { id: storyId }, data: { projectId: project.id } });
+
+      const formData = new FormData();
+      formData.append("file", pngFile());
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        { method: "POST", body: formData }
+      );
+
+      const res = await POST(req as never, { params: Promise.resolve({ id: workUnitId }) });
+      expect(res.status).toBe(201);
+
+      const dto = await res.json();
+      expect(dto.jiraUploadedAt).not.toBeNull();
+      expect(uploadAttachment).toHaveBeenCalledTimes(1);
+
+      const persisted = await prisma.attachment.findUnique({ where: { id: dto.id } });
+      expect(persisted?.jiraUploadedAt).not.toBeNull();
+
+      // Story.projectId has no onDelete cascade — detach before deleting the
+      // project, or this throws a foreign-key constraint violation.
+      await prisma.story.update({ where: { id: storyId }, data: { projectId: null } });
+      await prisma.project.delete({ where: { id: project.id } });
+    });
+
+    it("still returns 201 with jiraUploadedAt null when the JIRA upload fails", async () => {
+      vi.mocked(uploadAttachment).mockRejectedValueOnce(new Error("JIRA API error: 500"));
+      const project = await prisma.project.create({
+        data: {
+          name: "JIRA Attachments Failure Test Project",
+          type: "JIRA",
+          jiraProjectKey: "ATT",
+          jiraSiteUrl: "https://example.atlassian.net",
+          jiraEmail: "user@example.com",
+          jiraApiToken: "token-123",
+        },
+      });
+      await prisma.story.update({ where: { id: storyId }, data: { projectId: project.id } });
+
+      const formData = new FormData();
+      formData.append("file", pngFile());
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        { method: "POST", body: formData }
+      );
+
+      const res = await POST(req as never, { params: Promise.resolve({ id: workUnitId }) });
+      expect(res.status).toBe(201);
+
+      const dto = await res.json();
+      expect(dto.jiraUploadedAt).toBeNull();
+
+      const persisted = await prisma.attachment.findUnique({ where: { id: dto.id } });
+      expect(persisted).not.toBeNull();
+
+      // Story.projectId has no onDelete cascade — detach before deleting the
+      // project, or this throws a foreign-key constraint violation.
+      await prisma.story.update({ where: { id: storyId }, data: { projectId: null } });
+      await prisma.project.delete({ where: { id: project.id } });
+    });
+
+    it("returns jiraUploadedAt null and never calls uploadAttachment for a non-JIRA-linked work unit", async () => {
+      vi.mocked(uploadAttachment).mockClear();
+      const formData = new FormData();
+      formData.append("file", pngFile());
+      const req = new Request(
+        `http://localhost/api/work-units/${workUnitId}/attachments`,
+        { method: "POST", body: formData }
+      );
+
+      const res = await POST(req as never, { params: Promise.resolve({ id: workUnitId }) });
+      const dto = await res.json();
+      expect(dto.jiraUploadedAt).toBeNull();
+      expect(uploadAttachment).not.toHaveBeenCalled();
     });
 
     it("rejects a video MIME type outside the allowlist", async () => {

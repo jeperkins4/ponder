@@ -43,6 +43,7 @@ export interface AttachmentDTO {
   filename: string;
   mimeType: string;
   size: number;
+  jiraUploadedAt: string | null; // ISO string, or null if not yet uploaded to JIRA
   createdAt: string; // ISO string
   url: string; // /api/attachments/{id}
 }

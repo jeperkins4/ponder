@@ -88,13 +88,14 @@ model WorkNote {
 }
 
 model Attachment {
-  id         String   @id @default(cuid())
-  workUnitId String
-  workUnit   WorkUnit @relation(fields: [workUnitId], references: [id], onDelete: Cascade)
-  filename   String
-  mimeType   String
-  size       Int
-  createdAt  DateTime @default(now())
+  id             String    @id @default(cuid())
+  workUnitId     String
+  workUnit       WorkUnit  @relation(fields: [workUnitId], references: [id], onDelete: Cascade)
+  filename       String
+  mimeType       String
+  size           Int
+  jiraUploadedAt DateTime?
+  createdAt      DateTime  @default(now())
 
   @@index([workUnitId])
 }

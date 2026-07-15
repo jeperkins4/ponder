@@ -295,6 +295,7 @@ describe("PonderClient", () => {
       mimeType: "image/png",
       size: 4,
       createdAt: "2026-07-02T00:00:00.000Z",
+      jiraUploadedAt: null,
       url: "/api/attachments/a1",
     };
     const calls: Array<{ url: string; init: RequestInit }> = [];

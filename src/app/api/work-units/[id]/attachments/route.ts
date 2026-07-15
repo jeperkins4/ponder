@@ -12,6 +12,7 @@ import {
   maxBytesForMimeType,
 } from "@/lib/attachmentPolicy";
 import { AttachmentDTO } from "@/lib/types";
+import { syncAttachmentToJira } from "@/lib/attachmentJiraSync";
 
 // Helper to convert Prisma Attachment to DTO
 function attachmentToDTO(attachment: {
@@ -20,6 +21,7 @@ function attachmentToDTO(attachment: {
   filename: string;
   mimeType: string;
   size: number;
+  jiraUploadedAt: Date | null;
   createdAt: Date;
 }): AttachmentDTO {
   return {
@@ -28,6 +30,7 @@ function attachmentToDTO(attachment: {
     filename: attachment.filename,
     mimeType: attachment.mimeType,
     size: attachment.size,
+    jiraUploadedAt: attachment.jiraUploadedAt?.toISOString() ?? null,
     createdAt: attachment.createdAt.toISOString(),
     url: `/api/attachments/${attachment.id}`,
   };
@@ -132,7 +135,10 @@ export async function POST(
       throw writeError;
     }
 
-    return NextResponse.json(attachmentToDTO(created), { status: 201 });
+    await syncAttachmentToJira(created.id, prisma);
+    const finalAttachment = await prisma.attachment.findUnique({ where: { id: created.id } });
+
+    return NextResponse.json(attachmentToDTO(finalAttachment ?? created), { status: 201 });
   } catch (error) {
     console.error("Error creating attachment:", error);
     return NextResponse.json(

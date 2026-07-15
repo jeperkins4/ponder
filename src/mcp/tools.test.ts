@@ -648,6 +648,48 @@ describe("attachImage", () => {
     expect(result.content[0].text).toContain("wu1");
   });
 
+  it("mentions the JIRA upload result when jiraUploadedAt is set", async () => {
+    const filePath = path.join(dir, "screenshot.png");
+    await writeFile(filePath, "fake-bytes");
+    const fakeClient = {
+      addAttachment: async () => ({
+        id: "a1",
+        workUnitId: "wu1",
+        filename: "screenshot.png",
+        mimeType: "image/png",
+        size: 10,
+        jiraUploadedAt: "2026-07-14T00:00:00.000Z",
+        createdAt: "2026-07-14T00:00:00.000Z",
+        url: "/api/attachments/a1",
+      }),
+    } as unknown as PonderClient;
+
+    const result = await attachImage(fakeClient, { workUnitId: "wu1", filePath });
+
+    expect(result.content[0].text).toMatch(/uploaded to JIRA/i);
+  });
+
+  it("mentions the attachment was not yet uploaded to JIRA when jiraUploadedAt is null", async () => {
+    const filePath = path.join(dir, "screenshot.png");
+    await writeFile(filePath, "fake-bytes");
+    const fakeClient = {
+      addAttachment: async () => ({
+        id: "a1",
+        workUnitId: "wu1",
+        filename: "screenshot.png",
+        mimeType: "image/png",
+        size: 10,
+        jiraUploadedAt: null,
+        createdAt: "2026-07-14T00:00:00.000Z",
+        url: "/api/attachments/a1",
+      }),
+    } as unknown as PonderClient;
+
+    const result = await attachImage(fakeClient, { workUnitId: "wu1", filePath });
+
+    expect(result.content[0].text).toMatch(/not yet uploaded to JIRA/i);
+  });
+
   it("returns an error-text result for an unsupported extension, without calling the client", async () => {
     const filePath = path.join(dir, "notes.txt");
     await writeFile(filePath, "not an image");
