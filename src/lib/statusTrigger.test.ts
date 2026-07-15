@@ -429,6 +429,39 @@ describe("applyStoryStatusSync", () => {
       expect(updated?.completionCommentPostedAt).not.toBeNull();
     });
 
+    it("skips attachments that already have jiraUploadedAt set", async () => {
+      const project = await makeJiraProject();
+      const story = await makeStory({ projectId: project.id, jiraStatus: "In Progress" });
+      const wu1 = await prisma.workUnit.create({
+        data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+      });
+      const alreadyUploaded = await prisma.attachment.create({
+        data: {
+          workUnitId: wu1.id,
+          filename: "already.png",
+          mimeType: "image/png",
+          size: 100,
+          jiraUploadedAt: new Date("2026-01-01T00:00:00Z"),
+        },
+      });
+      await prisma.attachment.create({
+        data: { workUnitId: wu1.id, filename: "pending.png", mimeType: "image/png", size: 100 },
+      });
+
+      const deps = fakeDeps();
+      await applyStoryStatusSync(story.id, prisma, deps);
+
+      expect(deps.uploadAttachment).toHaveBeenCalledTimes(1);
+      expect(deps.uploadAttachment).toHaveBeenCalledWith(
+        story.jiraKey,
+        expect.objectContaining({ filename: "pending.png" }),
+        expect.any(Object)
+      );
+
+      const untouched = await prisma.attachment.findUnique({ where: { id: alreadyUploaded.id } });
+      expect(untouched?.jiraUploadedAt?.toISOString()).toBe("2026-01-01T00:00:00.000Z");
+    });
+
     it("does not throw and still completes when consolidateAcceptanceCriteria rejects", async () => {
       const project = await makeJiraProject();
       const story = await makeStory({ projectId: project.id, jiraStatus: "In Progress" });
@@ -878,6 +911,30 @@ describe("reportWorkUnitToQA", () => {
       expect.objectContaining({ filename: "shot.png", mimeType: "image/png" }),
       expect.any(Object)
     );
+  });
+
+  it("skips attachments that already have jiraUploadedAt set", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id });
+    const wu = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+    const alreadyUploaded = await prisma.attachment.create({
+      data: {
+        workUnitId: wu.id,
+        filename: "already.png",
+        mimeType: "image/png",
+        size: 100,
+        jiraUploadedAt: new Date("2026-01-01T00:00:00Z"),
+      },
+    });
+
+    const deps = fakeReportDeps();
+    await reportWorkUnitToQA(wu.id, prisma, deps);
+
+    expect(deps.uploadAttachment).not.toHaveBeenCalled();
+    const untouched = await prisma.attachment.findUnique({ where: { id: alreadyUploaded.id } });
+    expect(untouched?.jiraUploadedAt?.toISOString()).toBe("2026-01-01T00:00:00.000Z");
   });
 
   it("transitions and archives when this was the last sibling to be reported", async () => {

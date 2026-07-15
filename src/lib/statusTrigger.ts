@@ -228,6 +228,7 @@ export async function applyStoryStatusSync(
       // the transition/local update — log and continue.
       for (const workUnit of doneWorkUnits) {
         for (const attachment of workUnit.attachments) {
+          if (attachment.jiraUploadedAt != null) continue;
           try {
             const buffer = await deps.readAttachmentFile(attachment.id);
             await deps.uploadAttachment(
@@ -235,6 +236,10 @@ export async function applyStoryStatusSync(
               { buffer, filename: attachment.filename, mimeType: attachment.mimeType },
               config
             );
+            await prisma.attachment.update({
+              where: { id: attachment.id },
+              data: { jiraUploadedAt: new Date() },
+            });
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             console.warn(
@@ -416,12 +421,17 @@ export async function reportWorkUnitToQA(
       await deps.addComment(story.jiraKey, comment, config);
 
       for (const attachment of workUnit.attachments) {
+        if (attachment.jiraUploadedAt != null) continue;
         const buffer = await deps.readAttachmentFile(attachment.id);
         await deps.uploadAttachment(
           story.jiraKey,
           { buffer, filename: attachment.filename, mimeType: attachment.mimeType },
           config
         );
+        await prisma.attachment.update({
+          where: { id: attachment.id },
+          data: { jiraUploadedAt: new Date() },
+        });
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
