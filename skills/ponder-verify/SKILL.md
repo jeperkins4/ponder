@@ -81,7 +81,7 @@ bleed into the next item's evidence.
 ### 3a. Load the browser tools (once, before the first item)
 
 ```
-ToolSearch with query "select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__gif_creator"
+ToolSearch with query "select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__gif_creator"
 ```
 
 Call `tabs_context_mcp` once to see existing tabs, then `tabs_create_mcp`
@@ -114,24 +114,27 @@ title is too vague to infer a flow) — **SKIP this item** the same way as
 ### 3d. Capture evidence
 
 - **Single state check** (e.g. "confirm the button is disabled", "confirm
-  the field shows X") → take one screenshot via the `computer` tool's
-  screenshot action.
+  the field shows X") → take one screenshot via the `computer` tool:
+  `{ action: "screenshot", tabId: <tab>, save_to_disk: true }`. The tool
+  result returns the saved file's path — that returned path is what you
+  pass to `attach_image` in 3f. Do not invent a path yourself.
 - **Multi-step interaction** (e.g. drag-and-drop, a multi-page flow, a
-  sequence a still image can't prove) → use `gif_creator` to record the
-  interaction instead.
+  sequence a still image can't prove) → use `gif_creator` instead:
+  1. `{ action: "start_recording", tabId: <tab> }`, then immediately take
+     a screenshot to capture the first frame.
+  2. Perform the interaction (the steps from 3c).
+  3. Immediately before stopping, take a screenshot to capture the last
+     frame, then `{ action: "stop_recording", tabId: <tab> }`.
+  4. `{ action: "export", tabId: <tab>, download: true, filename: "<work-unit-id>.gif" }`.
+     This downloads the GIF via the browser — it lands in the browser's
+     default Downloads directory, not a path you choose. Locate the
+     downloaded file there (match on the `filename` you passed) before
+     attaching it in 3f.
 
-Save the captured file to a scratch path, e.g.:
-
-```bash
-EVIDENCE_DIR=$(mktemp -d)
-```
-
-and pass `$EVIDENCE_DIR/<work-unit-id>.png` (or `.gif`) as the
-target/output path to whichever capture tool you used.
-
-If the capture tool itself fails (crashes, times out, produces nothing) —
-**SKIP this item**, reason `"capture tool failed"`, and continue. Never
-let one bad capture abort the whole run.
+If the capture tool itself fails (crashes, times out, produces nothing, or
+the downloaded GIF can't be located) — **SKIP this item**, reason
+`"capture tool failed"`, and continue. Never let one bad capture abort the
+whole run.
 
 ### 3e. Judge the result — do not rubber-stamp
 
