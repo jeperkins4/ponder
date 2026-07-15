@@ -43,7 +43,7 @@ So: Trello gives you *a board*. Ponder gives you a **JIRA-native decomposition l
 - **Auto-import** of your assigned, active JIRA issues (filtered by JQL), or scope a single import to one **epic** (all its issues, any assignee).
 - **AI-assisted breakdown** — optional per story, powered by `@anthropic-ai/sdk`.
 - **Bidirectional JIRA status sync** — non-blocking and idempotent.
-- **Verification with evidence** — request an AI-agent verification per card and attach the proof: screenshots *and screen recordings* (images up to 10 MB, video — MP4/WebM/QuickTime — up to 250 MB, served with seek support).
+- **Verification with evidence** — request an AI-agent verification per card and attach the proof: screenshots *and screen recordings* (images up to 10 MB, video — MP4/WebM/QuickTime — up to 250 MB, served with seek support). Evidence uploads to the original JIRA issue immediately, not just when the story completes.
 - **Verification capacity reporting** — is checking keeping pace with making? Verified/generated ratio, verification lag, queue depth, and verified-completion rate on `/reports`.
 - **Multi-project** support with per-project JIRA credentials (API token stored write-only).
 - **Ponder UI** — light/dark themes, keyboard-accessible, WCAG AA.
