@@ -33,6 +33,7 @@ const projects: ProjectWithStats[] = [
     name: "Project One",
     type: "JIRA",
     jiraProjectKey: "PONE",
+    githubRepos: "acme/web-app, acme/web-app-mobile",
     createdAt: new Date(),
     updatedAt: new Date(),
     hasApiToken: true,
@@ -171,6 +172,8 @@ describe("listProjects", () => {
     expect(text).toContain("stories: 0");
     expect(text).toContain("jiraProjectKey: PONE");
     expect(text).toContain("jiraProjectKey: —");
+    expect(text).toContain("githubRepos: acme/web-app, acme/web-app-mobile");
+    expect(text).toContain("githubRepos: —");
   });
 
   it("reports zero projects clearly", async () => {

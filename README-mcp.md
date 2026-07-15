@@ -61,11 +61,45 @@ claude mcp list
 should show `ponder` in the list. Restart Claude Code (or start a new
 session) after adding the server so it picks up the new connection.
 
+## Automated verification (`ponder-verify` skill)
+
+A global Claude Code skill that automates the Verify flow's evidence
+capture: it resolves which Ponder project this repo maps to (via each
+project's `githubRepos` setting), pulls the pending-verification queue,
+drives the app in a browser to capture a screenshot or recording per
+item, and reports pass/fail — instead of that loop being manually
+improvised each time.
+
+Install it once, globally (works from any repo afterward):
+
+```bash
+mkdir -p ~/.claude/skills/ponder-verify
+cp /Users/john-perkins/Projects/Sphero/teamalliance/kanban/skills/ponder-verify/SKILL.md ~/.claude/skills/ponder-verify/SKILL.md
+```
+
+Generic form, for use on any machine:
+
+```bash
+mkdir -p ~/.claude/skills/ponder-verify
+cp <path-to-ponder-repo>/skills/ponder-verify/SKILL.md ~/.claude/skills/ponder-verify/SKILL.md
+```
+
+**Before running it in a given repo:** make sure that repo's Ponder
+project has `githubRepos` set to this repo's `owner/repo` (project
+settings) — this is how the skill knows which project to work against.
+
+Then, from any repo with the `ponder` MCP server registered and its own
+dev server running:
+
+```
+/ponder-verify
+```
+
 ## Tools reference
 
 | Tool | Args | Description |
 | --- | --- | --- |
-| `list_projects` | _(none)_ | List all Ponder projects with story/work-unit stats. |
+| `list_projects` | _(none)_ | List all Ponder projects with story/work-unit stats and configured GitHub repo(s) (`githubRepos`, used for `ponder-verify`'s repo→project matching). |
 | `list_epics` | `projectId` | List a project's JIRA epics (key + name). |
 | `list_stories` | `projectId`, `epicKey?` | List stories (with a per-column work-unit breakdown) for a project, optionally filtered to a single epic. |
 | `list_work_units` | `projectId`, `column?`, `pendingVerification?`, `epicKey?` | List work units for a project, optionally filtered to a single column (`todo`, `in_progress`, `code_review`, `done`), to only those pending AI-agent verification, or to a single epic. |
@@ -103,7 +137,7 @@ Once connected, you can ask Claude Code things like:
 - "Move work unit ck123abc to code_review."
 - "Mark work unit ck123abc done."
 - "Update work unit ck123abc's title to 'Fix pagination bug'."
-- "List work units pending verification for project acme-web, verify each one, attach a screenshot or a recording of the test run, and report the result."
+- Run `/ponder-verify` (see "Automated verification" above) to process the pending-verification queue for the current repo automatically.
 - "Show me this week's throughput for project acme-web."
 
 ## Troubleshooting

@@ -42,7 +42,8 @@ export function createServer(client: PonderClient): McpServer {
   server.registerTool(
     "list_projects",
     {
-      description: "List all Ponder projects with story/work-unit stats.",
+      description:
+        "List all Ponder projects with story/work-unit stats and configured GitHub repo(s) (githubRepos).",
     },
     async () => listProjects(client)
   );
