@@ -242,8 +242,11 @@ export async function attachImage(
       filename,
       mimeType
     );
+    const jiraNote = attachment.jiraUploadedAt
+      ? " Also uploaded to JIRA."
+      : " Not yet uploaded to JIRA.";
     return textResult(
-      `Attached "${attachment.filename}" (${attachment.mimeType}, ${attachment.size} bytes) to work unit ${args.workUnitId}.`
+      `Attached "${attachment.filename}" (${attachment.mimeType}, ${attachment.size} bytes) to work unit ${args.workUnitId}.${jiraNote}`
     );
   } catch (error) {
     return textResult(
