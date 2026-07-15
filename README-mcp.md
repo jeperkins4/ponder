@@ -65,7 +65,7 @@ session) after adding the server so it picks up the new connection.
 
 | Tool | Args | Description |
 | --- | --- | --- |
-| `list_projects` | _(none)_ | List all Ponder projects with story/work-unit stats. |
+| `list_projects` | _(none)_ | List all Ponder projects with story/work-unit stats and configured GitHub repo(s) (`githubRepos`, used for `ponder-verify`'s repo→project matching). |
 | `list_epics` | `projectId` | List a project's JIRA epics (key + name). |
 | `list_stories` | `projectId`, `epicKey?` | List stories (with a per-column work-unit breakdown) for a project, optionally filtered to a single epic. |
 | `list_work_units` | `projectId`, `column?`, `pendingVerification?`, `epicKey?` | List work units for a project, optionally filtered to a single column (`todo`, `in_progress`, `code_review`, `done`), to only those pending AI-agent verification, or to a single epic. |

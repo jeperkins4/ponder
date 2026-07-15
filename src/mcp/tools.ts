@@ -30,7 +30,8 @@ export async function listProjects(client: PonderClient): Promise<McpTextResult>
 
   const lines = projects.map((project) => {
     const jiraKey = project.jiraProjectKey ?? "—";
-    return `- ${project.name} (id: ${project.id}, type: ${project.type}, jiraProjectKey: ${jiraKey}, stories: ${project.storyCount}, workUnits: ${project.workUnitCount})`;
+    const githubRepos = project.githubRepos ?? "—";
+    return `- ${project.name} (id: ${project.id}, type: ${project.type}, jiraProjectKey: ${jiraKey}, githubRepos: ${githubRepos}, stories: ${project.storyCount}, workUnits: ${project.workUnitCount})`;
   });
 
   return textResult(
