@@ -113,7 +113,7 @@ type StoryWithRelations = Story & { workUnits: WorkUnitWithAttachments[]; projec
 /**
  * Returns true when a project has complete JIRA credentials configured.
  */
-function hasJiraCredentials(
+export function hasJiraCredentials(
   project: Project | null
 ): project is Project & { jiraSiteUrl: string; jiraEmail: string; jiraApiToken: string } {
   return (
