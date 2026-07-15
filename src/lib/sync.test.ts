@@ -28,9 +28,8 @@ describe("syncStoriesForProject", () => {
       findUnique: ReturnType<typeof vi.fn>;
     };
     story: {
-      findUnique: ReturnType<typeof vi.fn>;
-      create: ReturnType<typeof vi.fn>;
-      update: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+      upsert: ReturnType<typeof vi.fn>;
     };
   };
 
@@ -42,9 +41,8 @@ describe("syncStoriesForProject", () => {
         findUnique: vi.fn(),
       },
       story: {
-        findUnique: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
+        findMany: vi.fn(),
+        upsert: vi.fn(),
       },
     };
 
@@ -158,8 +156,8 @@ describe("syncStoriesForProject", () => {
     ];
 
     mockFetchStoriesForProject.mockResolvedValueOnce(stories);
-    mockPrisma.story.findUnique.mockResolvedValueOnce(null);
-    mockPrisma.story.create.mockResolvedValueOnce({});
+    mockPrisma.story.findMany.mockResolvedValueOnce([]);
+    mockPrisma.story.upsert.mockResolvedValueOnce({});
 
     const result = await syncStoriesForProject(
       "proj-3",
@@ -175,9 +173,25 @@ describe("syncStoriesForProject", () => {
       },
       ["To Do", "In Progress", "Code Revew", "Code Review"]
     );
-    expect(mockPrisma.story.create).toHaveBeenCalledWith({
-      data: {
+    expect(mockPrisma.story.findMany).toHaveBeenCalledWith({
+      where: { jiraKey: { in: ["TEAM-1"] } },
+      select: { jiraKey: true },
+    });
+    expect(mockPrisma.story.upsert).toHaveBeenCalledWith({
+      where: { jiraKey: "TEAM-1" },
+      create: {
         jiraKey: "TEAM-1",
+        jiraId: "10000",
+        projectKey: "TEAM",
+        summary: "First story",
+        description: "First description",
+        jiraStatus: "To Do",
+        url: "https://example.com/browse/TEAM-1",
+        lastSyncedAt: new Date("2024-01-01T00:00:00.000Z"),
+        completionCommentPostedAt: null,
+        projectId: "proj-3",
+      },
+      update: {
         jiraId: "10000",
         projectKey: "TEAM",
         summary: "First story",
@@ -220,17 +234,29 @@ describe("syncStoriesForProject", () => {
     ];
 
     mockFetchStoriesForProject.mockResolvedValueOnce(stories);
-    mockPrisma.story.findUnique.mockResolvedValueOnce({ id: "existing-1" });
-    mockPrisma.story.update.mockResolvedValueOnce({});
+    mockPrisma.story.findMany.mockResolvedValueOnce([{ jiraKey: "TEAM-1" }]);
+    mockPrisma.story.upsert.mockResolvedValueOnce({});
 
     const result = await syncStoriesForProject(
       "proj-4",
       mockPrisma as unknown as PrismaClient
     );
 
-    expect(mockPrisma.story.update).toHaveBeenCalledWith({
+    expect(mockPrisma.story.upsert).toHaveBeenCalledWith({
       where: { jiraKey: "TEAM-1" },
-      data: {
+      create: {
+        jiraKey: "TEAM-1",
+        jiraId: "10000",
+        projectKey: "TEAM",
+        summary: "Updated story",
+        description: "Updated description",
+        jiraStatus: "In Progress",
+        url: "https://example.com/browse/TEAM-1",
+        lastSyncedAt: new Date("2024-01-02T00:00:00.000Z"),
+        completionCommentPostedAt: null,
+        projectId: "proj-4",
+      },
+      update: {
         jiraId: "10000",
         projectKey: "TEAM",
         summary: "Updated story",
