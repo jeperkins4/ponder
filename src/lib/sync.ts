@@ -82,46 +82,47 @@ export async function syncStoriesForProject(
   let created = 0;
   let updated = 0;
 
+  // Existing keys are resolved once, up front, instead of a per-story
+  // findUnique — halves the round trips (N upserts instead of N finds + N
+  // create/update) and mirrors the batch-then-upsert pattern already used
+  // by the import/process route (see findAlreadyImportedKeys).
+  const jiraKeys = stories.map((story) => story.jiraKey);
+  const existingKeys =
+    jiraKeys.length > 0
+      ? new Set(
+          (
+            await prismaClient.story.findMany({
+              where: { jiraKey: { in: jiraKeys } },
+              select: { jiraKey: true },
+            })
+          ).map((s) => s.jiraKey)
+        )
+      : new Set<string>();
+
   for (const story of stories) {
-    const existingStory = await prismaClient.story.findUnique({
+    const fields = {
+      jiraId: story.jiraId,
+      projectKey: story.projectKey,
+      summary: story.summary,
+      description: story.description,
+      jiraStatus: story.jiraStatus,
+      url: story.url,
+      lastSyncedAt: new Date(story.lastSyncedAt),
+      completionCommentPostedAt: story.completionCommentPostedAt
+        ? new Date(story.completionCommentPostedAt)
+        : null,
+      projectId,
+    };
+
+    await prismaClient.story.upsert({
       where: { jiraKey: story.jiraKey },
+      create: { jiraKey: story.jiraKey, ...fields },
+      update: fields,
     });
 
-    if (existingStory) {
-      await prismaClient.story.update({
-        where: { jiraKey: story.jiraKey },
-        data: {
-          jiraId: story.jiraId,
-          projectKey: story.projectKey,
-          summary: story.summary,
-          description: story.description,
-          jiraStatus: story.jiraStatus,
-          url: story.url,
-          lastSyncedAt: new Date(story.lastSyncedAt),
-          completionCommentPostedAt: story.completionCommentPostedAt
-            ? new Date(story.completionCommentPostedAt)
-            : null,
-          projectId,
-        },
-      });
+    if (existingKeys.has(story.jiraKey)) {
       updated++;
     } else {
-      await prismaClient.story.create({
-        data: {
-          jiraKey: story.jiraKey,
-          jiraId: story.jiraId,
-          projectKey: story.projectKey,
-          summary: story.summary,
-          description: story.description,
-          jiraStatus: story.jiraStatus,
-          url: story.url,
-          lastSyncedAt: new Date(story.lastSyncedAt),
-          completionCommentPostedAt: story.completionCommentPostedAt
-            ? new Date(story.completionCommentPostedAt)
-            : null,
-          projectId,
-        },
-      });
       created++;
     }
   }
