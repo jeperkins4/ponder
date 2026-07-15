@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
       summary: story.summary,
       description: story.description,
       jiraStatus: story.jiraStatus,
+      epicKey: story.epicKey,
+      epicName: story.epicName,
       url: story.url,
       lastSyncedAt: story.lastSyncedAt.toISOString(),
       completionCommentPostedAt: story.completionCommentPostedAt?.toISOString() ?? null,

@@ -8,7 +8,7 @@
 
 import { COLUMNS } from "@/lib/columns";
 import type { Column, StoryDTO } from "@/lib/types";
-import type { PonderClient } from "./client";
+import type { EpicImportProcessItem, PonderClient } from "./client";
 import { readLocalImage } from "./readLocalImage";
 
 export interface McpTextResult {
@@ -38,6 +38,22 @@ export async function listProjects(client: PonderClient): Promise<McpTextResult>
   );
 }
 
+/** List a project's JIRA epics (key + name). */
+export async function listEpics(
+  client: PonderClient,
+  args: { projectId: string }
+): Promise<McpTextResult> {
+  const epics = await client.getEpics(args.projectId);
+
+  if (epics.length === 0) {
+    return textResult(`No epics found for project ${args.projectId}.`);
+  }
+
+  const lines = epics.map((epic) => `- ${epic.name} (${epic.key})`);
+
+  return textResult(`${epics.length} epic(s):\n${lines.join("\n")}`);
+}
+
 function columnBreakdown(story: StoryDTO): string {
   const counts = new Map<Column, number>();
   for (const workUnit of story.workUnits) {
@@ -52,12 +68,19 @@ function columnBreakdown(story: StoryDTO): string {
 /** List stories (with a per-column work-unit breakdown) for a project. */
 export async function listStories(
   client: PonderClient,
-  args: { projectId: string }
+  args: { projectId: string; epicKey?: string }
 ): Promise<McpTextResult> {
-  const stories = await client.getStories(args.projectId);
+  let stories = await client.getStories(args.projectId);
+  if (args.epicKey) {
+    stories = stories.filter((story) => story.epicKey === args.epicKey);
+  }
 
   if (stories.length === 0) {
-    return textResult(`No stories found for project ${args.projectId}.`);
+    return textResult(
+      args.epicKey
+        ? `No stories found for project ${args.projectId} under epic ${args.epicKey}.`
+        : `No stories found for project ${args.projectId}.`
+    );
   }
 
   const lines = stories.map(
@@ -74,7 +97,12 @@ export async function listStories(
  */
 export async function listWorkUnits(
   client: PonderClient,
-  args: { projectId: string; column?: string; pendingVerification?: boolean }
+  args: {
+    projectId: string;
+    column?: string;
+    pendingVerification?: boolean;
+    epicKey?: string;
+  }
 ): Promise<McpTextResult> {
   const validColumns = COLUMNS.map((c) => c.key);
 
@@ -84,7 +112,10 @@ export async function listWorkUnits(
     );
   }
 
-  const stories = await client.getStories(args.projectId);
+  let stories = await client.getStories(args.projectId);
+  if (args.epicKey) {
+    stories = stories.filter((story) => story.epicKey === args.epicKey);
+  }
   const column = args.column as Column | undefined;
 
   const rows: {
@@ -385,4 +416,59 @@ export async function reportVerification(
       `Error: ${error instanceof Error ? error.message : String(error)}`
     );
   }
+}
+
+/**
+ * One-shot epic-scoped import: fetches the epic's not-yet-imported issues
+ * and imports all of them with a single breakDown flag applied uniformly.
+ * Mirrors ImportReview.tsx's preview -> process flow, collapsed into one
+ * call since MCP tools are single-shot, not an interactive review session.
+ */
+export async function importByEpic(
+  client: PonderClient,
+  args: {
+    projectId: string;
+    epicKey: string;
+    epicName?: string;
+    breakDown?: boolean;
+  }
+): Promise<McpTextResult> {
+  const preview = await client.previewEpicImport(args.projectId, args.epicKey);
+
+  if (preview.stories.length === 0) {
+    return textResult(preview.message ?? `No stories found for epic ${args.epicKey}.`);
+  }
+
+  const toImport = preview.stories.filter((story) => !story.alreadyImported);
+
+  if (toImport.length === 0) {
+    return textResult(
+      `${preview.stories.length} story(ies) found for epic ${args.epicKey}, all already on the board.`
+    );
+  }
+
+  const items: EpicImportProcessItem[] = toImport.map((story) => ({
+    jiraKey: story.jiraKey,
+    jiraId: story.jiraId,
+    summary: story.summary,
+    description: story.description,
+    jiraStatus: story.jiraStatus,
+    jiraStatusCategory: story.jiraStatusCategory,
+    breakDown: args.breakDown ?? false,
+  }));
+
+  const result = await client.processEpicImport(
+    args.projectId,
+    items,
+    args.epicKey,
+    args.epicName
+  );
+
+  const importedKeys = toImport.map((story) => story.jiraKey).join(", ");
+
+  return textResult(
+    `Imported epic ${args.epicKey}: ${result.storiesProcessed} processed, ` +
+      `${result.storiesSkipped} skipped, ${result.workUnitsCreated} work unit(s) created.\n` +
+      `Stories: ${importedKeys}`
+  );
 }

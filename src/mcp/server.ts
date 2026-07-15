@@ -20,6 +20,8 @@ import { z } from "zod/v3";
 import { PonderClient } from "./client";
 import {
   attachImage,
+  importByEpic,
+  listEpics,
   listProjects,
   listStories,
   listWorkUnits,
@@ -46,14 +48,28 @@ export function createServer(client: PonderClient): McpServer {
   );
 
   server.registerTool(
-    "list_stories",
+    "list_epics",
     {
-      description: "List stories (with their work units) for a project.",
+      description: "List a project's JIRA epics (key + name).",
       inputSchema: {
         projectId: z.string(),
       },
     },
-    async ({ projectId }) => listStories(client, { projectId })
+    async ({ projectId }) => listEpics(client, { projectId })
+  );
+
+  server.registerTool(
+    "list_stories",
+    {
+      description:
+        "List stories (with their work units) for a project, optionally " +
+        "filtered to a single epic.",
+      inputSchema: {
+        projectId: z.string(),
+        epicKey: z.string().optional(),
+      },
+    },
+    async ({ projectId, epicKey }) => listStories(client, { projectId, epicKey })
   );
 
   server.registerTool(
@@ -61,15 +77,35 @@ export function createServer(client: PonderClient): McpServer {
     {
       description:
         "List work units for a project, optionally filtered to a single column, " +
-        "or to only those pending AI-agent verification (pendingVerification: true).",
+        "to only those pending AI-agent verification (pendingVerification: true), " +
+        "or to a single epic.",
       inputSchema: {
         projectId: z.string(),
         column: z.string().optional(),
         pendingVerification: z.boolean().optional(),
+        epicKey: z.string().optional(),
       },
     },
-    async ({ projectId, column, pendingVerification }) =>
-      listWorkUnits(client, { projectId, column, pendingVerification })
+    async ({ projectId, column, pendingVerification, epicKey }) =>
+      listWorkUnits(client, { projectId, column, pendingVerification, epicKey })
+  );
+
+  server.registerTool(
+    "import_by_epic",
+    {
+      description:
+        "Import all not-yet-imported issues under a JIRA epic into this " +
+        "project's board, skipping issues already on the board. Optional " +
+        "breakDown applies to every imported story (default false).",
+      inputSchema: {
+        projectId: z.string(),
+        epicKey: z.string(),
+        epicName: z.string().optional(),
+        breakDown: z.boolean().optional(),
+      },
+    },
+    async ({ projectId, epicKey, epicName, breakDown }) =>
+      importByEpic(client, { projectId, epicKey, epicName, breakDown })
   );
 
   server.registerTool(

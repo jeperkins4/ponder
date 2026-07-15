@@ -66,8 +66,10 @@ session) after adding the server so it picks up the new connection.
 | Tool | Args | Description |
 | --- | --- | --- |
 | `list_projects` | _(none)_ | List all Ponder projects with story/work-unit stats. |
-| `list_stories` | `projectId` | List stories (with a per-column work-unit breakdown) for a project. |
-| `list_work_units` | `projectId`, `column?`, `pendingVerification?` | List work units for a project, optionally filtered to a single column (`todo`, `in_progress`, `code_review`, `done`), or to only those pending AI-agent verification. |
+| `list_epics` | `projectId` | List a project's JIRA epics (key + name). |
+| `list_stories` | `projectId`, `epicKey?` | List stories (with a per-column work-unit breakdown) for a project, optionally filtered to a single epic. |
+| `list_work_units` | `projectId`, `column?`, `pendingVerification?`, `epicKey?` | List work units for a project, optionally filtered to a single column (`todo`, `in_progress`, `code_review`, `done`), to only those pending AI-agent verification, or to a single epic. |
+| `import_by_epic` | `projectId`, `epicKey`, `epicName?`, `breakDown?` | Import all not-yet-imported issues under a JIRA epic into this project's board, skipping issues already on the board. `breakDown` (default `false`) applies uniformly to every imported story. |
 | `move_work_unit` | `workUnitId`, `column`, `order?` | Move a work unit to a column and optional position. |
 | `mark_done` | `workUnitId` | Convenience wrapper over `move_work_unit` that moves a work unit straight to Done. |
 | `update_work_unit` | `workUnitId`, `title?`, `description?` | Update a work unit's title and/or description (at least one required). |
@@ -94,6 +96,9 @@ Once connected, you can ask Claude Code things like:
 
 - "List my Ponder projects."
 - "Show the cards for project acme-web."
+- "List the epics for project acme-web."
+- "Show me stories for project acme-web under epic ACME-100."
+- "Import everything under epic ACME-100 into project acme-web."
 - "What's in the in_progress column for project acme-web?"
 - "Move work unit ck123abc to code_review."
 - "Mark work unit ck123abc done."

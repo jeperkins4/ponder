@@ -56,6 +56,84 @@ describe("PonderClient", () => {
     expect(result).toEqual(stories);
   });
 
+  it("getEpics('p1') requests GET .../jira/epics and unwraps .epics", async () => {
+    const fetchImpl = fakeFetch({
+      ok: true,
+      json: { epics: [{ key: "TEAM-1", name: "Big epic" }] },
+    });
+    const client = new PonderClient(baseUrl, fetchImpl);
+
+    const result = await client.getEpics("p1");
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      `${baseUrl}/api/projects/p1/jira/epics`,
+      expect.objectContaining({ method: "GET" })
+    );
+    expect(result).toEqual([{ key: "TEAM-1", name: "Big epic" }]);
+  });
+
+  it("previewEpicImport('p1','TEAM-1') POSTs {epicKey} to the preview endpoint", async () => {
+    const preview = { stories: [] };
+    const fetchImpl = fakeFetch({ ok: true, json: preview });
+    const client = new PonderClient(baseUrl, fetchImpl);
+
+    const result = await client.previewEpicImport("p1", "TEAM-1");
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      `${baseUrl}/api/projects/p1/import/preview`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ epicKey: "TEAM-1" }),
+      })
+    );
+    expect(result).toEqual(preview);
+  });
+
+  it("processEpicImport posts items + epicKey + epicName when epicName is provided", async () => {
+    const processResult = { storiesProcessed: 1, storiesSkipped: 0, workUnitsCreated: 1 };
+    const fetchImpl = fakeFetch({ ok: true, json: processResult });
+    const client = new PonderClient(baseUrl, fetchImpl);
+    const items = [
+      {
+        jiraKey: "TEAM-101",
+        jiraId: "10101",
+        summary: "S",
+        description: null,
+        jiraStatus: "To Do",
+        breakDown: false,
+      },
+    ];
+
+    const result = await client.processEpicImport("p1", items, "TEAM-1", "Big epic");
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      `${baseUrl}/api/projects/p1/import/process`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ items, epicKey: "TEAM-1", epicName: "Big epic" }),
+      })
+    );
+    expect(result).toEqual(processResult);
+  });
+
+  it("processEpicImport omits epicName from the body when not provided", async () => {
+    const fetchImpl = fakeFetch({
+      ok: true,
+      json: { storiesProcessed: 0, storiesSkipped: 0, workUnitsCreated: 0 },
+    });
+    const client = new PonderClient(baseUrl, fetchImpl);
+
+    await client.processEpicImport("p1", [], "TEAM-1");
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      `${baseUrl}/api/projects/p1/import/process`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ items: [], epicKey: "TEAM-1" }),
+      })
+    );
+  });
+
   it("moveWorkUnit('w1','done') POSTs {column:'done', order:0} and returns the DTO", async () => {
     const workUnit: WorkUnitDTO = {
       id: "w1",

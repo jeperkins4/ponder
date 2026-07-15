@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   attachImage,
+  importByEpic,
+  listEpics,
   listProjects,
   listStories,
   listWorkUnits,
@@ -17,7 +19,7 @@ import {
   reportVerification,
   updateWorkUnit,
 } from "./tools";
-import type { PonderClient } from "./client";
+import type { EpicImportPreviewStory, PonderClient } from "./client";
 import type { ProjectWithStats, StoryDTO, WorkUnitDTO } from "@/lib/types";
 import type { ReportsPayload } from "@/lib/reports/types";
 
@@ -180,6 +182,33 @@ describe("listProjects", () => {
   });
 });
 
+describe("listEpics", () => {
+  it("includes each epic's name and key", async () => {
+    const client = fakeClient({
+      getEpics: async () => [
+        { key: "PONE-100", name: "Big epic" },
+        { key: "PONE-200", name: "Other epic" },
+      ],
+    });
+
+    const result = await listEpics(client, { projectId: "p1" });
+    const text = result.content[0].text;
+
+    expect(text).toContain("Big epic");
+    expect(text).toContain("PONE-100");
+    expect(text).toContain("Other epic");
+    expect(text).toContain("PONE-200");
+  });
+
+  it("reports zero epics clearly", async () => {
+    const client = fakeClient({ getEpics: async () => [] });
+
+    const result = await listEpics(client, { projectId: "p1" });
+
+    expect(result.content[0].text).toMatch(/no epics/i);
+  });
+});
+
 describe("listStories", () => {
   it("includes each story's jiraKey, status, and per-column breakdown", async () => {
     const client = fakeClient({ getStories: async () => stories });
@@ -281,6 +310,90 @@ describe("listWorkUnits with pendingVerification", () => {
     const result = await listWorkUnits(client, { projectId: "p1", pendingVerification: true });
 
     expect(result.content[0].text).toMatch(/no work units/i);
+  });
+});
+
+describe("listStories with epicKey filter", () => {
+  const storiesWithEpic: StoryDTO[] = [
+    { ...stories[0], epicKey: "PONE-100", epicName: "Big epic" },
+    { ...stories[1], epicKey: "PONE-200", epicName: "Other epic" },
+  ];
+
+  it("filters to stories under the given epic", async () => {
+    const client = fakeClient({ getStories: async () => storiesWithEpic });
+
+    const result = await listStories(client, { projectId: "p1", epicKey: "PONE-100" });
+    const text = result.content[0].text;
+
+    expect(text).toContain("PONE-1");
+    expect(text).not.toContain("PONE-2");
+  });
+
+  it("returns a clear message when nothing matches the epic", async () => {
+    const client = fakeClient({ getStories: async () => storiesWithEpic });
+
+    const result = await listStories(client, { projectId: "p1", epicKey: "NOPE-1" });
+
+    expect(result.content[0].text).toMatch(/no stories/i);
+    expect(result.content[0].text).toContain("NOPE-1");
+  });
+});
+
+describe("listWorkUnits with epicKey filter", () => {
+  const storiesWithEpic: StoryDTO[] = [
+    { ...stories[0], epicKey: "PONE-100", epicName: "Big epic" },
+    {
+      ...stories[1],
+      epicKey: "PONE-200",
+      epicName: "Other epic",
+      workUnits: [
+        {
+          id: "w5",
+          storyId: "s2",
+          title: "Task E",
+          description: null,
+          acceptanceCriteria: null,
+          verification: null,
+          column: "code_review",
+          order: 0,
+          subNumber: null,
+          createdAt: new Date().toISOString(),
+          completedAt: null,
+          archivedAt: null,
+          movedToQaReportedAt: null,
+          verificationRequestedAt: null,
+          verifiedAt: null,
+          verificationOutcome: null,
+          verificationSummary: null,
+        },
+      ],
+    },
+  ];
+
+  it("filters work units to those under the given epic", async () => {
+    const client = fakeClient({ getStories: async () => storiesWithEpic });
+
+    const result = await listWorkUnits(client, { projectId: "p1", epicKey: "PONE-100" });
+    const text = result.content[0].text;
+
+    expect(text).toContain("Task A");
+    expect(text).toContain("Task D");
+    expect(text).not.toContain("Task E");
+  });
+
+  it("composes with the column filter", async () => {
+    const client = fakeClient({ getStories: async () => storiesWithEpic });
+
+    const result = await listWorkUnits(client, {
+      projectId: "p1",
+      epicKey: "PONE-100",
+      column: "code_review",
+    });
+    const text = result.content[0].text;
+
+    expect(text).toContain("Task D");
+    expect(text).not.toContain("Task A");
+    expect(text).not.toContain("Task E");
   });
 });
 
@@ -824,5 +937,105 @@ describe("reportJiraTrail", () => {
     const result = await reportJiraTrail(client, {});
 
     expect(result.content[0].text).toBe("No JIRA events in the selected range.");
+  });
+});
+
+describe("importByEpic", () => {
+  const previewStory = (
+    overrides: Partial<EpicImportPreviewStory>
+  ): EpicImportPreviewStory => ({
+    jiraKey: "PONE-101",
+    jiraId: "10101",
+    summary: "Story under epic",
+    description: null,
+    jiraStatus: "To Do",
+    targetColumn: "todo",
+    alreadyImported: false,
+    ...overrides,
+  });
+
+  it("returns the preview message when the project isn't JIRA-linked / missing credentials", async () => {
+    const client = fakeClient({
+      previewEpicImport: async () => ({
+        stories: [],
+        message: "JIRA credentials not configured. Add them in project settings.",
+      }),
+    });
+
+    const result = await importByEpic(client, { projectId: "p1", epicKey: "PONE-1" });
+
+    expect(result.content[0].text).toBe(
+      "JIRA credentials not configured. Add them in project settings."
+    );
+  });
+
+  it("returns a clear message when the epic has no stories and no preview message", async () => {
+    const client = fakeClient({
+      previewEpicImport: async () => ({ stories: [] }),
+    });
+
+    const result = await importByEpic(client, { projectId: "p1", epicKey: "PONE-1" });
+
+    expect(result.content[0].text).toMatch(/no stories found for epic PONE-1/i);
+  });
+
+  it("returns a clear message when every story is already imported, without calling process", async () => {
+    const processEpicImportMock = vi.fn();
+    const client = fakeClient({
+      previewEpicImport: async () => ({
+        stories: [previewStory({ alreadyImported: true })],
+      }),
+      processEpicImport: processEpicImportMock as unknown as PonderClient["processEpicImport"],
+    });
+
+    const result = await importByEpic(client, { projectId: "p1", epicKey: "PONE-1" });
+
+    expect(result.content[0].text).toMatch(/already on the board/i);
+    expect(processEpicImportMock).not.toHaveBeenCalled();
+  });
+
+  it("imports not-yet-imported stories with breakDown applied uniformly, and reports counts", async () => {
+    const processEpicImportMock = vi.fn(async () => ({
+      storiesProcessed: 1,
+      storiesSkipped: 1,
+      workUnitsCreated: 3,
+    })) as unknown as PonderClient["processEpicImport"];
+    const client = fakeClient({
+      previewEpicImport: async () => ({
+        stories: [
+          previewStory({ jiraKey: "PONE-101", alreadyImported: false }),
+          previewStory({ jiraKey: "PONE-102", alreadyImported: true }),
+        ],
+      }),
+      processEpicImport: processEpicImportMock,
+    });
+
+    const result = await importByEpic(client, {
+      projectId: "p1",
+      epicKey: "PONE-1",
+      epicName: "Big epic",
+      breakDown: true,
+    });
+
+    expect(processEpicImportMock).toHaveBeenCalledWith(
+      "p1",
+      [
+        {
+          jiraKey: "PONE-101",
+          jiraId: "10101",
+          summary: "Story under epic",
+          description: null,
+          jiraStatus: "To Do",
+          jiraStatusCategory: undefined,
+          breakDown: true,
+        },
+      ],
+      "PONE-1",
+      "Big epic"
+    );
+    expect(result.content[0].text).toContain("1 processed");
+    expect(result.content[0].text).toContain("1 skipped");
+    expect(result.content[0].text).toContain("3 work unit(s) created");
+    expect(result.content[0].text).toContain("PONE-101");
   });
 });

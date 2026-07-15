@@ -208,4 +208,57 @@ describe("GET /api/stories", () => {
       await prisma.project.delete({ where: { id: project.id } });
     }
   });
+
+  it("serializes epicKey/epicName when present on the story, and null when absent", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Epic Field Test Project", type: "STANDALONE" },
+    });
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const withEpic = await prisma.story.create({
+      data: {
+        jiraKey: `EPICFIELD-${suffix}-1`,
+        jiraId: `EPICFIELD-${suffix}-1`,
+        projectKey: "EPICFIELD",
+        summary: "Story with epic",
+        jiraStatus: "To Do",
+        url: `https://example.atlassian.net/browse/EPICFIELD-${suffix}-1`,
+        lastSyncedAt: new Date(),
+        projectId: project.id,
+        epicKey: "EPICFIELD-100",
+        epicName: "The epic",
+      },
+    });
+    const withoutEpic = await prisma.story.create({
+      data: {
+        jiraKey: `EPICFIELD-${suffix}-2`,
+        jiraId: `EPICFIELD-${suffix}-2`,
+        projectKey: "EPICFIELD",
+        summary: "Story without epic",
+        jiraStatus: "To Do",
+        url: `https://example.atlassian.net/browse/EPICFIELD-${suffix}-2`,
+        lastSyncedAt: new Date(),
+        projectId: project.id,
+      },
+    });
+
+    try {
+      const req = new NextRequest(
+        `http://localhost:3000/api/stories?projectId=${project.id}`
+      );
+      const res = await GET(req);
+      const data = await res.json();
+
+      const foundWithEpic = data.find((s: { id: string }) => s.id === withEpic.id);
+      expect(foundWithEpic.epicKey).toBe("EPICFIELD-100");
+      expect(foundWithEpic.epicName).toBe("The epic");
+
+      const foundWithoutEpic = data.find((s: { id: string }) => s.id === withoutEpic.id);
+      expect(foundWithoutEpic.epicKey).toBeNull();
+      expect(foundWithoutEpic.epicName).toBeNull();
+    } finally {
+      await prisma.story.delete({ where: { id: withEpic.id } });
+      await prisma.story.delete({ where: { id: withoutEpic.id } });
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+  });
 });
