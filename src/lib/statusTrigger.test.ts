@@ -128,6 +128,7 @@ describe("applyStoryStatusSync", () => {
       uploadAttachment: vi.fn(async () => {}),
       consolidateAcceptanceCriteria: vi.fn(async () => ({ acceptanceCriteria: "", verification: "" })),
       readAttachmentFile: vi.fn(async () => Buffer.from("fake bytes")),
+      getIssueStatus: vi.fn(async () => ({ name: "To Do" })),
       ...overrides,
     };
   }
@@ -606,7 +607,9 @@ describe("transitionStoryToQA", () => {
   }
 
   function fakeQaDeps(
-    overrides: Partial<Pick<ApplyStoryStatusSyncDeps, "getTransitions" | "transitionIssue">> = {}
+    overrides: Partial<
+      Pick<ApplyStoryStatusSyncDeps, "getTransitions" | "transitionIssue" | "getIssueStatus">
+    > = {}
   ) {
     return {
       getTransitions: vi.fn(async (): Promise<JiraTransition[]> => [
@@ -614,6 +617,7 @@ describe("transitionStoryToQA", () => {
         { id: "3", name: "Code Revew", to: { name: "Code Revew", statusCategory: { key: "indeterminate" } } },
       ]),
       transitionIssue: vi.fn(async () => {}),
+      getIssueStatus: vi.fn(async () => ({ name: "Code Revew" })),
       ...overrides,
     };
   }
@@ -690,7 +694,7 @@ describe("transitionStoryToQA", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("returns an error when no QA transition is available from the story's current status", async () => {
+  it("returns an error when no QA transition is available and the issue isn't already in QA", async () => {
     const project = await makeJiraProject();
     const story = await makeStory({ projectId: project.id });
     await prisma.workUnit.create({
@@ -701,6 +705,7 @@ describe("transitionStoryToQA", () => {
       getTransitions: vi.fn(async (): Promise<JiraTransition[]> => [
         { id: "3", name: "Code Revew", to: { name: "Code Revew", statusCategory: { key: "indeterminate" } } },
       ]),
+      getIssueStatus: vi.fn(async () => ({ name: "Code Revew" })),
     });
     const result = await transitionStoryToQA(story.id, prisma, deps);
 
@@ -708,6 +713,33 @@ describe("transitionStoryToQA", () => {
     if (!result.ok) {
       expect(result.error).toMatch(/QA/);
     }
+    expect(deps.transitionIssue).not.toHaveBeenCalled();
+  });
+
+  it("treats an issue already sitting in QA as satisfied, without calling JIRA to transition it", async () => {
+    const project = await makeJiraProject();
+    const story = await makeStory({ projectId: project.id, jiraStatus: "Code Revew" });
+    const wu1 = await prisma.workUnit.create({
+      data: { storyId: story.id, title: "Task 1", column: "done", order: 0 },
+    });
+
+    const deps = fakeQaDeps({
+      // No "QA" transition offered — JIRA workflows don't self-transition.
+      getTransitions: vi.fn(async (): Promise<JiraTransition[]> => [
+        { id: "3", name: "Code Revew", to: { name: "Code Revew", statusCategory: { key: "indeterminate" } } },
+      ]),
+      getIssueStatus: vi.fn(async () => ({ name: "QA" })),
+    });
+    const result = await transitionStoryToQA(story.id, prisma, deps);
+
+    expect(result).toEqual({ ok: true });
+    expect(deps.transitionIssue).not.toHaveBeenCalled();
+
+    const updated = await prisma.story.findUnique({ where: { id: story.id } });
+    expect(updated?.jiraStatus).toBe("QA");
+
+    const updatedWu1 = await prisma.workUnit.findUnique({ where: { id: wu1.id } });
+    expect(updatedWu1?.archivedAt).not.toBeNull();
   });
 
   it("surfaces a JIRA API failure as an error result instead of throwing", async () => {
@@ -840,6 +872,7 @@ describe("reportWorkUnitToQA", () => {
       addComment: ApplyStoryStatusSyncDeps["addComment"];
       uploadAttachment: ApplyStoryStatusSyncDeps["uploadAttachment"];
       readAttachmentFile: ApplyStoryStatusSyncDeps["readAttachmentFile"];
+      getIssueStatus: ApplyStoryStatusSyncDeps["getIssueStatus"];
     }> = {}
   ) {
     return {
@@ -850,6 +883,7 @@ describe("reportWorkUnitToQA", () => {
       addComment: vi.fn(async () => {}),
       uploadAttachment: vi.fn(async () => {}),
       readAttachmentFile: vi.fn(async () => Buffer.from("fake-image-bytes")),
+      getIssueStatus: vi.fn(async () => ({ name: "Code Revew" })),
       ...overrides,
     };
   }

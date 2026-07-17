@@ -38,7 +38,7 @@ export function pickTransition(
  * Normalizes a JIRA status name for comparison, treating "Code Review" and
  * "Code Revew" (a common misspelling used by some workflows) as equivalent.
  */
-function normalizeStatusName(name: string): string {
+export function normalizeStatusName(name: string): string {
   return name.trim().toLowerCase().replace(/code revew/, "code review");
 }
 
