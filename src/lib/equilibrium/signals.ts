@@ -52,13 +52,7 @@ export async function getRigorScore(
   const withEvidence = movedToQa.filter((u) => {
     if (!u.verificationRequestedAt) return false;
     const qaAt = u.movedToQaReportedAt as Date;
-    // Allow attachments created within 1 second before or after the QA move
-    // to account for database timing and workflow variations
-    const qaTimeMs = qaAt.getTime();
-    return u.attachments.some((a) => {
-      const attachTimeMs = a.createdAt.getTime();
-      return attachTimeMs >= qaTimeMs - 1000 && attachTimeMs <= qaTimeMs + 1000;
-    });
+    return u.attachments.some((a) => a.createdAt <= qaAt);
   }).length;
   return Math.round((withEvidence / movedToQa.length) * 100);
 }

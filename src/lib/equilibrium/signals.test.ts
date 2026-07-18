@@ -203,12 +203,15 @@ describe("getRigorScore", () => {
           title: "Verified",
           column: "done",
           order: 0,
-          movedToQaReportedAt: new Date(),
           verificationRequestedAt: new Date(),
         },
       });
       await prisma.attachment.create({
         data: { workUnitId: unit.id, filename: "evidence.png", mimeType: "image/png", size: 100 },
+      });
+      await prisma.workUnit.update({
+        where: { id: unit.id },
+        data: { movedToQaReportedAt: new Date() },
       });
       expect(await getRigorScore(prisma)).toBe(100);
     } finally {
