@@ -26,6 +26,7 @@ vi.mock("@/lib/jira/writeback", () => ({
   getTransitions: vi.fn(),
   transitionIssue: vi.fn(),
   addComment: vi.fn(),
+  getIssueStatus: vi.fn(),
 }));
 
 import { uploadAttachment } from "@/lib/jira/writeback";

@@ -41,6 +41,38 @@ export async function getTransitions(
   return data.transitions;
 }
 
+/** An issue's current workflow status. */
+export type JiraIssueStatus = { name: string };
+
+/**
+ * Fetches an issue's current workflow status.
+ * GET `${siteUrl}/rest/api/3/issue/${issueKey}?fields=status`
+ * @throws Error if the request fails
+ */
+export async function getIssueStatus(
+  issueKey: string,
+  config: JiraConfig
+): Promise<JiraIssueStatus> {
+  const url = new URL(config.siteUrl);
+  url.pathname = `/rest/api/3/issue/${issueKey}`;
+  url.searchParams.set("fields", "status");
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: basicAuthHeader(config),
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`JIRA API error: ${response.status}`);
+  }
+
+  const data: { fields: { status: { name: string } } } = await response.json();
+  return { name: data.fields.status.name };
+}
+
 /**
  * Executes a workflow transition on an issue.
  * POST `${siteUrl}/rest/api/3/issue/${issueKey}/transitions` with body

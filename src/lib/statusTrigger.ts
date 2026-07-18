@@ -20,8 +20,9 @@ import {
   transitionIssue as defaultTransitionIssue,
   addComment as defaultAddComment,
   uploadAttachment as defaultUploadAttachment,
+  getIssueStatus as defaultGetIssueStatus,
 } from "@/lib/jira/writeback";
-import { pickTransitionByStatusName } from "@/lib/jira/transitions";
+import { pickTransitionByStatusName, normalizeStatusName } from "@/lib/jira/transitions";
 import { summarizeCompletedWork as defaultSummarizeCompletedWork } from "@/lib/anthropic/summarize";
 import { consolidateAcceptanceCriteria as defaultConsolidateAcceptanceCriteria } from "@/lib/anthropic/consolidateAcceptanceCriteria";
 import { readAttachmentFile as defaultReadAttachmentFile } from "@/lib/attachmentStorage";
@@ -89,6 +90,7 @@ export type ApplyStoryStatusSyncDeps = {
   uploadAttachment: typeof defaultUploadAttachment;
   consolidateAcceptanceCriteria: typeof defaultConsolidateAcceptanceCriteria;
   readAttachmentFile: typeof defaultReadAttachmentFile;
+  getIssueStatus: typeof defaultGetIssueStatus;
 };
 
 const defaultDeps: ApplyStoryStatusSyncDeps = {
@@ -99,6 +101,7 @@ const defaultDeps: ApplyStoryStatusSyncDeps = {
   uploadAttachment: defaultUploadAttachment,
   consolidateAcceptanceCriteria: defaultConsolidateAcceptanceCriteria,
   readAttachmentFile: defaultReadAttachmentFile,
+  getIssueStatus: defaultGetIssueStatus,
 };
 
 export type ApplyStoryStatusSyncResult = {
@@ -298,11 +301,20 @@ async function archiveDoneWorkUnits(storyId: string, prisma: PrismaClient): Prom
  *
  * Requires every one of the story's work units to be in the `done` column;
  * otherwise returns an error without calling JIRA at all.
+ *
+ * If JIRA has no "QA" transition available because the issue is already
+ * sitting in QA (e.g. someone moved it there directly in JIRA), this is
+ * treated as already satisfied: the local record is brought in sync and the
+ * work units are archived, but JIRA itself is left untouched — there is
+ * nothing to transition.
  */
 export async function transitionStoryToQA(
   storyId: string,
   prisma: PrismaClient,
-  deps: Pick<ApplyStoryStatusSyncDeps, "getTransitions" | "transitionIssue"> = defaultDeps
+  deps: Pick<
+    ApplyStoryStatusSyncDeps,
+    "getTransitions" | "transitionIssue" | "getIssueStatus"
+  > = defaultDeps
 ): Promise<TransitionStoryToQAResult> {
   const story = (await prisma.story.findUnique({
     where: { id: storyId },
@@ -338,13 +350,18 @@ export async function transitionStoryToQA(
     const transition = pickTransitionByStatusName(transitions, "QA");
 
     if (!transition) {
-      return {
-        ok: false,
-        error: `No "QA" transition available for ${story.jiraKey} from its current status`,
-      };
+      const currentStatus = await deps.getIssueStatus(story.jiraKey, config);
+      if (normalizeStatusName(currentStatus.name) !== normalizeStatusName("QA")) {
+        return {
+          ok: false,
+          error: `No "QA" transition available for ${story.jiraKey} from its current status`,
+        };
+      }
+      // Already in QA on the JIRA side — nothing to transition there, but
+      // the local record and work units still need to catch up.
+    } else {
+      await deps.transitionIssue(story.jiraKey, transition.id, config);
     }
-
-    await deps.transitionIssue(story.jiraKey, transition.id, config);
 
     await prisma.story.update({
       where: { id: storyId },
@@ -378,7 +395,12 @@ export async function reportWorkUnitToQA(
   prisma: PrismaClient,
   deps: Pick<
     ApplyStoryStatusSyncDeps,
-    "getTransitions" | "transitionIssue" | "addComment" | "uploadAttachment" | "readAttachmentFile"
+    | "getTransitions"
+    | "transitionIssue"
+    | "addComment"
+    | "uploadAttachment"
+    | "readAttachmentFile"
+    | "getIssueStatus"
   > = defaultDeps
 ): Promise<TransitionStoryToQAResult & { transitioned?: boolean }> {
   const workUnit = await prisma.workUnit.findUnique({

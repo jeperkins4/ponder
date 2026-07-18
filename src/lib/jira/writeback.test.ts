@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getTransitions, transitionIssue, addComment, uploadAttachment } from "./writeback";
+import { getTransitions, transitionIssue, addComment, uploadAttachment, getIssueStatus } from "./writeback";
 import type { JiraConfig } from "./client";
 
 describe("JIRA write-back client", () => {
@@ -105,6 +105,40 @@ describe("JIRA write-back client", () => {
       await expect(
         addComment("TEAM-1", "text", mockConfig)
       ).rejects.toThrow("JIRA API error: 500");
+    });
+  });
+
+  describe("getIssueStatus", () => {
+    it("GETs the issue with fields=status and returns its status name", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ fields: { status: { name: "QA" } } }),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const result = await getIssueStatus("TEAM-1", mockConfig);
+
+      expect(result).toEqual({ name: "QA" });
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toBe(
+        "https://example.atlassian.net/rest/api/3/issue/TEAM-1?fields=status"
+      );
+      expect(options.method).toBe("GET");
+      const authHeader = (options.headers as Record<string, string>).Authorization;
+      expect(authHeader).toMatch(/^Basic /);
+    });
+
+    it("throws on non-2xx response", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: false, status: 404 })
+      );
+
+      await expect(getIssueStatus("TEAM-1", mockConfig)).rejects.toThrow(
+        "JIRA API error: 404"
+      );
     });
   });
 
