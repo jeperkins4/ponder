@@ -13,7 +13,12 @@ ADD COLUMN     "reopenCount" INTEGER NOT NULL DEFAULT 0;
 -- AlterTable
 ALTER TABLE "WorkUnit" ADD COLUMN     "lastReopenedAt" TIMESTAMP(3),
 ADD COLUMN     "reopenCount" INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ADD COLUMN     "updatedAt" TIMESTAMP(3);
+
+-- Backfill existing rows before enforcing NOT NULL
+UPDATE "WorkUnit" SET "updatedAt" = "createdAt" WHERE "updatedAt" IS NULL;
+
+ALTER TABLE "WorkUnit" ALTER COLUMN "updatedAt" SET NOT NULL;
 
 -- CreateTable
 CREATE TABLE "MeterSnapshot" (

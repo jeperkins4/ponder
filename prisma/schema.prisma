@@ -66,7 +66,7 @@ model WorkUnit {
   order                   Int
   subNumber               Int? // stable 1-based decomposition suffix (e.g. COM-540-1); null = not decomposed, Ponder-local only, never sent to JIRA
   createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @default(now()) @updatedAt // drives the Equilibrium Meter's staleness axis
+  updatedAt               DateTime  @updatedAt // drives the Equilibrium Meter's staleness axis
   completedAt             DateTime?
   archivedAt              DateTime?
   movedToQaReportedAt     DateTime?
