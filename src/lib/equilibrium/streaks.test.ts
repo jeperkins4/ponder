@@ -131,19 +131,40 @@ describe("getBalanceStreak", () => {
   it("breaks at the most recent non-green snapshot", async () => {
     await prisma.meterSnapshot.create({
       data: {
-        date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
         decomposition: 90, rigor: 90, wip: 90, staleness: 90,
         churnEvents: 0, overall: 90, band: "equilibrium",
       },
     });
     await prisma.meterSnapshot.create({
       data: {
-        date: new Date(),
+        date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
         decomposition: 40, rigor: 40, wip: 40, staleness: 40,
         churnEvents: 5, overall: 40, band: "out",
       },
     });
     expect(await getBalanceStreak(prisma)).toBe(0);
+  });
+
+  it("excludes today's row from the streak regardless of its band, so the result cannot change based on whether today's snapshot has been created yet", async () => {
+    await prisma.meterSnapshot.create({
+      data: {
+        date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        decomposition: 85, rigor: 85, wip: 85, staleness: 85,
+        churnEvents: 0, overall: 85, band: "equilibrium",
+      },
+    });
+    // Today's row exists and is green, but must NOT count toward the streak
+    // — the streak reflects only completed prior days.
+    await prisma.meterSnapshot.create({
+      data: {
+        date: new Date(),
+        decomposition: 95, rigor: 95, wip: 95, staleness: 95,
+        churnEvents: 0, overall: 95, band: "equilibrium",
+      },
+    });
+    // Same result whether or not today's row exists.
+    expect(await getBalanceStreak(prisma)).toBe(1);
   });
 });
 

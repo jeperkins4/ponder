@@ -14,8 +14,8 @@ import type { EquilibriumPayload } from "@/lib/equilibrium/types";
 
 export async function GET() {
   try {
-    const streaks = await getStreaks(prisma);
     const snapshot = await getTodaysSnapshot(prisma);
+    const streaks = await getStreaks(prisma);
     await checkAndAwardBadges(prisma, snapshot, streaks);
     const [badges, history] = await Promise.all([
       getBadgeStatus(prisma),

@@ -51,4 +51,14 @@ describe("GET /api/equilibrium", () => {
     const rows = await prisma.meterSnapshot.findMany();
     expect(rows).toHaveLength(1);
   });
+
+  it("returns the same balanceStreak on the first and second call of the day (order-independent, not a call-count artifact)", async () => {
+    const res1 = await GET();
+    const body1 = await res1.json();
+
+    const res2 = await GET();
+    const body2 = await res2.json();
+
+    expect(body2.streaks.balanceStreak).toBe(body1.streaks.balanceStreak);
+  });
 });
