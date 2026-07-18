@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "@/hooks/useTheme";
+import EquilibriumMeterWidget from "@/components/EquilibriumMeterWidget";
 
 /**
  * Global top navigation bar with the Ponder brand mark in the upper-left.
@@ -55,6 +56,7 @@ export default function TopNav() {
 
         {/* Nav links + theme toggle */}
         <div className="flex items-center gap-1">
+          <EquilibriumMeterWidget />
           {links.map((link) => {
             const active =
               pathname === link.href || pathname.startsWith(`${link.href}/`);

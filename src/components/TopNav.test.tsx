@@ -13,6 +13,22 @@ describe("TopNav", () => {
   beforeEach(() => {
     mockPathname = "/projects";
     localStorage.clear();
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            overall: 100,
+            band: "equilibrium",
+            axes: { decomposition: 100, rigor: 100, wip: 100, staleness: 100 },
+            churnEvents: 0,
+            churnDamper: 1,
+            streaks: { rigorStreak: 0, balanceStreak: 0 },
+            badges: [],
+            history: [],
+          }),
+      })
+    ) as unknown as typeof fetch;
   });
 
   it("renders the Ponder brand mark linking home", () => {
@@ -56,6 +72,11 @@ describe("TopNav", () => {
     expect(
       screen.getByRole("navigation", { name: /primary/i })
     ).toBeInTheDocument();
+  });
+
+  it("renders the Equilibrium Meter widget once it loads", async () => {
+    render(<TopNav />);
+    expect(await screen.findByText("100")).toBeInTheDocument();
   });
 
   it("toggles the theme and persists the preference", () => {
