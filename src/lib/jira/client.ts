@@ -35,8 +35,25 @@ type JiraIssue = {
       name: string;
       statusCategory?: { key: string };
     };
+    issuelinks?: JiraIssueLink[];
   };
 };
+
+/** Minimal shape of a JIRA issue link — only the linked issue's key is
+ * needed to detect follow-up stories referencing this one. */
+type JiraIssueLink = {
+  inwardIssue?: { key: string };
+  outwardIssue?: { key: string };
+};
+
+/** JIRA issue links come in two directions (inward/outward); either side may
+ * carry the linked issue depending on the link type. */
+function extractLinkedKeys(issuelinks: JiraIssueLink[] | undefined): string[] {
+  if (!issuelinks) return [];
+  return issuelinks
+    .map((link) => link.inwardIssue?.key ?? link.outwardIssue?.key)
+    .filter((key): key is string => !!key);
+}
 
 /**
  * JIRA enhanced-search (`/rest/api/3/search/jql`) response.
@@ -87,13 +104,14 @@ function issueToStoryDTO(issue: JiraIssue, siteUrl: string): StoryDTO {
     url: `${siteUrl}/browse/${issue.key}`,
     lastSyncedAt: new Date().toISOString(),
     completionCommentPostedAt: null,
+    linkedIssueKeys: extractLinkedKeys(issue.fields.issuelinks),
     workUnits: [],
   };
 }
 
 // Fields we need from each issue. The enhanced search endpoint returns only
 // `id`/`key` unless `fields` is requested explicitly, so this must be sent.
-const SEARCH_FIELDS = "summary,description,status";
+const SEARCH_FIELDS = "summary,description,status,issuelinks";
 const SEARCH_PAGE_SIZE = 100;
 // Safety bound so a misbehaving pagination token can never loop forever.
 const MAX_SEARCH_PAGES = 1000;

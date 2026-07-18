@@ -62,8 +62,49 @@ describe("JIRA API Client", () => {
       const url = mockFetch.mock.calls[0][0] as string;
       expect(url).toContain("/rest/api/3/search/jql");
       // The enhanced endpoint returns only id/key unless fields is requested.
-      expect(url).toContain("fields=summary%2Cdescription%2Cstatus");
+      expect(url).toContain("fields=summary%2Cdescription%2Cstatus%2Cissuelinks");
       expect(url).toContain("maxResults=");
+    });
+
+    it("extracts linked issue keys from issuelinks onto the StoryDTO", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          issues: [
+            {
+              id: "10001",
+              key: "TEAM-1",
+              fields: {
+                summary: "Issue 1",
+                description: null,
+                status: { name: "Code Revew", statusCategory: { key: "indeterminate" } },
+                issuelinks: [
+                  { outwardIssue: { key: "TEAM-2" } },
+                  { inwardIssue: { key: "TEAM-3" } },
+                  {}, // a link type this app doesn't need to understand
+                ],
+              },
+            },
+          ],
+        }),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const [story] = await fetchStoriesForProject("TEAM", mockConfig);
+
+      expect(story.linkedIssueKeys).toEqual(["TEAM-2", "TEAM-3"]);
+    });
+
+    it("defaults linkedIssueKeys to an empty array when issuelinks is absent", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ issues: [makeIssue(1)] }),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const [story] = await fetchStoriesForProject("TEAM", mockConfig);
+
+      expect(story.linkedIssueKeys).toEqual([]);
     });
 
     it("walks every page using nextPageToken and returns all issues", async () => {

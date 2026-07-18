@@ -83,30 +83,63 @@ export async function syncStoriesForProject(
   let created = 0;
   let updated = 0;
 
+  type ExistingStoryRow = {
+    jiraKey: string;
+    jiraStatus: string;
+    linkedFollowUpKeys: string | null;
+    completionCommentPostedAt: Date | null;
+  };
+
   // Existing stories are resolved once, up front, instead of a per-story
   // findUnique — halves the round trips (N upserts instead of N finds + N
   // create/update) and mirrors the batch-then-upsert pattern already used
   // by the import/process route (see findAlreadyImportedKeys). Also carries
-  // jiraStatus so this loop can detect status regressions (a churn signal
-  // for the Equilibrium Meter) without a second query.
+  // the fields this loop needs to detect two Equilibrium Meter churn
+  // signals without extra queries: jiraStatus (regression) and
+  // linkedFollowUpKeys/completionCommentPostedAt (new follow-up links).
   const jiraKeys = stories.map((story) => story.jiraKey);
   const existingByKey =
     jiraKeys.length > 0
-      ? new Map(
+      ? new Map<string, ExistingStoryRow>(
           (
             await prismaClient.story.findMany({
               where: { jiraKey: { in: jiraKeys } },
-              select: { jiraKey: true, jiraStatus: true },
+              select: {
+                jiraKey: true,
+                jiraStatus: true,
+                linkedFollowUpKeys: true,
+                completionCommentPostedAt: true,
+              },
             })
           ).map((s) => [s.jiraKey, s])
         )
-      : new Map<string, { jiraKey: string; jiraStatus: string }>();
+      : new Map<string, ExistingStoryRow>();
 
   for (const story of stories) {
     const existing = existingByKey.get(story.jiraKey);
     const isRegression = existing
       ? isStatusRegression(existing.jiraStatus, story.jiraStatus)
       : false;
+
+    // A story only accrues "linked follow-up" churn once it has already
+    // shipped (completionCommentPostedAt set) — a link on a story still in
+    // progress is normal cross-referencing, not fallout. Any key present
+    // now that wasn't in the stored list is treated as newly observed;
+    // there's no per-key timestamp, so all of a story's linked keys share
+    // one lastLinkedFollowUpAt whenever a new one shows up.
+    const previouslySeenKeys = new Set(
+      (existing?.linkedFollowUpKeys ?? "")
+        .split(",")
+        .map((k) => k.trim())
+        .filter(Boolean)
+    );
+    const newlyLinkedKeys = existing?.completionCommentPostedAt
+      ? (story.linkedIssueKeys ?? []).filter((key) => !previouslySeenKeys.has(key))
+      : [];
+    const mergedLinkedKeys =
+      newlyLinkedKeys.length > 0
+        ? [...previouslySeenKeys, ...newlyLinkedKeys].join(",")
+        : undefined;
 
     const fields = {
       jiraId: story.jiraId,
@@ -132,6 +165,9 @@ export async function syncStoriesForProject(
         // whether the miss was technical or a scoping problem.
         ...(isRegression
           ? { reopenCount: { increment: 1 }, lastReopenedAt: new Date() }
+          : {}),
+        ...(mergedLinkedKeys !== undefined
+          ? { linkedFollowUpKeys: mergedLinkedKeys, lastLinkedFollowUpAt: new Date() }
           : {}),
       },
     });

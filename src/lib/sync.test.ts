@@ -175,7 +175,12 @@ describe("syncStoriesForProject", () => {
     );
     expect(mockPrisma.story.findMany).toHaveBeenCalledWith({
       where: { jiraKey: { in: ["TEAM-1"] } },
-      select: { jiraKey: true, jiraStatus: true },
+      select: {
+        jiraKey: true,
+        jiraStatus: true,
+        linkedFollowUpKeys: true,
+        completionCommentPostedAt: true,
+      },
     });
     expect(mockPrisma.story.upsert).toHaveBeenCalledWith({
       where: { jiraKey: "TEAM-1" },
@@ -235,7 +240,7 @@ describe("syncStoriesForProject", () => {
 
     mockFetchStoriesForProject.mockResolvedValueOnce(stories);
     mockPrisma.story.findMany.mockResolvedValueOnce([
-      { jiraKey: "TEAM-1", jiraStatus: "To Do" },
+      { jiraKey: "TEAM-1", jiraStatus: "To Do", linkedFollowUpKeys: null, completionCommentPostedAt: null },
     ]);
     mockPrisma.story.upsert.mockResolvedValueOnce({});
 
@@ -302,7 +307,7 @@ describe("syncStoriesForProject", () => {
 
     mockFetchStoriesForProject.mockResolvedValueOnce(stories);
     mockPrisma.story.findMany.mockResolvedValueOnce([
-      { jiraKey: "TEAM-1", jiraStatus: "QA" },
+      { jiraKey: "TEAM-1", jiraStatus: "QA", linkedFollowUpKeys: null, completionCommentPostedAt: null },
     ]);
     mockPrisma.story.upsert.mockResolvedValueOnce({});
 
@@ -342,7 +347,7 @@ describe("syncStoriesForProject", () => {
 
     mockFetchStoriesForProject.mockResolvedValueOnce(stories);
     mockPrisma.story.findMany.mockResolvedValueOnce([
-      { jiraKey: "TEAM-1", jiraStatus: "In Progress" },
+      { jiraKey: "TEAM-1", jiraStatus: "In Progress", linkedFollowUpKeys: null, completionCommentPostedAt: null },
     ]);
     mockPrisma.story.upsert.mockResolvedValueOnce({});
 
@@ -389,6 +394,143 @@ describe("syncStoriesForProject", () => {
     const call = mockPrisma.story.upsert.mock.calls[0][0];
     expect(call.update.reopenCount).toBeUndefined();
     expect(call.create.reopenCount).toBeUndefined();
+  });
+
+  it("records a newly-linked follow-up key on a story that already shipped", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({
+      id: "proj-8",
+      name: "Team Project",
+      type: "JIRA",
+      jiraProjectKey: "TEAM",
+      jiraSiteUrl: "https://example.atlassian.net",
+      jiraEmail: "team@example.com",
+      jiraApiToken: "secret-token",
+    });
+
+    const stories: StoryDTO[] = [
+      {
+        id: "story-1",
+        jiraKey: "TEAM-1",
+        jiraId: "10000",
+        projectKey: "TEAM",
+        summary: "Shipped story with new fallout",
+        description: null,
+        jiraStatus: "Code Revew",
+        url: "https://example.com/browse/TEAM-1",
+        lastSyncedAt: "2024-01-04T00:00:00.000Z",
+        completionCommentPostedAt: null,
+        linkedIssueKeys: ["TEAM-2"],
+        workUnits: [],
+      },
+    ];
+
+    mockFetchStoriesForProject.mockResolvedValueOnce(stories);
+    mockPrisma.story.findMany.mockResolvedValueOnce([
+      {
+        jiraKey: "TEAM-1",
+        jiraStatus: "Code Revew",
+        linkedFollowUpKeys: null,
+        completionCommentPostedAt: new Date("2024-01-01T00:00:00.000Z"),
+      },
+    ]);
+    mockPrisma.story.upsert.mockResolvedValueOnce({});
+
+    await syncStoriesForProject("proj-8", mockPrisma as unknown as PrismaClient);
+
+    const call = mockPrisma.story.upsert.mock.calls[0][0];
+    expect(call.update.linkedFollowUpKeys).toBe("TEAM-2");
+    expect(call.update.lastLinkedFollowUpAt).toBeInstanceOf(Date);
+  });
+
+  it("does not record a linked key already seen before", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({
+      id: "proj-9",
+      name: "Team Project",
+      type: "JIRA",
+      jiraProjectKey: "TEAM",
+      jiraSiteUrl: "https://example.atlassian.net",
+      jiraEmail: "team@example.com",
+      jiraApiToken: "secret-token",
+    });
+
+    const stories: StoryDTO[] = [
+      {
+        id: "story-1",
+        jiraKey: "TEAM-1",
+        jiraId: "10000",
+        projectKey: "TEAM",
+        summary: "Shipped story, same link as before",
+        description: null,
+        jiraStatus: "Code Revew",
+        url: "https://example.com/browse/TEAM-1",
+        lastSyncedAt: "2024-01-04T00:00:00.000Z",
+        completionCommentPostedAt: null,
+        linkedIssueKeys: ["TEAM-2"],
+        workUnits: [],
+      },
+    ];
+
+    mockFetchStoriesForProject.mockResolvedValueOnce(stories);
+    mockPrisma.story.findMany.mockResolvedValueOnce([
+      {
+        jiraKey: "TEAM-1",
+        jiraStatus: "Code Revew",
+        linkedFollowUpKeys: "TEAM-2",
+        completionCommentPostedAt: new Date("2024-01-01T00:00:00.000Z"),
+      },
+    ]);
+    mockPrisma.story.upsert.mockResolvedValueOnce({});
+
+    await syncStoriesForProject("proj-9", mockPrisma as unknown as PrismaClient);
+
+    const call = mockPrisma.story.upsert.mock.calls[0][0];
+    expect(call.update.linkedFollowUpKeys).toBeUndefined();
+    expect(call.update.lastLinkedFollowUpAt).toBeUndefined();
+  });
+
+  it("does not record a linked key on a story that has not shipped yet", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({
+      id: "proj-10",
+      name: "Team Project",
+      type: "JIRA",
+      jiraProjectKey: "TEAM",
+      jiraSiteUrl: "https://example.atlassian.net",
+      jiraEmail: "team@example.com",
+      jiraApiToken: "secret-token",
+    });
+
+    const stories: StoryDTO[] = [
+      {
+        id: "story-1",
+        jiraKey: "TEAM-1",
+        jiraId: "10000",
+        projectKey: "TEAM",
+        summary: "In-progress story with a cross-reference",
+        description: null,
+        jiraStatus: "In Progress",
+        url: "https://example.com/browse/TEAM-1",
+        lastSyncedAt: "2024-01-04T00:00:00.000Z",
+        completionCommentPostedAt: null,
+        linkedIssueKeys: ["TEAM-2"],
+        workUnits: [],
+      },
+    ];
+
+    mockFetchStoriesForProject.mockResolvedValueOnce(stories);
+    mockPrisma.story.findMany.mockResolvedValueOnce([
+      {
+        jiraKey: "TEAM-1",
+        jiraStatus: "In Progress",
+        linkedFollowUpKeys: null,
+        completionCommentPostedAt: null,
+      },
+    ]);
+    mockPrisma.story.upsert.mockResolvedValueOnce({});
+
+    await syncStoriesForProject("proj-10", mockPrisma as unknown as PrismaClient);
+
+    const call = mockPrisma.story.upsert.mock.calls[0][0];
+    expect(call.update.linkedFollowUpKeys).toBeUndefined();
   });
 });
 
