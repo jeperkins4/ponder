@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchStoriesForProject, type JiraConfig } from "@/lib/jira/client";
 import { applyPrGatedCompletion } from "@/lib/github/prGatedCompletion";
 import { parseSyncStatuses } from "@/lib/jira/jql";
+import { isStatusRegression } from "@/lib/jira/statusStage";
 
 /**
  * Result of a project-aware sync operation. `message` is populated (and
@@ -82,24 +83,31 @@ export async function syncStoriesForProject(
   let created = 0;
   let updated = 0;
 
-  // Existing keys are resolved once, up front, instead of a per-story
+  // Existing stories are resolved once, up front, instead of a per-story
   // findUnique — halves the round trips (N upserts instead of N finds + N
   // create/update) and mirrors the batch-then-upsert pattern already used
-  // by the import/process route (see findAlreadyImportedKeys).
+  // by the import/process route (see findAlreadyImportedKeys). Also carries
+  // jiraStatus so this loop can detect status regressions (a churn signal
+  // for the Equilibrium Meter) without a second query.
   const jiraKeys = stories.map((story) => story.jiraKey);
-  const existingKeys =
+  const existingByKey =
     jiraKeys.length > 0
-      ? new Set(
+      ? new Map(
           (
             await prismaClient.story.findMany({
               where: { jiraKey: { in: jiraKeys } },
-              select: { jiraKey: true },
+              select: { jiraKey: true, jiraStatus: true },
             })
-          ).map((s) => s.jiraKey)
+          ).map((s) => [s.jiraKey, s])
         )
-      : new Set<string>();
+      : new Map<string, { jiraKey: string; jiraStatus: string }>();
 
   for (const story of stories) {
+    const existing = existingByKey.get(story.jiraKey);
+    const isRegression = existing
+      ? isStatusRegression(existing.jiraStatus, story.jiraStatus)
+      : false;
+
     const fields = {
       jiraId: story.jiraId,
       projectKey: story.projectKey,
@@ -117,10 +125,18 @@ export async function syncStoriesForProject(
     await prismaClient.story.upsert({
       where: { jiraKey: story.jiraKey },
       create: { jiraKey: story.jiraKey, ...fields },
-      update: fields,
+      update: {
+        ...fields,
+        // Status regressions (e.g. QA -> In Progress after a JIRA reopen)
+        // are a churn signal for the Equilibrium Meter, regardless of
+        // whether the miss was technical or a scoping problem.
+        ...(isRegression
+          ? { reopenCount: { increment: 1 }, lastReopenedAt: new Date() }
+          : {}),
+      },
     });
 
-    if (existingKeys.has(story.jiraKey)) {
+    if (existing) {
       updated++;
     } else {
       created++;

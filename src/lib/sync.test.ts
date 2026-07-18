@@ -175,7 +175,7 @@ describe("syncStoriesForProject", () => {
     );
     expect(mockPrisma.story.findMany).toHaveBeenCalledWith({
       where: { jiraKey: { in: ["TEAM-1"] } },
-      select: { jiraKey: true },
+      select: { jiraKey: true, jiraStatus: true },
     });
     expect(mockPrisma.story.upsert).toHaveBeenCalledWith({
       where: { jiraKey: "TEAM-1" },
@@ -234,7 +234,9 @@ describe("syncStoriesForProject", () => {
     ];
 
     mockFetchStoriesForProject.mockResolvedValueOnce(stories);
-    mockPrisma.story.findMany.mockResolvedValueOnce([{ jiraKey: "TEAM-1" }]);
+    mockPrisma.story.findMany.mockResolvedValueOnce([
+      { jiraKey: "TEAM-1", jiraStatus: "To Do" },
+    ]);
     mockPrisma.story.upsert.mockResolvedValueOnce({});
 
     const result = await syncStoriesForProject(
@@ -269,6 +271,124 @@ describe("syncStoriesForProject", () => {
       },
     });
     expect(result).toEqual({ created: 0, updated: 1 });
+  });
+
+  it("increments Story.reopenCount and stamps lastReopenedAt when jiraStatus regresses", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({
+      id: "proj-5",
+      name: "Team Project",
+      type: "JIRA",
+      jiraProjectKey: "TEAM",
+      jiraSiteUrl: "https://example.atlassian.net",
+      jiraEmail: "team@example.com",
+      jiraApiToken: "secret-token",
+    });
+
+    const stories: StoryDTO[] = [
+      {
+        id: "story-1",
+        jiraKey: "TEAM-1",
+        jiraId: "10000",
+        projectKey: "TEAM",
+        summary: "Reopened story",
+        description: null,
+        jiraStatus: "In Progress",
+        url: "https://example.com/browse/TEAM-1",
+        lastSyncedAt: "2024-01-03T00:00:00.000Z",
+        completionCommentPostedAt: null,
+        workUnits: [],
+      },
+    ];
+
+    mockFetchStoriesForProject.mockResolvedValueOnce(stories);
+    mockPrisma.story.findMany.mockResolvedValueOnce([
+      { jiraKey: "TEAM-1", jiraStatus: "QA" },
+    ]);
+    mockPrisma.story.upsert.mockResolvedValueOnce({});
+
+    await syncStoriesForProject("proj-5", mockPrisma as unknown as PrismaClient);
+
+    const call = mockPrisma.story.upsert.mock.calls[0][0];
+    expect(call.update.reopenCount).toEqual({ increment: 1 });
+    expect(call.update.lastReopenedAt).toBeInstanceOf(Date);
+  });
+
+  it("does not increment Story.reopenCount when jiraStatus advances", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({
+      id: "proj-6",
+      name: "Team Project",
+      type: "JIRA",
+      jiraProjectKey: "TEAM",
+      jiraSiteUrl: "https://example.atlassian.net",
+      jiraEmail: "team@example.com",
+      jiraApiToken: "secret-token",
+    });
+
+    const stories: StoryDTO[] = [
+      {
+        id: "story-1",
+        jiraKey: "TEAM-1",
+        jiraId: "10000",
+        projectKey: "TEAM",
+        summary: "Advancing story",
+        description: null,
+        jiraStatus: "QA",
+        url: "https://example.com/browse/TEAM-1",
+        lastSyncedAt: "2024-01-03T00:00:00.000Z",
+        completionCommentPostedAt: null,
+        workUnits: [],
+      },
+    ];
+
+    mockFetchStoriesForProject.mockResolvedValueOnce(stories);
+    mockPrisma.story.findMany.mockResolvedValueOnce([
+      { jiraKey: "TEAM-1", jiraStatus: "In Progress" },
+    ]);
+    mockPrisma.story.upsert.mockResolvedValueOnce({});
+
+    await syncStoriesForProject("proj-6", mockPrisma as unknown as PrismaClient);
+
+    const call = mockPrisma.story.upsert.mock.calls[0][0];
+    expect(call.update.reopenCount).toBeUndefined();
+    expect(call.update.lastReopenedAt).toBeUndefined();
+  });
+
+  it("does not increment reopenCount for a newly created story", async () => {
+    mockPrisma.project.findUnique.mockResolvedValueOnce({
+      id: "proj-7",
+      name: "Team Project",
+      type: "JIRA",
+      jiraProjectKey: "TEAM",
+      jiraSiteUrl: "https://example.atlassian.net",
+      jiraEmail: "team@example.com",
+      jiraApiToken: "secret-token",
+    });
+
+    const stories: StoryDTO[] = [
+      {
+        id: "story-1",
+        jiraKey: "TEAM-9",
+        jiraId: "10009",
+        projectKey: "TEAM",
+        summary: "Brand new story",
+        description: null,
+        jiraStatus: "To Do",
+        url: "https://example.com/browse/TEAM-9",
+        lastSyncedAt: "2024-01-03T00:00:00.000Z",
+        completionCommentPostedAt: null,
+        workUnits: [],
+      },
+    ];
+
+    mockFetchStoriesForProject.mockResolvedValueOnce(stories);
+    mockPrisma.story.findMany.mockResolvedValueOnce([]);
+    mockPrisma.story.upsert.mockResolvedValueOnce({});
+
+    await syncStoriesForProject("proj-7", mockPrisma as unknown as PrismaClient);
+
+    const call = mockPrisma.story.upsert.mock.calls[0][0];
+    expect(call.update.reopenCount).toBeUndefined();
+    expect(call.create.reopenCount).toBeUndefined();
   });
 });
 
