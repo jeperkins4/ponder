@@ -95,4 +95,52 @@ describe("moveWorkUnitColumn", () => {
       await cleanup(story.id);
     }
   });
+
+  it("increments reopenCount and stamps lastReopenedAt on a backward move", async () => {
+    const { story, unit } = await createStoryWithUnit("code_review");
+    try {
+      const before = Date.now();
+      const moved = await moveWorkUnitColumn(unit.id, "in_progress", 0, prisma);
+      expect(moved.reopenCount).toBe(1);
+      expect(moved.lastReopenedAt).not.toBeNull();
+      expect((moved.lastReopenedAt as Date).getTime()).toBeGreaterThanOrEqual(before);
+    } finally {
+      await cleanup(story.id);
+    }
+  });
+
+  it("does not increment reopenCount on a forward move", async () => {
+    const { story, unit } = await createStoryWithUnit("todo");
+    try {
+      const moved = await moveWorkUnitColumn(unit.id, "in_progress", 0, prisma);
+      expect(moved.reopenCount).toBe(0);
+      expect(moved.lastReopenedAt).toBeNull();
+    } finally {
+      await cleanup(story.id);
+    }
+  });
+
+  it("does not increment reopenCount on a same-column reorder", async () => {
+    const { story, unit } = await createStoryWithUnit("in_progress");
+    try {
+      const moved = await moveWorkUnitColumn(unit.id, "in_progress", 5, prisma);
+      expect(moved.reopenCount).toBe(0);
+      expect(moved.lastReopenedAt).toBeNull();
+    } finally {
+      await cleanup(story.id);
+    }
+  });
+
+  it("accumulates reopenCount across multiple backward moves", async () => {
+    const { story, unit } = await createStoryWithUnit("done", new Date());
+    try {
+      await moveWorkUnitColumn(unit.id, "todo", 0, prisma);
+      const movedAgain = await moveWorkUnitColumn(unit.id, "in_progress", 0, prisma);
+      const backAgain = await moveWorkUnitColumn(unit.id, "done", 0, prisma);
+      const secondRegression = await moveWorkUnitColumn(backAgain.id, "todo", 0, prisma);
+      expect(secondRegression.reopenCount).toBe(2);
+    } finally {
+      await cleanup(story.id);
+    }
+  });
 });
