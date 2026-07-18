@@ -135,7 +135,7 @@ describe("moveWorkUnitColumn", () => {
     const { story, unit } = await createStoryWithUnit("done", new Date());
     try {
       await moveWorkUnitColumn(unit.id, "todo", 0, prisma);
-      const movedAgain = await moveWorkUnitColumn(unit.id, "in_progress", 0, prisma);
+      await moveWorkUnitColumn(unit.id, "in_progress", 0, prisma);
       const backAgain = await moveWorkUnitColumn(unit.id, "done", 0, prisma);
       const secondRegression = await moveWorkUnitColumn(backAgain.id, "todo", 0, prisma);
       expect(secondRegression.reopenCount).toBe(2);
