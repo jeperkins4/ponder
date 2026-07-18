@@ -41,6 +41,10 @@ model Story {
   url                       String
   lastSyncedAt              DateTime
   completionCommentPostedAt DateTime?
+  reopenCount               Int       @default(0) // times jiraStatus regressed to an earlier workflow stage (Equilibrium Meter churn signal)
+  lastReopenedAt            DateTime?
+  linkedFollowUpKeys        String?   // comma-separated JIRA keys of issues linking back to this story, first observed after it shipped
+  lastLinkedFollowUpAt      DateTime?
   projectId                 String?
   project                   Project?   @relation(fields: [projectId], references: [id])
   workUnits                 WorkUnit[]
@@ -62,6 +66,7 @@ model WorkUnit {
   order                   Int
   subNumber               Int? // stable 1-based decomposition suffix (e.g. COM-540-1); null = not decomposed, Ponder-local only, never sent to JIRA
   createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @default(now()) @updatedAt // drives the Equilibrium Meter's staleness axis
   completedAt             DateTime?
   archivedAt              DateTime?
   movedToQaReportedAt     DateTime?
@@ -69,6 +74,8 @@ model WorkUnit {
   verifiedAt              DateTime?
   verificationOutcome     String?
   verificationSummary     String?
+  reopenCount             Int       @default(0) // times moved backward through columns after advancing (Equilibrium Meter churn signal)
+  lastReopenedAt          DateTime?
 
   workNotes   WorkNote[]
   attachments Attachment[]
@@ -98,4 +105,23 @@ model Attachment {
   createdAt      DateTime  @default(now())
 
   @@index([workUnitId])
+}
+
+model MeterSnapshot {
+  id            String   @id @default(cuid())
+  date          DateTime @unique // day granularity (UTC midnight)
+  decomposition Int
+  rigor         Int
+  wip           Int
+  staleness     Int
+  churnEvents   Int
+  overall       Int
+  band          String   // "equilibrium" | "drifting" | "out"
+  createdAt     DateTime @default(now())
+}
+
+model Badge {
+  id       String   @id @default(cuid())
+  key      String   @unique
+  earnedAt DateTime @default(now())
 }
