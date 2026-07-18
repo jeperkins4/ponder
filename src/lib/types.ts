@@ -61,6 +61,10 @@ export interface StoryDTO {
   /** JIRA statusCategory key; present only on DTOs from the JIRA fetch path
    * (import/sync). Local API serializers never set it. */
   jiraStatusCategory?: "new" | "indeterminate" | "done";
+  /** JIRA keys of issues linked to this one — present only on DTOs from the
+   * JIRA fetch path (sync). Used to detect follow-up stories/bugs created
+   * after this story shipped, a churn signal for the Equilibrium Meter. */
+  linkedIssueKeys?: string[];
   url: string;
   lastSyncedAt: string; // ISO string
   completionCommentPostedAt: string | null; // ISO string
